@@ -1,0 +1,85 @@
+export const ErrorCode = {
+  // 通用错误码 (90xxx)
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  MISSING_PARAMETER: 'MISSING_PARAMETER',
+  PARAM_FORMAT_ERROR: 'PARAM_FORMAT_ERROR',
+  RESOURCE_NOT_FOUND: 'RESOURCE_NOT_FOUND',
+  DUPLICATE_SUBMISSION: 'DUPLICATE_SUBMISSION',
+  AUTHENTICATION_FAILED: 'AUTHENTICATION_FAILED',
+  PERMISSION_DENIED: 'PERMISSION_DENIED',
+  REQUEST_TIMEOUT: 'REQUEST_TIMEOUT',
+  SYSTEM_ERROR: 'SYSTEM_ERROR',
+  EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+
+  // 编码生成模块 (10xxx)
+  DICT_LOAD_FAILED: 'DICT_LOAD_FAILED',
+  CONDITION_INCOMPLETE: 'CONDITION_INCOMPLETE',
+  NO_MATCHING_CODE: 'NO_MATCHING_CODE',
+  GENERATE_LIMIT_EXCEEDED: 'GENERATE_LIMIT_EXCEEDED',
+  DRAFT_FULL: 'DRAFT_FULL',
+  DRAFT_SAVE_FAILED: 'DRAFT_SAVE_FAILED',
+  EXPORT_FAILED: 'EXPORT_FAILED',
+
+  // 编码校验模块 (20xxx)
+  VALIDATE_LIST_EMPTY: 'VALIDATE_LIST_EMPTY',
+  VALIDATE_LIMIT_EXCEEDED: 'VALIDATE_LIMIT_EXCEEDED',
+  FILE_FORMAT_ERROR: 'FILE_FORMAT_ERROR',
+  FILE_SIZE_EXCEEDED: 'FILE_SIZE_EXCEEDED',
+  VALIDATE_SERVICE_ERROR: 'VALIDATE_SERVICE_ERROR',
+  CORRECTION_NO_MATCH: 'CORRECTION_NO_MATCH',
+  BATCH_CORRECT_FAILED: 'BATCH_CORRECT_FAILED',
+  RESULT_EXPORT_FAILED: 'RESULT_EXPORT_FAILED',
+
+  // 统计分析模块 (30xxx)
+  IMPORT_FILE_FORMAT_ERROR: 'IMPORT_FILE_FORMAT_ERROR',
+  IMPORT_FILE_SIZE_EXCEEDED: 'IMPORT_FILE_SIZE_EXCEEDED',
+  IMPORT_DATA_EMPTY: 'IMPORT_DATA_EMPTY',
+  IMPORT_FIELD_MISMATCH: 'IMPORT_FIELD_MISMATCH',
+  IMPORT_LIMIT_EXCEEDED: 'IMPORT_LIMIT_EXCEEDED',
+  IMPORT_TIMEOUT: 'IMPORT_TIMEOUT',
+  STATISTICS_EMPTY: 'STATISTICS_EMPTY',
+  CHART_RENDER_ERROR: 'CHART_RENDER_ERROR',
+  REPORT_EXPORT_FAILED: 'REPORT_EXPORT_FAILED',
+} as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+export const ErrorMessage: Record<ErrorCode, string> = {
+  [ErrorCode.VALIDATION_ERROR]: '参数校验失败',
+  [ErrorCode.MISSING_PARAMETER]: '请填写必填参数：{field}',
+  [ErrorCode.PARAM_FORMAT_ERROR]: '参数{field}格式不正确',
+  [ErrorCode.RESOURCE_NOT_FOUND]: '请求的资源不存在',
+  [ErrorCode.DUPLICATE_SUBMISSION]: '请勿重复提交',
+  [ErrorCode.AUTHENTICATION_FAILED]: '未登录或登录已过期',
+  [ErrorCode.PERMISSION_DENIED]: '无权执行该操作',
+  [ErrorCode.REQUEST_TIMEOUT]: '请求超时，请重试',
+  [ErrorCode.SYSTEM_ERROR]: '系统繁忙，请稍后重试',
+  [ErrorCode.EXTERNAL_SERVICE_ERROR]: '外部服务暂不可用，请稍后重试',
+
+  [ErrorCode.DICT_LOAD_FAILED]: '筛选条件加载失败，请刷新重试',
+  [ErrorCode.CONDITION_INCOMPLETE]: '请完成所有必选条件后再生成编码',
+  [ErrorCode.NO_MATCHING_CODE]: '未生成有效编码，请检查筛选条件是否完整合规',
+  [ErrorCode.GENERATE_LIMIT_EXCEEDED]: '单次生成数量超出限制（上限100条）',
+  [ErrorCode.DRAFT_FULL]: '临时区已满（上限5000条），请先导出或清理',
+  [ErrorCode.DRAFT_SAVE_FAILED]: '保存至临时区失败，请重试',
+  [ErrorCode.EXPORT_FAILED]: '导出失败，请检查权限或重试',
+
+  [ErrorCode.VALIDATE_LIST_EMPTY]: '请先输入待校验的编码',
+  [ErrorCode.VALIDATE_LIMIT_EXCEEDED]: '单次校验数量超出限制（上限1000条），请分批校验',
+  [ErrorCode.FILE_FORMAT_ERROR]: '文件格式不合法，请上传.xlsx或.xls文件',
+  [ErrorCode.FILE_SIZE_EXCEEDED]: '文件大小超出限制（上限10MB）',
+  [ErrorCode.VALIDATE_SERVICE_ERROR]: '校验服务异常，请稍后重试',
+  [ErrorCode.CORRECTION_NO_MATCH]: '未找到匹配的纠错建议，请手动修改',
+  [ErrorCode.BATCH_CORRECT_FAILED]: '批量纠错失败，请重试',
+  [ErrorCode.RESULT_EXPORT_FAILED]: '导出失败，请重试',
+
+  [ErrorCode.IMPORT_FILE_FORMAT_ERROR]: '文件格式不合法，请上传.xlsx或.xls文件',
+  [ErrorCode.IMPORT_FILE_SIZE_EXCEEDED]: '文件大小超出限制（上限10MB）',
+  [ErrorCode.IMPORT_DATA_EMPTY]: '文件中未检测到有效数据',
+  [ErrorCode.IMPORT_FIELD_MISMATCH]: '文件字段不匹配，请使用标准模板',
+  [ErrorCode.IMPORT_LIMIT_EXCEEDED]: '单次导入数量超出限制（上限10000条），请分批导入',
+  [ErrorCode.IMPORT_TIMEOUT]: '数据导入超时，请稍后重试或分批导入',
+  [ErrorCode.STATISTICS_EMPTY]: '暂无统计数据，请先上传稽核数据',
+  [ErrorCode.CHART_RENDER_ERROR]: '图表加载失败，请刷新重试',
+  [ErrorCode.REPORT_EXPORT_FAILED]: '导出失败，请重试',
+};

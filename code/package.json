@@ -1,0 +1,19 @@
+{
+  "name": "cec-new-energy-code",
+  "version": "1.0.0",
+  "private": true,
+  "description": "华电新能源测点编码管理工具",
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "dev:backend": "pnpm --filter @cec/backend dev",
+    "dev:frontend": "pnpm --filter @cec/frontend dev",
+    "build:frontend": "pnpm --filter @cec/frontend build"
+  },
+  "engines": {
+    "node": ">=24.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
