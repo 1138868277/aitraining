@@ -9,18 +9,34 @@ const schema = config.db.schema;
 /** 临时区存储（内存，页面刷新丢失） */
 const draftStore: Map<string, DraftCodeItem[]> = new Map();
 
-/** 生成单条编码 */
-export function generateSingleCode(
+/** 生成编码（支持单条或批量） */
+export function generateCode(
   conditions: GenerateCodeRequest,
   dictNames: Record<string, string> = {},
-): GenerateCodeResponse {
-  const code = generateCodeFromConditions(conditions);
-  const name = generateCodeName(conditions, dictNames);
-  return {
-    code,
-    name,
-    generateTime: formatDateTime(),
-  };
+): GenerateCodeResponse | GenerateCodeResponse[] {
+  const codes = generateCodeFromConditions(conditions);
+  const names = generateCodeName(conditions, dictNames);
+
+  // 如果是单条
+  if (typeof codes === 'string' && typeof names === 'string') {
+    return {
+      code: codes,
+      name: names,
+      generateTime: formatDateTime(),
+    };
+  }
+
+  // 如果是批量
+  if (Array.isArray(codes) && Array.isArray(names) && codes.length === names.length) {
+    return codes.map((code, index) => ({
+      code,
+      name: names[index],
+      generateTime: formatDateTime(),
+    }));
+  }
+
+  // 默认返回空数组
+  return [];
 }
 
 /** 保存至临时区 */

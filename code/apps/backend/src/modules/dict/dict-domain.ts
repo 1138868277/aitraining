@@ -41,42 +41,120 @@ export async function getProjectLineDict(): Promise<DictItem[]> {
   return query(sql);
 }
 
-/** 获取标准编码字典列表（按层级过滤） */
-export async function getCodeDictByParent(parentCode?: string): Promise<DictItem[]> {
-  if (!parentCode) {
-    const sql = `SELECT DISTINCT first_class_code AS code, first_class_name AS name
-      FROM ${schema}.cec_new_energy_code_dict
-      WHERE if_delete = '0' AND first_class_code IS NOT NULL
-      ORDER BY first_class_code`;
-    return query(sql);
+/** 根据类型代码获取type_domain_code */
+function getTypeDomainCode(typeCode?: string): string | null {
+  if (!typeCode) return null;
+
+  // 如果typeCode长度为3，可能是二级类码，不是类型代码
+  if (typeCode.length === 3) {
+    return null;
   }
 
-  const level2Sql = `SELECT DISTINCT second_class_code AS code, second_class_name AS name
-    FROM ${schema}.cec_new_energy_code_dict
-    WHERE if_delete = '0' AND first_class_code = $1 AND second_class_code IS NOT NULL
-    ORDER BY second_class_code`;
-  const level2 = await query(level2Sql, [parentCode]);
-  if (level2.length > 0) return level2;
+  // F1-F4 -> F, G1-G2 -> G, Y0 -> Y (或不过滤)
+  if (typeCode.startsWith('F')) {
+    return 'F';
+  } else if (typeCode.startsWith('G')) {
+    return 'G';
+  } else if (typeCode === 'Y0') {
+    return 'Y';
+  }
+  return null;
+}
 
-  const extSql = `SELECT DISTINCT second_ext_code AS code, second_ext_name AS name
-    FROM ${schema}.cec_new_energy_code_dict
-    WHERE if_delete = '0' AND second_class_code = $1 AND second_ext_code IS NOT NULL
-    ORDER BY second_ext_code`;
-  const ext = await query(extSql, [parentCode]);
-  if (ext.length > 0) return ext;
+/** 获取标准编码字典列表（按层级过滤） */
+export async function getCodeDictByParent(parentCode?: string, typeCode?: string): Promise<DictItem[]> {
+  const typeDomainCode = getTypeDomainCode(typeCode);
 
-  const level3Sql = `SELECT DISTINCT third_class_code AS code, third_class_name AS name
-    FROM ${schema}.cec_new_energy_code_dict
-    WHERE if_delete = '0' AND second_ext_code = $1 AND third_class_code IS NOT NULL
-    ORDER BY third_class_code`;
-  const level3 = await query(level3Sql, [parentCode]);
-  if (level3.length > 0) return level3;
+  if (!parentCode) {
+    // 第一级：返回所有一级类码
+    let sql = `SELECT DISTINCT first_class_code AS code, first_class_name AS name
+      FROM ${schema}.cec_new_energy_code_dict
+      WHERE if_delete = '0' AND first_class_code IS NOT NULL`;
 
-  const level3ExtSql = `SELECT DISTINCT third_ext_code AS code, third_ext_name AS name
-    FROM ${schema}.cec_new_energy_code_dict
-    WHERE if_delete = '0' AND third_class_code = $1 AND third_ext_code IS NOT NULL
-    ORDER BY third_ext_code`;
-  return query(level3ExtSql, [parentCode]);
+    const params: any[] = [];
+    if (typeDomainCode) {
+      sql += ` AND type_domain_code = $1`;
+      params.push(typeDomainCode);
+    }
+
+    sql += ` ORDER BY first_class_code`;
+    return query(sql, params);
+  }
+
+  // 判断parentCode的长度来确定层级
+  // 一级类码长度为2，二级类码长度为3，数据类码长度为2，数据编码长度为3
+  if (parentCode.length === 2) {
+    // parentCode可能是一级类码或数据类码
+    // 先检查是否是一级类码
+    const checkFirstSql = `SELECT COUNT(*) as cnt FROM ${schema}.cec_new_energy_code_dict WHERE first_class_code = $1`;
+    const checkResult = await query<{ cnt: number }>(checkFirstSql, [parentCode]);
+    if (checkResult[0].cnt > 0) {
+      // 是一级类码，返回对应的二级类码
+      let level2Sql = `SELECT DISTINCT second_class_code AS code, second_class_name AS name
+        FROM ${schema}.cec_new_energy_code_dict
+        WHERE if_delete = '0' AND first_class_code = $1 AND second_class_code IS NOT NULL`;
+
+      const params: any[] = [parentCode];
+      if (typeDomainCode) {
+        level2Sql += ` AND type_domain_code = $2`;
+        params.push(typeDomainCode);
+      }
+
+      level2Sql += ` ORDER BY second_class_code`;
+      return query(level2Sql, params);
+    } else {
+      // 可能是数据类码，返回对应的数据编码
+      let dataCodeSql = `SELECT DISTINCT data_code AS code, data_name AS name
+        FROM ${schema}.cec_new_energy_code_dict
+        WHERE if_delete = '0' AND data_category_code = $1 AND data_code IS NOT NULL`;
+
+      const params: any[] = [parentCode];
+      if (typeDomainCode) {
+        dataCodeSql += ` AND type_domain_code = $2`;
+        params.push(typeDomainCode);
+      }
+
+      dataCodeSql += ` ORDER BY data_code`;
+      return query(dataCodeSql, params);
+    }
+  } else if (parentCode.length === 3) {
+    // parentCode可能是二级类码
+    const checkSecondSql = `SELECT COUNT(*) as cnt FROM ${schema}.cec_new_energy_code_dict WHERE second_class_code = $1`;
+    const checkResult = await query<{ cnt: number }>(checkSecondSql, [parentCode]);
+    if (checkResult[0].cnt > 0) {
+      // 是二级类码，返回对应的数据类码
+      let dataCategorySql = `SELECT DISTINCT data_category_code AS code, data_category_name AS name
+        FROM ${schema}.cec_new_energy_code_dict
+        WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code IS NOT NULL`;
+
+      const params: any[] = [parentCode];
+      if (typeDomainCode) {
+        dataCategorySql += ` AND type_domain_code = $2`;
+        params.push(typeDomainCode);
+      }
+
+      dataCategorySql += ` ORDER BY data_category_code`;
+      return query(dataCategorySql, params);
+    }
+  } else if (parentCode.length === 4) {
+    // parentCode可能是二级扩展码，typeCode参数可能是二级类码（3位）
+    // 查询三级类码：从数据类字典表获取data_code作为三级类码
+    if (typeCode && typeCode.length === 3) {
+      // typeCode是二级类码，根据它过滤
+      let thirdClassSql = `SELECT DISTINCT data_code AS code, data_name AS name
+        FROM ${schema}.cec_new_energy_data_type_dict
+        WHERE if_delete = '0' AND second_class_code = $1 AND data_code IS NOT NULL`;
+
+      const params: any[] = [typeCode];
+      thirdClassSql += ` ORDER BY data_code`;
+      return query(thirdClassSql, params);
+    }
+    // 如果没有二级类码，返回空数组
+    return [];
+  }
+
+  // 默认返回空数组
+  return [];
 }
 
 /** 获取数据类字典 */

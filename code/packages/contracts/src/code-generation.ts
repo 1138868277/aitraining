@@ -8,9 +8,9 @@ export const generateCodeRequestSchema = z.object({
   prefixNo: z.string().length(1, '前缀号必须为1位'),
   firstClassCode: z.string().length(2, '一级类码必须为2位'),
   secondClassCode: z.string().length(3, '二级类码必须为3位'),
-  secondExtCode: z.string().length(4, '二级类扩展码必须为4位'),
+  secondExtCode: z.string().min(1, '二级类扩展码不能为空'),
   thirdClassCode: z.string().length(3, '三级类码必须为3位'),
-  thirdExtCode: z.string().length(4, '三级类扩展码必须为4位'),
+  thirdExtCode: z.string().min(1, '三级类扩展码不能为空'),
   dataTypeCode: z.string().length(2, '数据类码必须为2位').optional().default('00'),
   dataCode: z.string().length(3, '数据码必须为3位').optional().default('000'),
 });

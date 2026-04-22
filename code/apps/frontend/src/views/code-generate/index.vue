@@ -9,7 +9,9 @@
         <el-row :gutter="20">
           <el-col :span="6" v-for="field in conditionFields" :key="field.key">
             <el-form-item :label="field.label" :required="field.required">
+              <!-- 下拉选择框 -->
               <el-select
+                v-if="field.type === 'select'"
                 v-model="conditions[field.key]"
                 :placeholder="'请选择' + field.label"
                 filterable
@@ -21,10 +23,46 @@
                 <el-option
                   v-for="item in dictOptions[field.key] || []"
                   :key="item.code"
-                  :label="item.name"
+                  :label="item.code + item.name"
                   :value="item.code"
                 />
               </el-select>
+
+              <!-- 输入框（带快捷选择） -->
+              <div v-else-if="field.type === 'input'" class="input-with-quick-options">
+                <el-input
+                  v-model="conditions[field.key]"
+                  :placeholder="'请输入' + field.label"
+                  :disabled="field.disabled(conditions)"
+                  clearable
+                  @change="onConditionChange(field.key)"
+                  style="width: 100%"
+                />
+                <div v-if="field.quickOptions && field.quickOptions.length > 0" class="quick-options">
+                  <el-tag
+                    v-for="option in field.quickOptions"
+                    :key="option"
+                    size="small"
+                    class="quick-option-tag"
+                    @click="conditions[field.key] = option"
+                  >
+                    {{ option }}
+                  </el-tag>
+                </div>
+              </div>
+
+              <!-- 扩展输入框（从X开始拓展X条） -->
+              <div v-else-if="field.type === 'extend-input'" class="extend-input">
+                <el-input
+                  v-model="conditions[field.key]"
+                  :placeholder="'格式：从X开始拓展X条，如：5,3'"
+                  :disabled="field.disabled(conditions)"
+                  clearable
+                  @change="onConditionChange(field.key)"
+                  style="width: 100%"
+                />
+                <div class="extend-hint">格式：从X开始拓展X条，如：5,3 生成0005,0006,0007</div>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -115,20 +153,22 @@ interface ConditionField {
   label: string;
   required: boolean;
   disabled: (conds: Record<string, string>) => boolean;
+  type?: 'select' | 'input' | 'extend-input'; // 字段类型：下拉选择、输入框、扩展输入框
+  quickOptions?: string[]; // 快捷选择项
 }
 
 const conditionFields: ConditionField[] = [
-  { key: 'stationCode', label: '场站', required: true, disabled: () => false },
-  { key: 'typeCode', label: '类型', required: true, disabled: () => false },
-  { key: 'projectLineCode', label: '项目期号&并网线路', required: true, disabled: () => false },
-  { key: 'prefixNo', label: '前缀号', required: true, disabled: () => false },
-  { key: 'firstClassCode', label: '一级类码', required: true, disabled: () => false },
-  { key: 'secondClassCode', label: '二级类码', required: true, disabled: (c) => !c.firstClassCode },
-  { key: 'secondExtCode', label: '二级类扩展码', required: true, disabled: (c) => !c.secondClassCode },
-  { key: 'thirdClassCode', label: '三级类码', required: true, disabled: (c) => !c.secondExtCode },
-  { key: 'thirdExtCode', label: '三级类扩展码', required: true, disabled: (c) => !c.thirdClassCode },
-  { key: 'dataTypeCode', label: '数据类码', required: false, disabled: (c) => !c.secondClassCode },
-  { key: 'dataCode', label: '数据码', required: false, disabled: (c) => !c.dataTypeCode },
+  { key: 'stationCode', label: '场站', required: true, disabled: () => false, type: 'select' },
+  { key: 'typeCode', label: '类型', required: true, disabled: () => false, type: 'select' },
+  { key: 'projectLineCode', label: '项目期号&并网线路', required: true, disabled: () => false, type: 'input', quickOptions: ['111', '112', '121', '122'] },
+  { key: 'prefixNo', label: '前缀号', required: true, disabled: () => false, type: 'select' },
+  { key: 'firstClassCode', label: '一级类码', required: true, disabled: () => false, type: 'select' },
+  { key: 'secondClassCode', label: '二级类码', required: true, disabled: (c) => !c.firstClassCode, type: 'select' },
+  { key: 'secondExtCode', label: '二级类扩展码', required: true, disabled: (c) => !c.secondClassCode, type: 'extend-input' },
+  { key: 'thirdClassCode', label: '三级类码', required: true, disabled: (c) => !c.secondExtCode, type: 'select' },
+  { key: 'thirdExtCode', label: '三级类扩展码', required: true, disabled: (c) => !c.thirdClassCode, type: 'extend-input' },
+  { key: 'dataTypeCode', label: '数据类码', required: false, disabled: (c) => !c.secondClassCode, type: 'select' },
+  { key: 'dataCode', label: '数据码', required: false, disabled: (c) => !c.dataTypeCode, type: 'select' },
 ];
 
 const conditions = reactive<Record<string, string>>({});
@@ -144,20 +184,31 @@ const canGenerate = computed(() => requiredFields.every((k) => conditions[k]));
 // 初始化加载顶级字典
 onMounted(async () => {
   try {
-    const [stations, types, projects, prefixes, firstClass, dataTypes] = await Promise.all([
+    const [stations, types, prefixes, firstClass, dataTypes] = await Promise.all([
       dictService.getDictItems('station'),
       dictService.getDictItems('type'),
-      dictService.getDictItems('projectLine'),
       dictService.getDictItems('prefix'),
       dictService.getCascadedDictItems(''),
       dictService.getDictItems('dataType'),
     ]);
     dictOptions['stationCode'] = stations;
     dictOptions['typeCode'] = types;
-    dictOptions['projectLineCode'] = projects;
     dictOptions['prefixNo'] = prefixes;
     dictOptions['firstClassCode'] = firstClass;
     dictOptions['dataTypeCode'] = dataTypes;
+
+    // 设置默认值
+    // 前缀号默认"内部数据"（编码为0）
+    const internalDataPrefix = prefixes.find(p => p.name === '内部数据');
+    if (internalDataPrefix) {
+      conditions.prefixNo = internalDataPrefix.code;
+    }
+
+    // 一级类码默认"生产运行"（编码为B1）
+    const productionOperation = firstClass.find(f => f.name === '生产运行');
+    if (productionOperation) {
+      conditions.firstClassCode = productionOperation.code;
+    }
   } catch (err: any) {
     ElMessage.error('筛选条件加载失败，请刷新重试');
   }
@@ -179,6 +230,34 @@ async function onConditionChange(key: string) {
     dictOptions[nextKey] = [];
   }
 
+  // 类型代码变更时，需要重新加载一级类码和二级类码（如果已选择）
+  if (key === 'typeCode') {
+    if (conditions.firstClassCode) {
+      // 重新加载一级类码（根据新类型过滤）
+      try {
+        const firstClassItems = await dictService.getCascadedDictItems('', conditions[key]);
+        dictOptions['firstClassCode'] = firstClassItems;
+        // 如果当前选择的一级类码不在新列表中，清空它
+        const currentFirstClass = conditions.firstClassCode;
+        if (currentFirstClass && !firstClassItems.find(item => item.code === currentFirstClass)) {
+          conditions.firstClassCode = '';
+          // 清空后续所有字段
+          conditions.secondClassCode = '';
+          conditions.secondExtCode = '';
+          conditions.thirdClassCode = '';
+          conditions.thirdExtCode = '';
+          dictOptions['secondClassCode'] = [];
+          dictOptions['thirdClassCode'] = [];
+        }
+      } catch {}
+    }
+    // 清空已生成的编码
+    if (generatedCodes.value.length > 0) {
+      generatedCodes.value = [];
+    }
+    return;
+  }
+
   if (key === 'secondClassCode' && conditions[key]) {
     try {
       const dataTypes = await dictService.getDictItems('dataType');
@@ -196,7 +275,12 @@ async function onConditionChange(key: string) {
   // 联动加载子级字典
   if (['firstClassCode', 'secondClassCode', 'secondExtCode', 'thirdClassCode'].includes(key) && conditions[key]) {
     try {
-      const items = await dictService.getCascadedDictItems(conditions[key]);
+      let typeCode = conditions.typeCode;
+      // 查询三级类码时，需要传递二级类码作为过滤条件
+      if (key === 'secondExtCode') {
+        typeCode = conditions.secondClassCode; // 使用二级类码作为typeCode参数
+      }
+      const items = await dictService.getCascadedDictItems(conditions[key], typeCode);
       dictOptions[nextKey || ''] = items;
     } catch {}
   }
@@ -314,5 +398,39 @@ async function handleExport() {
 .draft-total {
   font-size: 14px;
   color: #606266;
+}
+
+.input-with-quick-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.quick-option-tag {
+  cursor: pointer;
+  user-select: none;
+}
+
+.quick-option-tag:hover {
+  background-color: #ecf5ff;
+  border-color: #c6e2ff;
+}
+
+.extend-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.extend-hint {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.2;
 }
 </style>

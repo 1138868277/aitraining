@@ -21,8 +21,10 @@ router.get('/api/dict/:dictType', async (req: Request, res: Response) => {
 router.get('/api/dict/:dictType/items', async (req: Request, res: Response) => {
   try {
     const parentCode = req.query.parentCode as string | undefined;
+    const typeCode = req.query.typeCode as string | undefined;
+    const search = req.query.search as string | undefined;
     // parentCode为空或未传时查询一级类码
-    const items = await dictService.getCascadedDictItems(parentCode);
+    const items = await dictService.getCascadedDictItems(parentCode, typeCode, search);
     success(res, { dictType: req.params.dictType, items });
   } catch (err) {
     console.error('Failed to load cascaded dict:', err);

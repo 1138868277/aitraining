@@ -21,8 +21,8 @@ export async function getDictItems(dictType: string): Promise<DictItemResponse[]
   return handler();
 }
 
-export async function getCascadedDictItems(parentCode: string): Promise<DictItemResponse[]> {
-  return dictDomain.getCodeDictByParent(parentCode);
+export async function getCascadedDictItems(parentCode: string, typeCode?: string): Promise<DictItemResponse[]> {
+  return dictDomain.getCodeDictByParent(parentCode, typeCode);
 }
 
 export async function getDataCodes(dataTypeCode: string): Promise<DictItemResponse[]> {
