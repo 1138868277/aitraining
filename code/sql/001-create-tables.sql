@@ -1,14 +1,15 @@
--- 华电新能源测点编码管理工具 - 建表脚本
--- Schema: liuhaojun (请替换为实际schema)
+-- 华电新能源测点编码管理工具 - 建表脚本 (PostgreSQL/SeaboxSQL 兼容)
+-- Schema: liuhaojun
 
 SET search_path TO liuhaojun;
 
 -- 1. 场站字典表
-CREATE TABLE IF NOT EXISTS cec_new_energy_station_dict (
+DROP TABLE IF EXISTS cec_new_energy_station_dict CASCADE;
+CREATE TABLE cec_new_energy_station_dict (
     station_id BIGINT NOT NULL,
-    station_code VARCHAR(4) NOT NULL COMMENT '场站编码',
-    station_name VARCHAR(100) NOT NULL COMMENT '场站名称',
-    management_domain VARCHAR(50) COMMENT '所属管理域',
+    station_code VARCHAR(4) NOT NULL,
+    station_name VARCHAR(100) NOT NULL,
+    management_domain VARCHAR(50),
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -18,13 +19,17 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_station_dict (
     PRIMARY KEY (station_id)
 );
 COMMENT ON TABLE cec_new_energy_station_dict IS '场站字典表';
-CREATE UNIQUE INDEX IF NOT EXISTS idx_station_code ON cec_new_energy_station_dict(station_code) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_station_dict.station_code IS '场站编码';
+COMMENT ON COLUMN cec_new_energy_station_dict.station_name IS '场站名称';
+COMMENT ON COLUMN cec_new_energy_station_dict.management_domain IS '所属管理域';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_station_code ON cec_new_energy_station_dict(station_code);
 
 -- 2. 类型字典表
-CREATE TABLE IF NOT EXISTS cec_new_energy_type_dict (
+DROP TABLE IF EXISTS cec_new_energy_type_dict CASCADE;
+CREATE TABLE cec_new_energy_type_dict (
     type_id BIGINT NOT NULL,
-    type_code VARCHAR(2) NOT NULL COMMENT '类型编码',
-    type_name VARCHAR(100) NOT NULL COMMENT '类型名称',
+    type_code VARCHAR(2) NOT NULL,
+    type_name VARCHAR(100) NOT NULL,
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -34,13 +39,16 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_type_dict (
     PRIMARY KEY (type_id)
 );
 COMMENT ON TABLE cec_new_energy_type_dict IS '类型字典表';
-CREATE UNIQUE INDEX IF NOT EXISTS idx_type_code ON cec_new_energy_type_dict(type_code) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_type_dict.type_code IS '类型编码';
+COMMENT ON COLUMN cec_new_energy_type_dict.type_name IS '类型名称';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_type_code ON cec_new_energy_type_dict(type_code);
 
 -- 3. 前缀字典表
-CREATE TABLE IF NOT EXISTS cec_new_energy_prefix_dict (
+DROP TABLE IF EXISTS cec_new_energy_prefix_dict CASCADE;
+CREATE TABLE cec_new_energy_prefix_dict (
     prefix_id BIGINT NOT NULL,
-    prefix_no VARCHAR(1) NOT NULL COMMENT '前缀号',
-    prefix_name VARCHAR(100) NOT NULL COMMENT '前缀名称',
+    prefix_no VARCHAR(1) NOT NULL,
+    prefix_name VARCHAR(100) NOT NULL,
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -50,13 +58,16 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_prefix_dict (
     PRIMARY KEY (prefix_id)
 );
 COMMENT ON TABLE cec_new_energy_prefix_dict IS '编码前缀字典表';
-CREATE UNIQUE INDEX IF NOT EXISTS idx_prefix_no ON cec_new_energy_prefix_dict(prefix_no) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_prefix_dict.prefix_no IS '前缀号';
+COMMENT ON COLUMN cec_new_energy_prefix_dict.prefix_name IS '前缀名称';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_prefix_no ON cec_new_energy_prefix_dict(prefix_no);
 
 -- 4. 项目期号&并网线路字典表
-CREATE TABLE IF NOT EXISTS cec_new_energy_project_line_dict (
+DROP TABLE IF EXISTS cec_new_energy_project_line_dict CASCADE;
+CREATE TABLE cec_new_energy_project_line_dict (
     project_line_id BIGINT NOT NULL,
-    project_line_code VARCHAR(3) NOT NULL COMMENT '项目期号&并网线路编码',
-    project_line_name VARCHAR(100) NOT NULL COMMENT '项目期号&并网线路名称',
+    project_line_code VARCHAR(3) NOT NULL,
+    project_line_name VARCHAR(100) NOT NULL,
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -66,21 +77,24 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_project_line_dict (
     PRIMARY KEY (project_line_id)
 );
 COMMENT ON TABLE cec_new_energy_project_line_dict IS '项目期号&并网线路字典表';
-CREATE UNIQUE INDEX IF NOT EXISTS idx_project_line_code ON cec_new_energy_project_line_dict(project_line_code) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_project_line_dict.project_line_code IS '项目期号&并网线路编码';
+COMMENT ON COLUMN cec_new_energy_project_line_dict.project_line_name IS '项目期号&并网线路名称';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_project_line_code ON cec_new_energy_project_line_dict(project_line_code);
 
 -- 5. 标准编码字典表（多级联动）
-CREATE TABLE IF NOT EXISTS cec_new_energy_code_dict (
+DROP TABLE IF EXISTS cec_new_energy_code_dict CASCADE;
+CREATE TABLE cec_new_energy_code_dict (
     code_dict_id BIGINT NOT NULL,
-    first_class_code VARCHAR(2) COMMENT '一级类码',
-    first_class_name VARCHAR(100) COMMENT '一级类码名称',
-    second_class_code VARCHAR(3) COMMENT '二级类码',
-    second_class_name VARCHAR(100) COMMENT '二级类码名称',
-    second_ext_code VARCHAR(4) COMMENT '二级类扩展码',
-    second_ext_name VARCHAR(100) COMMENT '二级类扩展码名称',
-    third_class_code VARCHAR(3) COMMENT '三级类码',
-    third_class_name VARCHAR(100) COMMENT '三级类码名称',
-    third_ext_code VARCHAR(4) COMMENT '三级类扩展码',
-    third_ext_name VARCHAR(100) COMMENT '三级类扩展码名称',
+    first_class_code VARCHAR(2),
+    first_class_name VARCHAR(100),
+    second_class_code VARCHAR(3),
+    second_class_name VARCHAR(100),
+    second_ext_code VARCHAR(4),
+    second_ext_name VARCHAR(100),
+    third_class_code VARCHAR(3),
+    third_class_name VARCHAR(100),
+    third_ext_code VARCHAR(4),
+    third_ext_name VARCHAR(100),
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -90,19 +104,30 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_code_dict (
     PRIMARY KEY (code_dict_id)
 );
 COMMENT ON TABLE cec_new_energy_code_dict IS '标准编码字典表';
-CREATE INDEX IF NOT EXISTS idx_code_dict_first ON cec_new_energy_code_dict(first_class_code) WHERE if_delete = '0';
-CREATE INDEX IF NOT EXISTS idx_code_dict_second ON cec_new_energy_code_dict(second_class_code) WHERE if_delete = '0';
-CREATE INDEX IF NOT EXISTS idx_code_dict_second_ext ON cec_new_energy_code_dict(second_ext_code) WHERE if_delete = '0';
-CREATE INDEX IF NOT EXISTS idx_code_dict_third ON cec_new_energy_code_dict(third_class_code) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_code_dict.first_class_code IS '一级类码';
+COMMENT ON COLUMN cec_new_energy_code_dict.first_class_name IS '一级类码名称';
+COMMENT ON COLUMN cec_new_energy_code_dict.second_class_code IS '二级类码';
+COMMENT ON COLUMN cec_new_energy_code_dict.second_class_name IS '二级类码名称';
+COMMENT ON COLUMN cec_new_energy_code_dict.second_ext_code IS '二级类扩展码';
+COMMENT ON COLUMN cec_new_energy_code_dict.second_ext_name IS '二级类扩展码名称';
+COMMENT ON COLUMN cec_new_energy_code_dict.third_class_code IS '三级类码';
+COMMENT ON COLUMN cec_new_energy_code_dict.third_class_name IS '三级类码名称';
+COMMENT ON COLUMN cec_new_energy_code_dict.third_ext_code IS '三级类扩展码';
+COMMENT ON COLUMN cec_new_energy_code_dict.third_ext_name IS '三级类扩展码名称';
+CREATE INDEX IF NOT EXISTS idx_code_dict_first ON cec_new_energy_code_dict(first_class_code);
+CREATE INDEX IF NOT EXISTS idx_code_dict_second ON cec_new_energy_code_dict(second_class_code);
+CREATE INDEX IF NOT EXISTS idx_code_dict_second_ext ON cec_new_energy_code_dict(second_ext_code);
+CREATE INDEX IF NOT EXISTS idx_code_dict_third ON cec_new_energy_code_dict(third_class_code);
 
 -- 6. 数据类字典表
-CREATE TABLE IF NOT EXISTS cec_new_energy_data_type_dict (
+DROP TABLE IF EXISTS cec_new_energy_data_type_dict CASCADE;
+CREATE TABLE cec_new_energy_data_type_dict (
     data_type_id BIGINT NOT NULL,
-    data_type_code VARCHAR(2) NOT NULL COMMENT '数据类码',
-    data_type_name VARCHAR(100) NOT NULL COMMENT '数据类名称',
-    data_code VARCHAR(3) COMMENT '数据码',
-    data_name VARCHAR(100) COMMENT '数据码名称',
-    second_class_code VARCHAR(3) COMMENT '关联二级类码',
+    data_type_code VARCHAR(2) NOT NULL,
+    data_type_name VARCHAR(100) NOT NULL,
+    data_code VARCHAR(3),
+    data_name VARCHAR(100),
+    second_class_code VARCHAR(3),
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -112,14 +137,20 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_data_type_dict (
     PRIMARY KEY (data_type_id)
 );
 COMMENT ON TABLE cec_new_energy_data_type_dict IS '数据类字典表';
-CREATE INDEX IF NOT EXISTS idx_data_type_code ON cec_new_energy_data_type_dict(data_type_code) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_data_type_dict.data_type_code IS '数据类码';
+COMMENT ON COLUMN cec_new_energy_data_type_dict.data_type_name IS '数据类名称';
+COMMENT ON COLUMN cec_new_energy_data_type_dict.data_code IS '数据码';
+COMMENT ON COLUMN cec_new_energy_data_type_dict.data_name IS '数据码名称';
+COMMENT ON COLUMN cec_new_energy_data_type_dict.second_class_code IS '关联二级类码';
+CREATE INDEX IF NOT EXISTS idx_data_type_code ON cec_new_energy_data_type_dict(data_type_code);
 
 -- 7. 编码生成记录表
-CREATE TABLE IF NOT EXISTS cec_new_energy_createcode (
+DROP TABLE IF EXISTS cec_new_energy_createcode CASCADE;
+CREATE TABLE cec_new_energy_createcode (
     id BIGINT NOT NULL,
-    code VARCHAR(31) NOT NULL COMMENT '生成的测点编码',
-    name VARCHAR(500) COMMENT '编码名称',
-    batch_no VARCHAR(20) COMMENT '批次号',
+    code VARCHAR(31) NOT NULL,
+    name VARCHAR(500),
+    batch_no VARCHAR(20),
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -129,19 +160,23 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_createcode (
     PRIMARY KEY (id)
 );
 COMMENT ON TABLE cec_new_energy_createcode IS '编码生成记录表';
-CREATE INDEX IF NOT EXISTS idx_createcode_tm ON cec_new_energy_createcode(create_tm DESC) WHERE if_delete = '0';
-CREATE INDEX IF NOT EXISTS idx_createcode_code ON cec_new_energy_createcode(code) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_createcode.code IS '生成的测点编码';
+COMMENT ON COLUMN cec_new_energy_createcode.name IS '编码名称';
+COMMENT ON COLUMN cec_new_energy_createcode.batch_no IS '批次号';
+CREATE INDEX IF NOT EXISTS idx_createcode_tm ON cec_new_energy_createcode(create_tm DESC);
+CREATE INDEX IF NOT EXISTS idx_createcode_code ON cec_new_energy_createcode(code);
 
 -- 8. 编码稽核数据表
-CREATE TABLE IF NOT EXISTS cec_new_energy_checkdata (
+DROP TABLE IF EXISTS cec_new_energy_checkdata CASCADE;
+CREATE TABLE cec_new_energy_checkdata (
     id BIGINT NOT NULL,
-    code VARCHAR(31) NOT NULL COMMENT '测点编码',
-    name VARCHAR(500) COMMENT '编码名称',
-    management_domain VARCHAR(50) COMMENT '管理域',
-    station VARCHAR(100) COMMENT '场站',
-    type_code VARCHAR(2) COMMENT '类型编码',
-    result VARCHAR(20) DEFAULT 'PENDING' COMMENT '校验结果: COMPLIANT/ABNORMAL/PENDING',
-    file_source VARCHAR(200) COMMENT '数据来源文件',
+    code VARCHAR(31) NOT NULL,
+    name VARCHAR(500),
+    management_domain VARCHAR(50),
+    station VARCHAR(100),
+    type_code VARCHAR(2),
+    result VARCHAR(20) DEFAULT 'PENDING',
+    file_source VARCHAR(200),
     tenant_id VARCHAR(20) DEFAULT '0',
     creator VARCHAR(50),
     modifier VARCHAR(50),
@@ -151,6 +186,13 @@ CREATE TABLE IF NOT EXISTS cec_new_energy_checkdata (
     PRIMARY KEY (id)
 );
 COMMENT ON TABLE cec_new_energy_checkdata IS '编码稽核数据表';
-CREATE INDEX IF NOT EXISTS idx_checkdata_result ON cec_new_energy_checkdata(result) WHERE if_delete = '0';
-CREATE INDEX IF NOT EXISTS idx_checkdata_domain ON cec_new_energy_checkdata(management_domain) WHERE if_delete = '0';
-CREATE INDEX IF NOT EXISTS idx_checkdata_station ON cec_new_energy_checkdata(station) WHERE if_delete = '0';
+COMMENT ON COLUMN cec_new_energy_checkdata.code IS '测点编码';
+COMMENT ON COLUMN cec_new_energy_checkdata.name IS '编码名称';
+COMMENT ON COLUMN cec_new_energy_checkdata.management_domain IS '管理域';
+COMMENT ON COLUMN cec_new_energy_checkdata.station IS '场站';
+COMMENT ON COLUMN cec_new_energy_checkdata.type_code IS '类型编码';
+COMMENT ON COLUMN cec_new_energy_checkdata.result IS '校验结果: COMPLIANT/ABNORMAL/PENDING';
+COMMENT ON COLUMN cec_new_energy_checkdata.file_source IS '数据来源文件';
+CREATE INDEX IF NOT EXISTS idx_checkdata_result ON cec_new_energy_checkdata(result);
+CREATE INDEX IF NOT EXISTS idx_checkdata_domain ON cec_new_energy_checkdata(management_domain);
+CREATE INDEX IF NOT EXISTS idx_checkdata_station ON cec_new_energy_checkdata(station);

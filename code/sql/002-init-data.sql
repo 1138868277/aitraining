@@ -1,5 +1,5 @@
 -- 华电新能源测点编码管理工具 - 初始化示例数据
--- Schema: liuhaojun (请替换为实际schema)
+-- Schema: liuhaojun
 
 SET search_path TO liuhaojun;
 
@@ -30,7 +30,7 @@ INSERT INTO cec_new_energy_project_line_dict (project_line_id, project_line_code
 (4002, '002', '二期项目-线路B'),
 (4003, '003', '三期项目-线路C');
 
--- 标准编码字典（多级联动示例）
+-- 标准编码字典（多级联动）
 INSERT INTO cec_new_energy_code_dict (code_dict_id, first_class_code, first_class_name, second_class_code, second_class_name, second_ext_code, second_ext_name, third_class_code, third_class_name, third_ext_code, third_ext_name) VALUES
 (5001, '01', '发电设备', '001', '风力发电机', '0001', '直驱风机', '001', '变桨系统', '0001', '桨叶1'),
 (5002, '01', '发电设备', '001', '风力发电机', '0001', '直驱风机', '001', '变桨系统', '0002', '桨叶2'),

@@ -37,11 +37,11 @@ const taskStore: Map<
 async function getDictSets(): Promise<Record<string, Set<string>>> {
   const sets: Record<string, Set<string>> = {};
 
-  const stationSql = `SELECT station_code FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = 0`;
+  const stationSql = `SELECT station_code FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0'`;
   const stations = await query<{ station_code: string }>(stationSql);
   sets['station'] = new Set(stations.map((s) => s.station_code));
 
-  const typeSql = `SELECT type_code FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = 0`;
+  const typeSql = `SELECT type_code FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0'`;
   const types = await query<{ type_code: string }>(typeSql);
   sets['type'] = new Set(types.map((t) => t.type_code));
 
@@ -52,10 +52,10 @@ async function getDictSets(): Promise<Record<string, Set<string>>> {
 async function getDictItemLists(): Promise<Record<string, Array<{ code: string; name: string }>>> {
   const lists: Record<string, Array<{ code: string; name: string }>> = {};
 
-  const stationSql = `SELECT station_code AS code, station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = 0`;
+  const stationSql = `SELECT station_code AS code, station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0'`;
   lists['station'] = await query(stationSql);
 
-  const typeSql = `SELECT type_code AS code, type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = 0`;
+  const typeSql = `SELECT type_code AS code, type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0'`;
   lists['type'] = await query(typeSql);
 
   return lists;

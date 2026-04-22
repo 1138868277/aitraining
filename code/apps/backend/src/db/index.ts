@@ -19,13 +19,13 @@ pool.on('error', (err) => {
 
 /** 执行查询 */
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
-  const result = await pool.query({ text, params });
+  const result = await pool.query({ text, values: params });
   return result.rows as T[];
 }
 
 /** 执行单行查询 */
 export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | null> {
-  const result = await pool.query({ text, params });
+  const result = await pool.query({ text, values: params });
   return (result.rows[0] as T) || null;
 }
 

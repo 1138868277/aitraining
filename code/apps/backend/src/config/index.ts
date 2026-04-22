@@ -1,3 +1,9 @@
+import { config as dotenvConfig } from 'dotenv';
+import { resolve } from 'path';
+
+// 从项目根目录加载 .env 文件
+dotenvConfig({ path: resolve(import.meta.dirname, '../../../../.env') });
+
 export const config = {
   server: {
     port: parseInt(process.env.SERVER_PORT || '3000', 10),

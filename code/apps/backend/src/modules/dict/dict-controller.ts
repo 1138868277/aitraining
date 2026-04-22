@@ -20,10 +20,8 @@ router.get('/api/dict/:dictType', async (req: Request, res: Response) => {
 /** 获取联动字典项 */
 router.get('/api/dict/:dictType/items', async (req: Request, res: Response) => {
   try {
-    const parentCode = req.query.parentCode as string;
-    if (!parentCode) {
-      return error(res, ErrorCode.MISSING_PARAMETER, '缺少parentCode参数');
-    }
+    const parentCode = req.query.parentCode as string | undefined;
+    // parentCode为空或未传时查询一级类码
     const items = await dictService.getCascadedDictItems(parentCode);
     success(res, { dictType: req.params.dictType, items });
   } catch (err) {

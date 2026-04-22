@@ -1,5 +1,5 @@
 -- 生成测试用的稽核数据
--- Schema: liuhaojun (请替换为实际schema)
+-- Schema: liuhaojun
 
 SET search_path TO liuhaojun;
 

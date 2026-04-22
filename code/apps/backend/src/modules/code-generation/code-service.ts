@@ -100,14 +100,14 @@ export async function queryCodeHistory(
   pageNum: number,
   pageSize: number,
 ): Promise<{ list: any[]; total: number; pageNum: number; pageSize: number; pages: number }> {
-  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_createcode WHERE if_delete = 0`;
+  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_createcode WHERE if_delete = '0'`;
   const countResult = await queryOne<{ total: number }>(countSql);
   const total = countResult?.total || 0;
 
   const offset = (pageNum - 1) * pageSize;
   const listSql = `SELECT id, code, name, create_tm AS generate_time, creator
     FROM ${schema}.cec_new_energy_createcode
-    WHERE if_delete = 0
+    WHERE if_delete = '0'
     ORDER BY create_tm DESC
     LIMIT $1 OFFSET $2`;
   const list = await query(listSql, [pageSize, offset]);

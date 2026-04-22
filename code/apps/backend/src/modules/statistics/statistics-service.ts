@@ -15,7 +15,7 @@ export async function getOverview(): Promise<{
     COUNT(CASE WHEN result = 'COMPLIANT' THEN 1 END) AS compliant_count,
     COUNT(CASE WHEN result = 'ABNORMAL' THEN 1 END) AS abnormal_count
     FROM ${schema}.cec_new_energy_checkdata
-    WHERE if_delete = 0`;
+    WHERE if_delete = '0'`;
   const result = await query<{
     total_count: string;
     compliant_count: string;
@@ -53,7 +53,7 @@ export async function getByDimension(
     COUNT(CASE WHEN result = 'COMPLIANT' THEN 1 END) AS compliant_count,
     COUNT(CASE WHEN result = 'ABNORMAL' THEN 1 END) AS abnormal_count
     FROM ${schema}.cec_new_energy_checkdata
-    WHERE if_delete = 0
+    WHERE if_delete = '0'
     GROUP BY ${column}
     ORDER BY total_count DESC`;
 
@@ -114,7 +114,7 @@ export async function getDetails(
   pageNum: number,
   pageSize: number,
 ): Promise<{ list: any[]; total: number; pageNum: number; pageSize: number }> {
-  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_checkdata WHERE if_delete = 0`;
+  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_checkdata WHERE if_delete = '0'`;
   const countResult = await query<{ total: string }>(countSql);
   const total = parseInt(countResult[0]?.total || '0');
 
@@ -125,7 +125,7 @@ export async function getDetails(
     COUNT(CASE WHEN result = 'COMPLIANT' THEN 1 END) AS compliant_count,
     COUNT(CASE WHEN result = 'ABNORMAL' THEN 1 END) AS abnormal_count
     FROM ${schema}.cec_new_energy_checkdata
-    WHERE if_delete = 0
+    WHERE if_delete = '0'
     GROUP BY management_domain, station, type_code
     ORDER BY management_domain
     LIMIT $1 OFFSET $2`;
