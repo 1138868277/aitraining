@@ -44,4 +44,16 @@ router.get('/api/dict/data-code/:dataTypeCode', async (req: Request, res: Respon
   }
 });
 
+/** 根据类型代码获取二级类码列表 */
+router.get('/api/dict/second-class/:typeCode', async (req: Request, res: Response) => {
+  try {
+    const { typeCode } = req.params;
+    const items = await dictService.getSecondClassByType(typeCode);
+    success(res, { items });
+  } catch (err) {
+    console.error('Failed to load second class by type:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '二级类码加载失败，请刷新重试', 500);
+  }
+});
+
 export default router;
