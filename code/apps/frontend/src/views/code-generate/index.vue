@@ -16,6 +16,9 @@
                   :placeholder="'请选择' + field.label"
                   filterable
                   :disabled="field.disabled(conditions)"
+                  :multiple="field.multiple"
+                  collapse-tags
+                  collapse-tags-tooltip
                   clearable
                   @change="onConditionChange(field.key)"
                   style="width: 100%"
@@ -68,26 +71,28 @@
                 <div class="extend-number-row">
                   <el-input
                     v-model="conditions[field.key + 'Start']"
-                    :placeholder="field.key === 'secondExtCode' ? '起始（默认1）' : '起始（默认0）'"
+                    :placeholder="field.key === 'secondExtCode' ? '默认1' : '默认0'"
                     :disabled="field.disabled(conditions)"
                     type="number"
                     :min="field.key === 'secondExtCode' ? 1 : 0"
                     max="9999"
                     @change="onExtendNumberChange(field.key)"
                     @input="limitStartInput($event, field.key)"
-                    style="width: 48%"
-                  />
+                  >
+                    <template #prefix><span class="extend-prefix">起始</span></template>
+                  </el-input>
                   <el-input
                     v-model="conditions[field.key + 'Count']"
-                    placeholder="数量（默认1）"
+                    placeholder="默认1"
                     :disabled="field.disabled(conditions)"
                     type="number"
                     min="1"
                     max="99"
                     @change="onExtendNumberChange(field.key)"
                     @input="limitCountInput($event, field.key)"
-                    style="width: 48%"
-                  />
+                  >
+                    <template #prefix><span class="extend-prefix">延伸</span></template>
+                  </el-input>
                 </div>
               </div>
             </el-form-item>
@@ -216,6 +221,7 @@ interface ConditionField {
   disabled: (conds: Record<string, string>) => boolean;
   type?: 'select' | 'input' | 'extend-input' | 'extend-number'; // 字段类型：下拉选择、输入框、扩展输入框、扩展数字输入框
   quickOptions?: string[]; // 快捷选择项
+  multiple?: boolean; // 是否支持多选
 }
 
 const conditionFields: ConditionField[] = [
@@ -228,11 +234,11 @@ const conditionFields: ConditionField[] = [
   { key: 'secondExtCode', label: '二级类扩展码', required: true, disabled: (c) => !c.secondClassCode, type: 'extend-number' },
   { key: 'thirdClassCode', label: '三级类码', required: true, disabled: (c) => !c.secondClassCode, type: 'select' },
   { key: 'thirdExtCode', label: '三级类扩展码', required: true, disabled: (c) => !c.thirdClassCode, type: 'extend-number' },
-  { key: 'dataTypeCode', label: '数据类码', required: false, disabled: (c) => !c.secondClassCode, type: 'select' },
-  { key: 'dataCode', label: '数据码', required: false, disabled: (c) => !c.dataTypeCode, type: 'select' },
+  { key: 'dataTypeCode', label: '数据类码', required: true, disabled: (c) => !c.secondClassCode, type: 'select' },
+  { key: 'dataCode', label: '数据码', required: true, disabled: (c) => !c.dataTypeCode, type: 'select', multiple: true },
 ];
 
-const conditions = reactive<Record<string, string>>({});
+const conditions = reactive<Record<string, any>>({});
 const dictOptions = reactive<Record<string, Array<{ code: string; name: string }>>>({});
 const generatedCodes = ref<Array<{ code: string; name: string; generateTime: string }>>([]);
 const draftCodes = ref<Array<{ code: string; name: string; generateTime: string; batchNo: string }>>([]);
@@ -251,7 +257,11 @@ const canGenerate = computed(() => {
       return !!conditions[field.key + 'Start'];
     } else {
       // 对于其他字段，检查字段值是否存在
-      return !!conditions[field.key];
+      const val = conditions[field.key];
+      if (field.multiple) {
+        return Array.isArray(val) && val.length > 0;
+      }
+      return !!val;
     }
   });
 });
@@ -296,8 +306,9 @@ const expectedCodeCount = computed(() => {
 
   const secondCount = parseExtendFormatCount(secondExtStr);
   const thirdCount = parseExtendFormatCount(thirdExtStr);
+  const dataCodeCount = Array.isArray(conditions.dataCode) ? conditions.dataCode.length : 1;
 
-  return secondCount * thirdCount;
+  return secondCount * thirdCount * dataCodeCount;
 });
 
 // 初始化加载顶级字典
@@ -328,6 +339,9 @@ onMounted(async () => {
       conditions.firstClassCode = productionOperation.code;
     }
 
+    // 类型默认"F1"
+    conditions.typeCode = 'F1';
+
     // 项目期号&并网线路默认"111"
     conditions.projectLineCode = '111';
 
@@ -339,6 +353,9 @@ onMounted(async () => {
     // 三级类扩展码：起始默认0，数量默认1
     conditions.thirdExtCodeStart = '0';
     conditions.thirdExtCodeCount = '1';
+
+    // 触发类型级联加载二级类码
+    await onConditionChange('typeCode');
   } catch (err: any) {
     ElMessage.error('筛选条件加载失败，请刷新重试');
   }
@@ -354,7 +371,8 @@ async function onConditionChange(key: string) {
 
   const nextKey = cascadeMap[key];
   if (nextKey) {
-    conditions[nextKey] = '';
+    const field = conditionFields.find(f => f.key === nextKey);
+    conditions[nextKey] = field?.multiple ? [] : '';
     dictOptions[nextKey] = [];
   }
 
@@ -376,7 +394,7 @@ async function onConditionChange(key: string) {
       dictOptions['dataTypeCode'] = [];
       dictOptions['dataCode'] = [];
       conditions.dataTypeCode = '';
-      conditions.dataCode = '';
+      conditions.dataCode = [];
     } catch {}
     // 清空已生成的编码
     if (generatedCodes.value.length > 0) {
@@ -481,48 +499,54 @@ function onExtendNumberChange(key: string) {
 async function handleGenerate() {
   try {
     // 组合扩展码：将起始值和数量组合成"5,3"格式
-    const processedConditions = { ...conditions };
+    const baseConditions = { ...conditions };
 
     // 处理二级类扩展码
     if (conditions.secondExtCodeStart && conditions.secondExtCodeCount) {
-      processedConditions.secondExtCode = `${conditions.secondExtCodeStart},${conditions.secondExtCodeCount}`;
+      baseConditions.secondExtCode = `${conditions.secondExtCodeStart},${conditions.secondExtCodeCount}`;
     } else if (conditions.secondExtCodeStart) {
-      processedConditions.secondExtCode = conditions.secondExtCodeStart.toString().padStart(4, '0');
+      baseConditions.secondExtCode = conditions.secondExtCodeStart.toString().padStart(4, '0');
     }
 
     // 处理三级类扩展码
     if (conditions.thirdExtCodeStart && conditions.thirdExtCodeCount) {
-      processedConditions.thirdExtCode = `${conditions.thirdExtCodeStart},${conditions.thirdExtCodeCount}`;
+      baseConditions.thirdExtCode = `${conditions.thirdExtCodeStart},${conditions.thirdExtCodeCount}`;
     } else if (conditions.thirdExtCodeStart) {
-      processedConditions.thirdExtCode = conditions.thirdExtCodeStart.toString().padStart(4, '0');
+      baseConditions.thirdExtCode = conditions.thirdExtCodeStart.toString().padStart(4, '0');
     }
 
     // 删除扩展数字字段的原始Start/Count属性，避免schema验证问题
-    delete processedConditions.secondExtCodeStart;
-    delete processedConditions.secondExtCodeCount;
-    delete processedConditions.thirdExtCodeStart;
-    delete processedConditions.thirdExtCodeCount;
+    delete baseConditions.secondExtCodeStart;
+    delete baseConditions.secondExtCodeCount;
+    delete baseConditions.thirdExtCodeStart;
+    delete baseConditions.thirdExtCodeCount;
 
-    const parsed = generateCodeRequestSchema.parse(processedConditions);
-    const result = await codeService.generateCode(parsed as any);
+    // 获取所有待生成的数据码（支持多选笛卡尔积）
+    const dataCodes = Array.isArray(conditions.dataCode) && conditions.dataCode.length > 0
+      ? conditions.dataCode
+      : [conditions.dataCode || '000'];
 
-    // 处理返回结果：可能是单个对象或数组
-    if (Array.isArray(result)) {
-      generatedCodes.value = result;
-    } else if (result && typeof result === 'object') {
-      generatedCodes.value = [result];
-    } else {
-      // 如果返回格式不符合预期，尝试从批量响应中提取
-      if (result && result.codes && Array.isArray(result.codes)) {
-        generatedCodes.value = result.codes;
-      } else {
-        throw new Error('生成编码返回格式错误');
+    const allResults: Array<{ code: string; name: string; generateTime: string }> = [];
+
+    for (const dc of dataCodes) {
+      const payload = { ...baseConditions, dataCode: dc };
+      const parsed = generateCodeRequestSchema.parse(payload);
+      const result = await codeService.generateCode(parsed as any);
+
+      if (Array.isArray(result)) {
+        allResults.push(...result);
+      } else if (result && typeof result === 'object') {
+        allResults.push(result);
+      } else if (result && result.codes && Array.isArray(result.codes)) {
+        allResults.push(...result.codes);
       }
     }
 
+    generatedCodes.value = allResults;
+
     // 显示生成数量提示
-    if (generatedCodes.value.length > 1) {
-      ElMessage.success(`成功生成 ${generatedCodes.value.length} 个编码`);
+    if (allResults.length > 1) {
+      ElMessage.success(`成功生成 ${allResults.length} 个编码`);
     }
 
     activeTab.value = 'generated';
@@ -532,8 +556,16 @@ async function handleGenerate() {
 }
 
 function handleClear() {
-  // 清空所有条件
-  Object.keys(conditions).forEach((k) => (conditions[k] = ''));
+  // 清空所有条件（多选字段置为空数组）
+  conditionFields.forEach((field) => {
+    conditions[field.key] = field.multiple ? [] : '';
+  });
+  // 清空可能残留的扩展字段
+  Object.keys(conditions).forEach((k) => {
+    if (!conditionFields.find(f => f.key === k)) {
+      conditions[k] = '';
+    }
+  });
 
   // 重置前缀号为默认值（内部数据）
   const internalDataPrefix = dictOptions['prefixNo']?.find(p => p.name === '内部数据');
@@ -733,12 +765,24 @@ async function handleExport() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: 100%;
 }
 
 .extend-number-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+}
+
+.extend-number-row .el-input {
+  flex: 1;
+}
+
+.extend-prefix {
+  color: #909399;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .expected-count {
