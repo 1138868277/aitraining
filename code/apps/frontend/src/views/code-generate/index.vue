@@ -403,16 +403,30 @@ async function onConditionChange(key: string) {
     return;
   }
 
-  if (key === 'secondClassCode' && conditions[key]) {
-    try {
-      // 根据类型和二级类码获取数据类码
-      if (conditions.typeCode && conditions[key]) {
-        const dataTypes = await dictService.getDataTypeBySecondClass(conditions.typeCode, conditions[key]);
-        dictOptions['dataTypeCode'] = dataTypes;
-      } else {
-        dictOptions['dataTypeCode'] = [];
-      }
-    } catch {}
+  if (key === 'secondClassCode') {
+    // 清空二级类码后续的字段并恢复扩展码默认值
+    conditions.secondExtCodeStart = '1';
+    conditions.secondExtCodeCount = '1';
+    conditions.thirdClassCode = '';
+    conditions.thirdExtCodeStart = '0';
+    conditions.thirdExtCodeCount = '1';
+    conditions.dataTypeCode = '';
+    conditions.dataCode = [];
+    dictOptions['thirdClassCode'] = [];
+    dictOptions['dataTypeCode'] = [];
+    dictOptions['dataCode'] = [];
+
+    if (conditions[key]) {
+      try {
+        // 根据类型和二级类码获取数据类码
+        if (conditions.typeCode && conditions[key]) {
+          const dataTypes = await dictService.getDataTypeBySecondClass(conditions.typeCode, conditions[key]);
+          dictOptions['dataTypeCode'] = dataTypes;
+        } else {
+          dictOptions['dataTypeCode'] = [];
+        }
+      } catch {}
+    }
   }
 
   if (key === 'dataTypeCode' && conditions[key]) {
@@ -453,7 +467,9 @@ async function onConditionChange(key: string) {
         const items = await dictService.getCascadedDictItems(conditions[key], conditions.typeCode);
         dictOptions['thirdClassCode'] = items;
       } else if (key === 'thirdClassCode') {
-        // 三级类码变化时，没有后续级联
+        // 三级类码切换时，三级类扩展码重置为默认值
+        conditions.thirdExtCodeStart = '0';
+        conditions.thirdExtCodeCount = '1';
       }
     } catch {}
   }
