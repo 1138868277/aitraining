@@ -43,8 +43,22 @@ export async function saveCodeRecords(codes: Array<{ code: string; name: string 
 export async function getCodeHistory(
   pageNum = 1,
   pageSize = 20,
+  startTime?: string,
+  endTime?: string,
 ): Promise<{ list: CodeRecord[]; total: number }> {
-  const res = await api.get('/codes', { params: { pageNum, pageSize } });
+  const params: Record<string, any> = { pageNum, pageSize };
+  if (startTime) params.startTime = startTime;
+  if (endTime) params.endTime = endTime;
+  const res = await api.get('/codes', { params });
+  return res.data;
+}
+
+export async function deleteCodeRecord(id: number): Promise<void> {
+  await api.delete(`/codes/${id}`);
+}
+
+export async function batchDeleteCodeRecords(ids: number[]): Promise<{ deletedCount: number }> {
+  const res = await api.delete('/codes/batch', { data: { ids } });
   return res.data;
 }
 

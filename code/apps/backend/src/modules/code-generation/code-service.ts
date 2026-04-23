@@ -152,22 +152,41 @@ export async function getRecentConditions(): Promise<any[]> {
   return query(sql);
 }
 
-/** 分页查询编码生成历史 */
+/** 分页查询编码生成历史（支持时间过滤） */
 export async function queryCodeHistory(
   pageNum: number,
   pageSize: number,
+  startTime?: string,
+  endTime?: string,
 ): Promise<{ list: any[]; total: number; pageNum: number; pageSize: number; pages: number }> {
-  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_createcode WHERE if_delete = '0'`;
+  const conditions: string[] = ['if_delete = \'0\''];
+  const params: any[] = [];
+  let paramIdx = 1;
+
+  if (startTime) {
+    conditions.push(`create_tm >= $${paramIdx++}`);
+    params.push(startTime);
+  }
+  if (endTime) {
+    // 将结束日期往后推一天，使筛选包含整个结束日
+    conditions.push(`create_tm < ($${paramIdx++}::date + 1)`);
+    params.push(endTime);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_createcode WHERE ${whereClause}`;
   const countResult = await queryOne<{ total: number }>(countSql);
   const total = countResult?.total || 0;
 
   const offset = (pageNum - 1) * pageSize;
-  const listSql = `SELECT id, code, name, create_tm AS generate_time, creator
+  const listSql = `SELECT id, code, name,
+    TO_CHAR(create_tm, 'YYYY-MM-DD HH24:MI:SS') AS generate_time, creator
     FROM ${schema}.cec_new_energy_createcode
-    WHERE if_delete = '0'
+    WHERE ${whereClause}
     ORDER BY create_tm DESC
-    LIMIT $1 OFFSET $2`;
-  const list = await query(listSql, [pageSize, offset]);
+    LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+  const list = await query(listSql, [...params, pageSize, offset]);
 
   return {
     list,
@@ -176,4 +195,24 @@ export async function queryCodeHistory(
     pageSize,
     pages: Math.ceil(total / pageSize),
   };
+}
+
+/** 删除单条编码生成记录 */
+export async function deleteCodeRecord(id: number): Promise<boolean> {
+  const sql = `UPDATE ${schema}.cec_new_energy_createcode
+    SET if_delete = '1', modify_tm = NOW()
+    WHERE id = $1 AND if_delete = '0'`;
+  const result = await query(sql, [id]);
+  return (result as any)?.rowCount > 0;
+}
+
+/** 批量删除编码生成记录 */
+export async function batchDeleteCodeRecords(ids: number[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+  const sql = `UPDATE ${schema}.cec_new_energy_createcode
+    SET if_delete = '1', modify_tm = NOW()
+    WHERE id IN (${placeholders}) AND if_delete = '0'`;
+  const result = await query(sql, ids);
+  return (result as any)?.rowCount || 0;
 }

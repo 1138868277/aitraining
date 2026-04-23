@@ -173,24 +173,17 @@
       <template #header>
         <div class="result-header">
           <span>编码结果</span>
-          <div>
-            <el-button
-              size="small"
-              :disabled="generatedCodes.length === 0"
-              @click="handleSaveDraft"
-            >
-              保存至临时区
-            </el-button>
-            <el-button size="small" :disabled="draftCodes.length === 0" @click="handleExport">
-              批量导出
-            </el-button>
-          </div>
         </div>
       </template>
 
-      <el-tabs v-model="activeTab">
-        <!-- 本次生成标签页 -->
-        <el-tab-pane label="本次生成" name="generated">
+      <el-tabs v-model="activeTab" @tab-click="onTabClick">
+        <!-- 编码预览标签页 -->
+        <el-tab-pane label="编码预览" name="preview">
+          <div v-if="generatedCodes.length > 0" class="preview-actions">
+            <span class="preview-count">共 {{ generatedCodes.length }} 条</span>
+            <el-button size="small" @click="copyAllPreview">一键复制全部</el-button>
+            <el-button size="small" type="primary" @click="savePreviewToDb">保存</el-button>
+          </div>
           <el-table :data="generatedCodes" border stripe style="width: 100%">
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column prop="code" label="编码" width="320" />
@@ -205,15 +198,37 @@
           <el-empty v-if="generatedCodes.length === 0" description="暂无生成记录" />
         </el-tab-pane>
 
-        <!-- 临时区标签页 -->
-        <el-tab-pane label="临时区" name="draft">
-          <div v-if="draftCodes.length > 0" class="draft-actions">
-            <span class="draft-total">共 {{ draftCodes.length }} 条</span>
+        <!-- 最近保存标签页 -->
+        <el-tab-pane label="最近保存" name="saved">
+          <!-- 时间筛选 -->
+          <div class="saved-filter-bar">
+            <el-date-picker
+              v-model="savedStartDate"
+              type="date"
+              placeholder="开始"
+              value-format="YYYY-MM-DD"
+              style="width: 225px"
+            />
+            <span class="range-separator">~</span>
+            <el-date-picker
+              v-model="savedEndDate"
+              type="date"
+              placeholder="结束"
+              value-format="YYYY-MM-DD"
+              style="width: 225px"
+            />
+            <el-button size="small" type="primary" @click="onSavedTimeFilter">查询</el-button>
+            <el-button size="small" @click="onSavedTimeReset">重置</el-button>
+          </div>
+
+          <!-- 选中操作栏 -->
+          <div v-if="savedCodes.length > 0" class="saved-selection-bar">
+            <span class="saved-total">共 {{ savedTotal }} 条</span>
             <span class="range-selector">
               <el-input-number
-                v-model="rangeStart"
+                v-model="savedRangeStart"
                 :min="1"
-                :max="draftCodes.length"
+                :max="savedCodes.length"
                 size="small"
                 controls-position="right"
                 placeholder="起始行"
@@ -221,43 +236,49 @@
               />
               <span class="range-separator">~</span>
               <el-input-number
-                v-model="rangeEnd"
+                v-model="savedRangeEnd"
                 :min="1"
-                :max="draftCodes.length"
+                :max="savedCodes.length"
                 size="small"
                 controls-position="right"
                 placeholder="结束行"
                 style="width: 100px"
               />
-              <el-button size="small" @click="selectRange">选中范围</el-button>
-              <el-button size="small" @click="clearSelection">取消选中</el-button>
+              <el-button size="small" @click="selectSavedRange">选中范围</el-button>
+              <el-button size="small" @click="clearSavedSelection">取消选中</el-button>
             </span>
-            <el-button size="small" @click="copySelected">复制选中</el-button>
-            <el-button size="small" @click="deleteSelected">删除选中</el-button>
+            <el-button size="small" @click="copySelectedSaved">复制选中</el-button>
+            <el-button size="small" @click="deleteSelectedSaved">删除选中</el-button>
           </div>
+
           <el-table
-            ref="draftTableRef"
-            :data="draftCodes"
+            ref="savedTableRef"
+            :data="savedCodes"
             border
             stripe
             style="width: 100%"
-            @selection-change="onSelectionChange"
-            :row-class-name="draftRowClassName"
+            @selection-change="onSavedSelectionChange"
           >
             <el-table-column type="selection" width="50" />
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column prop="code" label="编码" width="320" />
             <el-table-column prop="name" label="编码名称" min-width="200" />
             <el-table-column prop="generateTime" label="生成时间" width="180" />
-            <el-table-column label="批次" width="120">
-              <template #default="{ row }">
-                <el-tag :type="getBatchTagType(row.batchNo)" size="small" effect="plain">
-                  第{{ row.batchNo }}批
-                </el-tag>
-              </template>
-            </el-table-column>
           </el-table>
-          <el-empty v-if="draftCodes.length === 0" description="临时区暂无数据" />
+          <el-empty v-if="savedCodes.length === 0 && !savedLoading" description="暂无保存记录" />
+
+          <!-- 分页 -->
+          <div v-if="savedTotal > 0" class="saved-pagination">
+            <el-pagination
+              v-model:current-page="savedPageNum"
+              v-model:page-size="savedPageSize"
+              :total="savedTotal"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next"
+              @current-change="loadSavedCodes"
+              @size-change="loadSavedCodes"
+            />
+          </div>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -266,7 +287,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import * as dictService from '@/services/dict';
 import * as codeService from '@/services/code-generation';
 import { generateCodeRequestSchema } from '@cec/contracts';
@@ -298,12 +319,22 @@ const conditionFields: ConditionField[] = [
 const conditions = reactive<Record<string, any>>({});
 const dictOptions = reactive<Record<string, Array<{ code: string; name: string }>>>({});
 const generatedCodes = ref<Array<{ code: string; name: string; generateTime: string }>>([]);
-const draftCodes = ref<Array<{ code: string; name: string; generateTime: string; batchNo: string }>>([]);
-const selectedDraftIds = ref<number[]>([]);
-const activeTab = ref('generated');
-const draftTableRef = ref<any>(null);
-const rangeStart = ref(1);
-const rangeEnd = ref(1);
+
+/** 最近保存分页数据 */
+const savedCodes = ref<Array<{ id?: number; code: string; name: string; generateTime: string; creator: string }>>([]);
+const savedTotal = ref(0);
+const savedPageNum = ref(1);
+const savedPageSize = ref(20);
+
+/** 最近保存时间筛选 */
+const savedStartDate = ref<string>('');
+const savedEndDate = ref<string>('');
+const savedTableRef = ref<any>(null);
+const savedRangeStart = ref(1);
+const savedRangeEnd = ref(1);
+const selectedSavedIds = ref<number[]>([]);
+const savedLoading = ref(false);
+const activeTab = ref('preview');
 const recentConditions = ref<Array<{ id: number; conditionData: Record<string, any>; conditionSummary: string; generateTime: string }>>([]);
 const recentPopoverRef = ref<any>(null);
 
@@ -418,6 +449,9 @@ onMounted(async () => {
 
     // 加载最近条件记录
     loadRecentConditions();
+
+    // 加载最近保存记录
+    loadSavedCodes();
   } catch (err: any) {
     ElMessage.error('筛选条件加载失败，请刷新重试');
   }
@@ -630,7 +664,7 @@ async function handleGenerate() {
     // 生成成功后保存当前条件到最近记录
     saveCurrentConditions();
 
-    activeTab.value = 'generated';
+    activeTab.value = 'preview';
   } catch (err: any) {
     ElMessage.error(err.message || '生成编码失败');
   }
@@ -667,68 +701,160 @@ function handleClear() {
   conditions.thirdExtCodeCount = '1';
 
   generatedCodes.value = [];
-  draftCodes.value = [];
 }
 
-async function handleSaveDraft() {
+/** 保存编码至数据库 */
+async function handleSaveToDb() {
   try {
-    const result = await codeService.saveToDraft({ codes: generatedCodes.value });
-    ElMessage.success(`已保存 ${result.savedCount} 条`);
-    // 刷新临时区
-    const draftList = await codeService.getDraftList(1, 5000);
-    draftCodes.value = draftList.list;
+    const result = await codeService.saveCodeRecords(generatedCodes.value);
+    ElMessage.success(`已保存 ${result.savedCount} 条至数据库`);
+    savedPageNum.value = 1;
+    loadSavedCodes();
   } catch (err: any) {
     ElMessage.error(err.message || '保存失败');
   }
 }
 
-function onSelectionChange(rows: any[]) {
-  selectedDraftIds.value = rows.map((r) => r.id);
+/** 编码预览：一键复制全部（编码 + 名称） */
+function copyAllPreview() {
+  const text = generatedCodes.value.map(c => `${c.code} ${c.name}`).join('\n');
+  navigator.clipboard.writeText(text).then(
+    () => ElMessage.success('已复制全部编码'),
+    () => ElMessage.warning('复制失败，请手动选择复制'),
+  );
 }
 
-/** 按行号范围选中临时区中的行（追加选中，不影响已有选中） */
-function selectRange() {
-  const start = Math.max(1, Math.min(rangeStart.value, rangeEnd.value));
-  const end = Math.min(draftCodes.value.length, Math.max(rangeStart.value, rangeEnd.value));
+/** 编码预览：保存至数据库并切换到最近保存 */
+async function savePreviewToDb() {
+  const scrollY = window.scrollY;
+  await handleSaveToDb();
+  activeTab.value = 'saved';
+  nextTick(() => {
+    window.scrollTo(0, scrollY);
+  });
+}
 
-  for (let i = start - 1; i < end; i++) {
-    draftTableRef.value?.toggleRowSelection(draftCodes.value[i], true);
+/** 格式化时间为 YYYY-MM-DD HH:mm:ss */
+function formatLocalTime(date: any): string {
+  if (!date) return '';
+  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+  if (!(d instanceof Date) || isNaN(d.getTime())) return String(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  const s = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${h}:${min}:${s}`;
+}
+
+/** 加载最近保存记录（支持时间筛选） */
+async function loadSavedCodes() {
+  savedLoading.value = true;
+  try {
+    const result = await codeService.getCodeHistory(
+      savedPageNum.value, savedPageSize.value,
+      savedStartDate.value || undefined,
+      savedEndDate.value || undefined,
+    );
+    savedCodes.value = (result.list || []).map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      generateTime: item.generate_time || '',
+      creator: item.creator || '-',
+    }));
+    savedTotal.value = result.total || 0;
+  } catch {
+    // 静默失败
+  } finally {
+    savedLoading.value = false;
   }
 }
 
-/** 取消指定范围行的选中 */
-function clearSelection() {
-  const start = Math.max(1, Math.min(rangeStart.value, rangeEnd.value));
-  const end = Math.min(draftCodes.value.length, Math.max(rangeStart.value, rangeEnd.value));
+/** 时间筛选查询 */
+function onSavedTimeFilter() {
+  savedPageNum.value = 1;
+  loadSavedCodes();
+}
 
+/** 重置时间筛选 */
+function onSavedTimeReset() {
+  savedStartDate.value = '';
+  savedEndDate.value = '';
+  savedPageNum.value = 1;
+  loadSavedCodes();
+}
+
+/** 最近保存选中变化 */
+function onSavedSelectionChange(rows: any[]) {
+  selectedSavedIds.value = rows.map((r) => r.id);
+}
+
+/** 选中行范围 */
+function selectSavedRange() {
+  const len = savedCodes.value.length;
+  const start = Math.max(1, Math.min(savedRangeStart.value, savedRangeEnd.value));
+  const end = Math.min(len, Math.max(savedRangeStart.value, savedRangeEnd.value));
   for (let i = start - 1; i < end; i++) {
-    draftTableRef.value?.toggleRowSelection(draftCodes.value[i], false);
+    savedTableRef.value?.toggleRowSelection(savedCodes.value[i], true);
   }
 }
 
-/** 批次对应的背景色（按批次索引循环） */
-const BATCH_COLORS = [
-  '#ecf5ff', // 淡蓝
-  '#f0f9eb', // 淡绿
-  '#fdf6ec', // 淡橙
-  '#fef0f0', // 淡红
-  '#f5f7fa', // 淡灰
-  '#e8f4f8', // 青
-  '#f3e8ff', // 紫
-  '#fff7e6', // 米黄
-];
-
-/** 根据批次号返回行样式名 */
-function draftRowClassName({ row }: { row: { batchNo: string } }) {
-  const index = (parseInt(row.batchNo, 10) - 1) % BATCH_COLORS.length;
-  return `draft-row-batch-${index}`;
+/** 取消行范围选中 */
+function clearSavedSelection() {
+  const len = savedCodes.value.length;
+  const start = Math.max(1, Math.min(savedRangeStart.value, savedRangeEnd.value));
+  const end = Math.min(len, Math.max(savedRangeStart.value, savedRangeEnd.value));
+  for (let i = start - 1; i < end; i++) {
+    savedTableRef.value?.toggleRowSelection(savedCodes.value[i], false);
+  }
 }
 
-/** 根据批次号返回 el-tag 类型 */
-function getBatchTagType(batchNo: string) {
-  const index = (parseInt(batchNo, 10) - 1) % 4;
-  const types = ['primary', 'success', 'warning', 'danger'] as const;
-  return types[index];
+/** 复制选中编码（编码 + 名称） */
+function copySelectedSaved() {
+  const codes = savedCodes.value
+    .filter((d: any) => selectedSavedIds.value.includes(d.id))
+    .map((d: any) => `${d.code} ${d.name}`)
+    .join('\n');
+  if (!codes) {
+    ElMessage.warning('请先选择要复制的编码');
+    return;
+  }
+  navigator.clipboard.writeText(codes).then(
+    () => ElMessage.success('已复制'),
+    () => ElMessage.warning('复制失败，请手动选择复制'),
+  );
+}
+
+/** 删除选中记录（逻辑删除） */
+async function deleteSelectedSaved() {
+  if (selectedSavedIds.value.length === 0) {
+    ElMessage.warning('请先选择要删除的编码');
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedSavedIds.value.length} 条编码吗？删除后数据将置为失效状态。`,
+      '确认删除',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
+    );
+    const result = await codeService.batchDeleteCodeRecords(selectedSavedIds.value);
+    ElMessage.success(`已删除 ${result.deletedCount} 条`);
+    loadSavedCodes();
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '删除失败');
+    }
+  }
+}
+
+/** 切换标签页时保持滚动位置 */
+function onTabClick() {
+  const scrollY = window.scrollY;
+  nextTick(() => {
+    window.scrollTo(0, scrollY);
+  });
 }
 
 function copyCode(code: string) {
@@ -736,40 +862,6 @@ function copyCode(code: string) {
     () => ElMessage.success('已复制'),
     () => ElMessage.warning('复制失败，请手动选择复制'),
   );
-}
-
-function copySelected() {
-  if (selectedDraftIds.value.length === 0) {
-    ElMessage.warning('请先选择要复制的编码');
-    return;
-  }
-  const codes = draftCodes.value
-    .filter((d) => selectedDraftIds.value.includes(d.id))
-    .map((d) => d.code)
-    .join('\n');
-  navigator.clipboard.writeText(codes).then(
-    () => ElMessage.success('已复制'),
-    () => ElMessage.warning('复制失败，请手动选择复制'),
-  );
-}
-
-async function deleteSelected() {
-  if (selectedDraftIds.value.length === 0) {
-    ElMessage.warning('请先选择要删除的编码');
-    return;
-  }
-  try {
-    await codeService.batchDeleteDraft(selectedDraftIds.value);
-    ElMessage.success('删除成功');
-    const draftList = await codeService.getDraftList(1, 5000);
-    draftCodes.value = draftList.list;
-  } catch (err: any) {
-    ElMessage.error(err.message || '删除失败');
-  }
-}
-
-async function handleExport() {
-  ElMessage.success('导出任务已创建');
 }
 
 /** 加载最近条件记录 */
@@ -917,6 +1009,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 .code-generate {
   max-width: 1400px;
   margin: 0 auto;
+  overflow-anchor: none;
 }
 
 .condition-card {
@@ -1013,23 +1106,61 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   align-items: center;
 }
 
-.draft-actions {
+.result-card {
+  overflow-anchor: none;
+}
+
+.preview-actions {
   margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
-.draft-total {
+.preview-count {
   font-size: 14px;
   color: #606266;
 }
 
-.range-selector {
+.saved-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.saved-filter-bar {
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
-  gap: 4px;
+}
+
+.saved-filter-bar > * + * {
+  margin-left: 10px;
+}
+
+.saved-selection-bar {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.saved-selection-bar > * + * {
+  margin-left: 10px;
+}
+
+.saved-total {
+  font-size: 14px;
+  color: #606266;
+}
+
+.saved-selection-bar .range-selector {
+  display: flex;
+  align-items: center;
+}
+
+.saved-selection-bar .range-selector > * + * {
+  margin-left: 10px;
 }
 
 .range-separator {
@@ -1092,13 +1223,4 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   align-items: center;
 }
 
-/* 临时区批次行颜色 */
-.draft-row-batch-0 { background-color: #ecf5ff; }
-.draft-row-batch-1 { background-color: #f0f9eb; }
-.draft-row-batch-2 { background-color: #fdf6ec; }
-.draft-row-batch-3 { background-color: #fef0f0; }
-.draft-row-batch-4 { background-color: #f5f7fa; }
-.draft-row-batch-5 { background-color: #e8f4f8; }
-.draft-row-batch-6 { background-color: #f3e8ff; }
-.draft-row-batch-7 { background-color: #fff7e6; }
 </style>

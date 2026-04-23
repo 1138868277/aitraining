@@ -130,16 +130,48 @@ router.post('/api/codes', async (req: Request, res: Response) => {
   }
 });
 
-/** 查询生成历史 */
+/** 查询生成历史（支持时间过滤） */
 router.get('/api/codes', async (req: Request, res: Response) => {
   try {
     const pageNum = parseInt(req.query.pageNum as string) || 1;
     const pageSize = Math.min(parseInt(req.query.pageSize as string) || 20, 100);
-    const result = await codeService.queryCodeHistory(pageNum, pageSize);
+    const startTime = req.query.startTime as string;
+    const endTime = req.query.endTime as string;
+    const result = await codeService.queryCodeHistory(pageNum, pageSize, startTime, endTime);
     paginated(res, result.list, result.total, pageNum, pageSize);
   } catch (err) {
     console.error('Failed to query code history:', err);
     error(res, ErrorCode.SYSTEM_ERROR, '查询编码历史失败', 500);
+  }
+});
+
+/** 批量删除编码生成记录 */
+router.delete('/api/codes/batch', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return error(res, ErrorCode.MISSING_PARAMETER, '请指定要删除的记录ID');
+    }
+    const deletedCount = await codeService.batchDeleteCodeRecords(ids);
+    success(res, { deletedCount });
+  } catch (err) {
+    console.error('Failed to batch delete code records:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '批量删除失败', 500);
+  }
+});
+
+/** 删除单条编码生成记录 */
+router.delete('/api/codes/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const deleted = await codeService.deleteCodeRecord(id);
+    if (!deleted) {
+      return error(res, ErrorCode.RESOURCE_NOT_FOUND, '记录不存在', 404);
+    }
+    success(res, null);
+  } catch (err) {
+    console.error('Failed to delete code record:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '删除失败', 500);
   }
 });
 
