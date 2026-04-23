@@ -157,4 +157,27 @@ router.get('/api/codes/export', (req: Request, res: Response) => {
   }
 });
 
+/** 保存最近条件记录 */
+router.post('/api/codes/recent-conditions', async (req: Request, res: Response) => {
+  try {
+    const { conditions: conds } = req.body;
+    await codeService.saveRecentCondition(conds || {});
+    success(res, null);
+  } catch (err) {
+    console.error('Failed to save recent condition:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '保存最近条件失败', 500);
+  }
+});
+
+/** 查询最近条件记录（最近10条） */
+router.get('/api/codes/recent-conditions', async (req: Request, res: Response) => {
+  try {
+    const list = await codeService.getRecentConditions();
+    success(res, list);
+  } catch (err) {
+    console.error('Failed to get recent conditions:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '查询最近条件失败', 500);
+  }
+});
+
 export default router;

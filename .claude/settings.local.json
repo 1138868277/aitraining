@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp /Users/liuhaojun/.claude/image-cache/62683735-8d0c-4f34-b6cc-9dbb2342c34a/1.png /tmp/recent-condition-screenshot.png)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

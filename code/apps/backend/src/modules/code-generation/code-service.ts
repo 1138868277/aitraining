@@ -117,6 +117,41 @@ export async function saveCodeRecords(
   return saved;
 }
 
+/** 生成条件摘要文本 */
+function generateConditionSummary(conditions: Record<string, any>): string {
+  const parts: string[] = [];
+  if (conditions.stationCode) parts.push(`场站：${conditions.stationCode}`);
+  if (conditions.typeCode) parts.push(`发电类型：${conditions.typeCode}`);
+  if (conditions.secondClassCode) parts.push(`二级类码：${conditions.secondClassCode}`);
+  if (conditions.thirdClassCode) parts.push(`三级类码：${conditions.thirdClassCode}`);
+  if (conditions.dataTypeCode) parts.push(`数据类码：${conditions.dataTypeCode}`);
+  if (conditions.dataCode) {
+    const codes = Array.isArray(conditions.dataCode) ? conditions.dataCode : [conditions.dataCode];
+    parts.push(`数据码：${codes.join('、')}`);
+  }
+  return parts.join(' ｜ ');
+}
+
+/** 保存最近条件记录 */
+export async function saveRecentCondition(conditions: Record<string, any>): Promise<void> {
+  const summary = generateConditionSummary(conditions);
+  const sql = `INSERT INTO ${schema}.cec_new_energy_recent_condition
+    (condition_data, condition_summary, creator, create_tm, modify_tm, if_delete)
+    VALUES ($1, $2, 'system', NOW(), NOW(), '0')`;
+  await query(sql, [JSON.stringify(conditions), summary]);
+}
+
+/** 查询最近条件记录（最近10条） */
+export async function getRecentConditions(): Promise<any[]> {
+  const sql = `SELECT id, condition_data, condition_summary,
+    TO_CHAR(create_tm, 'YYYY-MM-DD HH24:MI:SS') AS generate_time
+    FROM ${schema}.cec_new_energy_recent_condition
+    WHERE if_delete = '0'
+    ORDER BY create_tm DESC
+    LIMIT 10`;
+  return query(sql);
+}
+
 /** 分页查询编码生成历史 */
 export async function queryCodeHistory(
   pageNum: number,

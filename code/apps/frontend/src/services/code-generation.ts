@@ -47,3 +47,12 @@ export async function getCodeHistory(
   const res = await api.get('/codes', { params: { pageNum, pageSize } });
   return res.data;
 }
+
+export async function saveRecentCondition(conditions: Record<string, any>): Promise<void> {
+  await api.post('/codes/recent-conditions', { conditions });
+}
+
+export async function getRecentConditions(): Promise<any[]> {
+  const res = await api.get('/codes/recent-conditions');
+  return res.data;
+}

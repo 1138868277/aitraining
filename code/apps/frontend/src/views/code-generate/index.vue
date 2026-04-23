@@ -3,7 +3,64 @@
     <!-- 顶部筛选条件面板 -->
     <el-card class="condition-card">
       <template #header>
-        <span>筛选条件</span>
+        <div class="condition-header">
+          <span>筛选条件</span>
+          <el-popover
+            ref="recentPopoverRef"
+            trigger="hover"
+            placement="bottom-end"
+            width="480"
+            popper-class="recent-condition-popover"
+          >
+            <template #reference>
+              <el-button size="small">
+                最近记录
+                <el-tag v-if="recentConditions.length > 0" size="small" type="primary" class="recent-count-tag">{{ recentConditions.length }}</el-tag>
+              </el-button>
+            </template>
+            <div class="recent-conditions-list">
+              <div
+                v-for="(item, index) in recentConditions"
+                :key="item.id"
+                class="recent-condition-item"
+                :class="{ 'is-first': index === 0 }"
+                @click="applyRecentCondition(item)"
+              >
+                <div class="recent-condition-fields">
+                  <div class="recent-field" v-if="item.conditionData.stationCode">
+                    <span class="recent-field-label">场站：</span>
+                    <span class="recent-field-value">{{ item.conditionData.stationCode }}{{ formatName('stationCode', item.conditionData.stationCode) }}</span>
+                  </div>
+                  <div class="recent-field" v-if="item.conditionData.typeCode">
+                    <span class="recent-field-label">发电类型：</span>
+                    <span class="recent-field-value">{{ item.conditionData.typeCode }}{{ formatName('typeCode', item.conditionData.typeCode) }}</span>
+                  </div>
+                  <div class="recent-field" v-if="item.conditionData.secondClassCode">
+                    <span class="recent-field-label">二级类码：</span>
+                    <span class="recent-field-value">{{ item.conditionData.secondClassCode }}{{ formatName('secondClassCode', item.conditionData.secondClassCode) }}</span>
+                  </div>
+                  <div class="recent-field" v-if="item.conditionData.thirdClassCode">
+                    <span class="recent-field-label">三级类码：</span>
+                    <span class="recent-field-value">{{ item.conditionData.thirdClassCode }}{{ formatName('thirdClassCode', item.conditionData.thirdClassCode) }}</span>
+                  </div>
+                  <div class="recent-field" v-if="item.conditionData.dataTypeCode">
+                    <span class="recent-field-label">数据类码：</span>
+                    <span class="recent-field-value">{{ item.conditionData.dataTypeCode }}{{ formatName('dataTypeCode', item.conditionData.dataTypeCode) }}</span>
+                  </div>
+                  <div class="recent-field" v-if="item.conditionData.dataCode">
+                    <span class="recent-field-label">数据码：</span>
+                    <span class="recent-field-value">{{ formatDataCode(item.conditionData.dataCode) }}</span>
+                  </div>
+                </div>
+                <div class="recent-condition-meta">
+                  <span class="recent-condition-time">{{ item.generateTime }}</span>
+                  <el-tag size="small" type="primary" effect="plain" class="apply-tag">点击应用</el-tag>
+                </div>
+              </div>
+              <el-empty v-if="recentConditions.length === 0" description="暂无最近记录" />
+            </div>
+          </el-popover>
+        </div>
       </template>
       <el-form :model="conditions" label-width="140px" label-position="top">
         <el-row :gutter="20">
@@ -247,6 +304,8 @@ const activeTab = ref('generated');
 const draftTableRef = ref<any>(null);
 const rangeStart = ref(1);
 const rangeEnd = ref(1);
+const recentConditions = ref<Array<{ id: number; conditionData: Record<string, any>; conditionSummary: string; generateTime: string }>>([]);
+const recentPopoverRef = ref<any>(null);
 
 const canGenerate = computed(() => {
   return conditionFields.every((field) => {
@@ -356,6 +415,9 @@ onMounted(async () => {
 
     // 触发类型级联加载二级类码
     await onConditionChange('typeCode');
+
+    // 加载最近条件记录
+    loadRecentConditions();
   } catch (err: any) {
     ElMessage.error('筛选条件加载失败，请刷新重试');
   }
@@ -565,6 +627,9 @@ async function handleGenerate() {
       ElMessage.success(`成功生成 ${allResults.length} 个编码`);
     }
 
+    // 生成成功后保存当前条件到最近记录
+    saveCurrentConditions();
+
     activeTab.value = 'generated';
   } catch (err: any) {
     ElMessage.error(err.message || '生成编码失败');
@@ -706,6 +771,146 @@ async function deleteSelected() {
 async function handleExport() {
   ElMessage.success('导出任务已创建');
 }
+
+/** 加载最近条件记录 */
+async function loadRecentConditions() {
+  try {
+    const list = await codeService.getRecentConditions();
+    recentConditions.value = (list || []).map((item: any) => ({
+      id: item.id,
+      conditionData: typeof item.condition_data === 'string' ? JSON.parse(item.condition_data) : (item.condition_data || {}),
+      conditionSummary: item.condition_summary || '',
+      generateTime: item.generate_time || '',
+    }));
+
+    // 预加载最近记录的字典名称（三级类码、数据类码、数据码）
+    if (recentConditions.value.length > 0) {
+      const data = recentConditions.value[0].conditionData;
+      await preloadRecentDicts(data);
+    }
+  } catch {
+    // 静默失败，不影响主功能
+  }
+}
+
+/** 根据最近记录的编码预加载对应的字典列表，使名称能正常显示 */
+async function preloadRecentDicts(data: Record<string, any>) {
+  if (data.secondClassCode) {
+    if (!dictOptions['thirdClassCode']?.length) {
+      try {
+        dictOptions['thirdClassCode'] = await dictService.getCascadedDictItems(data.secondClassCode, data.typeCode);
+      } catch {}
+    }
+    if (!dictOptions['dataTypeCode']?.length) {
+      try {
+        dictOptions['dataTypeCode'] = await dictService.getDataTypeBySecondClass(data.typeCode, data.secondClassCode);
+      } catch {}
+    }
+  }
+  if (data.dataTypeCode && !dictOptions['dataCode']?.length) {
+    try {
+      dictOptions['dataCode'] = await dictService.getDataCodes(data.dataTypeCode, data.secondClassCode, data.typeCode);
+    } catch {}
+  }
+}
+
+/** 查找字典项名称 */
+function findDictName(key: string, code: string): string | undefined {
+  return dictOptions[key]?.find(item => item.code === code)?.name;
+}
+
+/** 显示字典名称（code 有对应 name 时返回 " name"，否则返回空串） */
+function formatName(dictKey: string, code: string): string {
+  const name = findDictName(dictKey, code);
+  return name ? ` ${name}` : '';
+}
+
+/** 显示数据码（支持多选），格式："001 电压" 或 "001 电压、002 频率" */
+function formatDataCode(dataCode: string | string[]): string {
+  const codes = Array.isArray(dataCode) ? dataCode : [dataCode];
+  return codes.map(c => {
+    const name = findDictName('dataCode', c);
+    return name ? `${c} ${name}` : c;
+  }).join('、');
+}
+
+/** 保存当前条件到最近记录（只存筛选条件编码，不存名称） */
+async function saveCurrentConditions() {
+  const snapshot: Record<string, any> = {};
+  conditionFields.forEach((field) => {
+    const val = conditions[field.key];
+    if (val !== undefined && val !== null && val !== '') {
+      if (field.multiple && Array.isArray(val) && val.length === 0) return;
+      snapshot[field.key] = val;
+    }
+  });
+  // 保存扩展字段
+  ['secondExtCodeStart', 'secondExtCodeCount', 'thirdExtCodeStart', 'thirdExtCodeCount'].forEach((k) => {
+    if (conditions[k]) snapshot[k] = conditions[k];
+  });
+
+  try {
+    await codeService.saveRecentCondition(snapshot);
+    loadRecentConditions();
+  } catch {
+    // 静默失败
+  }
+}
+
+/** 应用最近条件记录：一键切换所有筛选条件 */
+async function applyRecentCondition(item: { conditionData: Record<string, any> }) {
+  const saved = item.conditionData;
+  if (!saved || Object.keys(saved).length === 0) return;
+
+  // 1. 清空所有条件
+  conditionFields.forEach((field) => {
+    conditions[field.key] = field.multiple ? [] : '';
+  });
+  ['secondExtCodeStart', 'secondExtCodeCount', 'thirdExtCodeStart', 'thirdExtCodeCount'].forEach((k) => {
+    conditions[k] = '';
+  });
+
+  // 2. 按依赖顺序设置条件并触发级联加载
+  // 2a. 设置独立字段
+  conditions.stationCode = saved.stationCode || '';
+  conditions.typeCode = saved.typeCode || '';
+  conditions.projectLineCode = saved.projectLineCode || '';
+  conditions.prefixNo = saved.prefixNo || '';
+  conditions.firstClassCode = saved.firstClassCode || '';
+
+  // 2b. 触发类型级联（加载二级类码列表）
+  await onConditionChange('typeCode');
+
+  // 2c. 设置二级类相关字段
+  conditions.secondClassCode = saved.secondClassCode || '';
+  conditions.secondExtCodeStart = saved.secondExtCodeStart || '1';
+  conditions.secondExtCodeCount = saved.secondExtCodeCount || '1';
+
+  // 2d. 触发二级类级联（加载三级类码和数据类码列表）
+  await onConditionChange('secondClassCode');
+
+  // 2e. 设置三级类、扩展和数据类字段
+  conditions.thirdClassCode = saved.thirdClassCode || '';
+  conditions.thirdExtCodeStart = saved.thirdExtCodeStart || '0';
+  conditions.thirdExtCodeCount = saved.thirdExtCodeCount || '1';
+  conditions.dataTypeCode = saved.dataTypeCode || '';
+
+  // 2f. 触发数据类码级联（加载数据码列表）
+  await onConditionChange('dataTypeCode');
+
+  // 2g. 设置数据码
+  if (saved.dataCode !== undefined && saved.dataCode !== null) {
+    conditions.dataCode = saved.dataCode;
+  }
+
+  // 清空已生成的编码
+  generatedCodes.value = [];
+
+  // 关闭popover
+  recentPopoverRef.value?.hide?.();
+
+  ElMessage.success('已应用最近条件');
+}
 </script>
 
 <style scoped>
@@ -716,6 +921,84 @@ async function handleExport() {
 
 .condition-card {
   margin-bottom: 20px;
+}
+
+.condition-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.recent-count-tag {
+  margin-left: 4px;
+}
+
+.recent-conditions-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.recent-condition-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #ebeef5;
+  transition: background-color 0.2s;
+  border-radius: 4px;
+}
+
+.recent-condition-item:last-child {
+  border-bottom: none;
+}
+
+.recent-condition-item:hover {
+  background-color: #f5f7fa;
+}
+
+.recent-condition-item.is-first {
+  background-color: #f0f9eb;
+}
+
+.recent-condition-item.is-first:hover {
+  background-color: #e1f3d8;
+}
+
+.recent-condition-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recent-field {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.recent-field-label {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.recent-field-value {
+  color: #303133;
+}
+
+.recent-condition-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.recent-condition-time {
+  font-size: 12px;
+  color: #909399;
+}
+
+.apply-tag {
+  flex-shrink: 0;
 }
 
 .condition-actions {

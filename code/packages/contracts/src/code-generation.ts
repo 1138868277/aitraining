@@ -104,3 +104,13 @@ export const codeRecordPageResponseSchema = z.object({
 });
 
 export type CodeRecordPageResponse = z.infer<typeof codeRecordPageResponseSchema>;
+
+/** 最近条件记录项 */
+export const recentConditionItemSchema = z.object({
+  id: z.number(),
+  conditionData: z.record(z.string(), z.any()),
+  conditionSummary: z.string().optional(),
+  generateTime: z.string(),
+});
+
+export type RecentConditionItem = z.infer<typeof recentConditionItemSchema>;
