@@ -1,6 +1,6 @@
 import type { GenerateCodeRequest, GenerateCodeResponse, DraftCodeItem } from '@cec/contracts';
 import { generateCodeFromConditions, generateCodeName } from './code-domain.js';
-import { formatDateTime, generateBatchNo } from '@cec/shared';
+import { formatDateTime } from '@cec/shared';
 import { query, queryOne } from '../../db/index.js';
 import { config } from '../../config/index.js';
 
@@ -44,12 +44,18 @@ export function saveToDraft(
   sessionId: string,
   codes: Array<{ code: string; name: string }>,
 ): { savedCount: number; totalCount: number } {
-  const batchNo = generateBatchNo();
   const existing = draftStore.get(sessionId) || [];
 
   if (existing.length + codes.length > 5000) {
     throw new Error('DRAFT_FULL');
   }
+
+  // 计算当前会话中的最大批次号，自增生成下一批
+  const maxBatch = existing.reduce((max, item) => {
+    const num = parseInt(item.batchNo, 10);
+    return isNaN(num) ? max : Math.max(max, num);
+  }, 0);
+  const batchNo = String(maxBatch + 1);
 
   const newItems: DraftCodeItem[] = codes.map((c, i) => ({
     id: Date.now() + i,

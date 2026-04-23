@@ -8,7 +8,7 @@ import type {
   CodeRecord,
 } from '@cec/contracts';
 
-export async function generateCode(params: GenerateCodeRequest): Promise<GenerateCodeResponse> {
+export async function generateCode(params: GenerateCodeRequest): Promise<GenerateCodeResponse | GenerateCodeResponse[]> {
   const res = await api.post('/codes/generate', params);
   return res.data;
 }

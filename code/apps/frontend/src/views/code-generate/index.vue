@@ -56,22 +56,24 @@
                 <div class="extend-number-row">
                   <el-input
                     v-model="conditions[field.key + 'Start']"
-                    placeholder="起始"
+                    :placeholder="field.key === 'secondExtCode' ? '起始（默认1）' : '起始（默认0）'"
                     :disabled="field.disabled(conditions)"
                     type="number"
-                    min="0"
+                    :min="field.key === 'secondExtCode' ? 1 : 0"
                     max="9999"
                     @change="onExtendNumberChange(field.key)"
+                    @input="limitStartInput($event, field.key)"
                     style="width: 48%"
                   />
                   <el-input
                     v-model="conditions[field.key + 'Count']"
-                    placeholder="数量"
+                    placeholder="数量（默认1）"
                     :disabled="field.disabled(conditions)"
                     type="number"
                     min="1"
-                    max="100"
+                    max="99"
                     @change="onExtendNumberChange(field.key)"
+                    @input="limitCountInput($event, field.key)"
                     style="width: 48%"
                   />
                 </div>
@@ -86,6 +88,9 @@
           生成编码
         </el-button>
         <el-button @click="handleClear">清空条件</el-button>
+        <span v-if="canGenerate && expectedCodeCount > 1" class="expected-count">
+          预计生成 {{ expectedCodeCount }} 个编码
+        </span>
       </div>
     </el-card>
 
@@ -130,22 +135,53 @@
         <el-tab-pane label="临时区" name="draft">
           <div v-if="draftCodes.length > 0" class="draft-actions">
             <span class="draft-total">共 {{ draftCodes.length }} 条</span>
+            <span class="range-selector">
+              <el-input-number
+                v-model="rangeStart"
+                :min="1"
+                :max="draftCodes.length"
+                size="small"
+                controls-position="right"
+                placeholder="起始行"
+                style="width: 100px"
+              />
+              <span class="range-separator">~</span>
+              <el-input-number
+                v-model="rangeEnd"
+                :min="1"
+                :max="draftCodes.length"
+                size="small"
+                controls-position="right"
+                placeholder="结束行"
+                style="width: 100px"
+              />
+              <el-button size="small" @click="selectRange">选中范围</el-button>
+              <el-button size="small" @click="clearSelection">取消选中</el-button>
+            </span>
             <el-button size="small" @click="copySelected">复制选中</el-button>
             <el-button size="small" @click="deleteSelected">删除选中</el-button>
           </div>
           <el-table
+            ref="draftTableRef"
             :data="draftCodes"
             border
             stripe
             style="width: 100%"
             @selection-change="onSelectionChange"
+            :row-class-name="draftRowClassName"
           >
             <el-table-column type="selection" width="50" />
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column prop="code" label="编码" width="320" />
             <el-table-column prop="name" label="编码名称" min-width="200" />
             <el-table-column prop="generateTime" label="生成时间" width="180" />
-            <el-table-column prop="batchNo" label="批次" width="160" />
+            <el-table-column label="批次" width="120">
+              <template #default="{ row }">
+                <el-tag :type="getBatchTagType(row.batchNo)" size="small" effect="plain">
+                  第{{ row.batchNo }}批
+                </el-tag>
+              </template>
+            </el-table-column>
           </el-table>
           <el-empty v-if="draftCodes.length === 0" description="临时区暂无数据" />
         </el-tab-pane>
@@ -155,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import * as dictService from '@/services/dict';
 import * as codeService from '@/services/code-generation';
@@ -190,6 +226,9 @@ const generatedCodes = ref<Array<{ code: string; name: string; generateTime: str
 const draftCodes = ref<Array<{ code: string; name: string; generateTime: string; batchNo: string }>>([]);
 const selectedDraftIds = ref<number[]>([]);
 const activeTab = ref('generated');
+const draftTableRef = ref<any>(null);
+const rangeStart = ref(1);
+const rangeEnd = ref(1);
 
 const canGenerate = computed(() => {
   return conditionFields.every((field) => {
@@ -203,6 +242,50 @@ const canGenerate = computed(() => {
       return !!conditions[field.key];
     }
   });
+});
+
+/** 解析扩展格式，如"5,3"返回数量，如"0005"返回1 */
+function parseExtendFormatCount(extendStr: string): number {
+  if (!extendStr) return 0;
+
+  // 如果是标准的4位编码，直接返回1
+  if (/^\d{4}$/.test(extendStr)) {
+    return 1;
+  }
+
+  // 尝试解析"从X开始拓展X条"格式，如"5,3"
+  const match = extendStr.match(/^(\d+)\s*,\s*(\d+)$/);
+  if (match) {
+    const count = parseInt(match[2], 10);
+    return Math.max(1, count);
+  }
+
+  // 默认返回1
+  return 1;
+}
+
+/** 预计生成的编码数量 */
+const expectedCodeCount = computed(() => {
+  // 获取二级类扩展码字符串
+  let secondExtStr = '';
+  if (conditions.secondExtCodeStart && conditions.secondExtCodeCount) {
+    secondExtStr = `${conditions.secondExtCodeStart},${conditions.secondExtCodeCount}`;
+  } else if (conditions.secondExtCodeStart) {
+    secondExtStr = conditions.secondExtCodeStart.toString().padStart(4, '0');
+  }
+
+  // 获取三级类扩展码字符串
+  let thirdExtStr = '';
+  if (conditions.thirdExtCodeStart && conditions.thirdExtCodeCount) {
+    thirdExtStr = `${conditions.thirdExtCodeStart},${conditions.thirdExtCodeCount}`;
+  } else if (conditions.thirdExtCodeStart) {
+    thirdExtStr = conditions.thirdExtCodeStart.toString().padStart(4, '0');
+  }
+
+  const secondCount = parseExtendFormatCount(secondExtStr);
+  const thirdCount = parseExtendFormatCount(thirdExtStr);
+
+  return secondCount * thirdCount;
 });
 
 // 初始化加载顶级字典
@@ -232,6 +315,18 @@ onMounted(async () => {
     if (productionOperation) {
       conditions.firstClassCode = productionOperation.code;
     }
+
+    // 项目期号&并网线路默认"111"
+    conditions.projectLineCode = '111';
+
+    // 设置扩展码默认值
+    // 二级类扩展码：起始默认1，数量默认1
+    conditions.secondExtCodeStart = '1';
+    conditions.secondExtCodeCount = '1';
+
+    // 三级类扩展码：起始默认0，数量默认1
+    conditions.thirdExtCodeStart = '0';
+    conditions.thirdExtCodeCount = '1';
   } catch (err: any) {
     ElMessage.error('筛选条件加载失败，请刷新重试');
   }
@@ -339,6 +434,30 @@ async function onConditionChange(key: string) {
   }
 }
 
+/** 限制起始输入：最多4位数字，按类型限制最小值 */
+function limitStartInput(value: string, key: string) {
+  // 去除非数字字符
+  const cleaned = value.replace(/\D/g, '');
+  // 最多4位
+  const truncated = cleaned.slice(0, 4);
+  conditions[key + 'Start'] = truncated;
+}
+
+/** 限制数量输入：最多2位数字，最大值99 */
+function limitCountInput(value: string, key: string) {
+  // 去除非数字字符
+  const cleaned = value.replace(/\D/g, '');
+  // 最多2位
+  const truncated = cleaned.slice(0, 2);
+  // 超过99则截断为99
+  const num = parseInt(truncated, 10);
+  if (!isNaN(num) && num > 99) {
+    conditions[key + 'Count'] = '99';
+  } else {
+    conditions[key + 'Count'] = truncated;
+  }
+}
+
 // 扩展数字输入框变化处理
 function onExtendNumberChange(key: string) {
   // 扩展码不与其他筛选条件联动，只清空已生成的编码
@@ -374,7 +493,26 @@ async function handleGenerate() {
 
     const parsed = generateCodeRequestSchema.parse(processedConditions);
     const result = await codeService.generateCode(parsed as any);
-    generatedCodes.value = [result];
+
+    // 处理返回结果：可能是单个对象或数组
+    if (Array.isArray(result)) {
+      generatedCodes.value = result;
+    } else if (result && typeof result === 'object') {
+      generatedCodes.value = [result];
+    } else {
+      // 如果返回格式不符合预期，尝试从批量响应中提取
+      if (result && result.codes && Array.isArray(result.codes)) {
+        generatedCodes.value = result.codes;
+      } else {
+        throw new Error('生成编码返回格式错误');
+      }
+    }
+
+    // 显示生成数量提示
+    if (generatedCodes.value.length > 1) {
+      ElMessage.success(`成功生成 ${generatedCodes.value.length} 个编码`);
+    }
+
     activeTab.value = 'generated';
   } catch (err: any) {
     ElMessage.error(err.message || '生成编码失败');
@@ -397,6 +535,12 @@ function handleClear() {
     conditions.firstClassCode = productionOperation.code;
   }
 
+  // 重置扩展码默认值
+  conditions.secondExtCodeStart = '1';
+  conditions.secondExtCodeCount = '1';
+  conditions.thirdExtCodeStart = '0';
+  conditions.thirdExtCodeCount = '1';
+
   generatedCodes.value = [];
   draftCodes.value = [];
 }
@@ -415,6 +559,51 @@ async function handleSaveDraft() {
 
 function onSelectionChange(rows: any[]) {
   selectedDraftIds.value = rows.map((r) => r.id);
+}
+
+/** 按行号范围选中临时区中的行（追加选中，不影响已有选中） */
+function selectRange() {
+  const start = Math.max(1, Math.min(rangeStart.value, rangeEnd.value));
+  const end = Math.min(draftCodes.value.length, Math.max(rangeStart.value, rangeEnd.value));
+
+  for (let i = start - 1; i < end; i++) {
+    draftTableRef.value?.toggleRowSelection(draftCodes.value[i], true);
+  }
+}
+
+/** 取消指定范围行的选中 */
+function clearSelection() {
+  const start = Math.max(1, Math.min(rangeStart.value, rangeEnd.value));
+  const end = Math.min(draftCodes.value.length, Math.max(rangeStart.value, rangeEnd.value));
+
+  for (let i = start - 1; i < end; i++) {
+    draftTableRef.value?.toggleRowSelection(draftCodes.value[i], false);
+  }
+}
+
+/** 批次对应的背景色（按批次索引循环） */
+const BATCH_COLORS = [
+  '#ecf5ff', // 淡蓝
+  '#f0f9eb', // 淡绿
+  '#fdf6ec', // 淡橙
+  '#fef0f0', // 淡红
+  '#f5f7fa', // 淡灰
+  '#e8f4f8', // 青
+  '#f3e8ff', // 紫
+  '#fff7e6', // 米黄
+];
+
+/** 根据批次号返回行样式名 */
+function draftRowClassName({ row }: { row: { batchNo: string } }) {
+  const index = (parseInt(row.batchNo, 10) - 1) % BATCH_COLORS.length;
+  return `draft-row-batch-${index}`;
+}
+
+/** 根据批次号返回 el-tag 类型 */
+function getBatchTagType(batchNo: string) {
+  const index = (parseInt(batchNo, 10) - 1) % 4;
+  const types = ['primary', 'success', 'warning', 'danger'] as const;
+  return types[index];
 }
 
 function copyCode(code: string) {
@@ -486,11 +675,23 @@ async function handleExport() {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .draft-total {
   font-size: 14px;
   color: #606266;
+}
+
+.range-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.range-separator {
+  color: #909399;
+  font-size: 14px;
 }
 
 .input-with-quick-options {
@@ -526,4 +727,22 @@ async function handleExport() {
   align-items: center;
   gap: 8px;
 }
+
+.expected-count {
+  margin-left: 12px;
+  font-size: 14px;
+  color: #67c23a;
+  display: flex;
+  align-items: center;
+}
+
+/* 临时区批次行颜色 */
+.draft-row-batch-0 { background-color: #ecf5ff; }
+.draft-row-batch-1 { background-color: #f0f9eb; }
+.draft-row-batch-2 { background-color: #fdf6ec; }
+.draft-row-batch-3 { background-color: #fef0f0; }
+.draft-row-batch-4 { background-color: #f5f7fa; }
+.draft-row-batch-5 { background-color: #e8f4f8; }
+.draft-row-batch-6 { background-color: #f3e8ff; }
+.draft-row-batch-7 { background-color: #fff7e6; }
 </style>

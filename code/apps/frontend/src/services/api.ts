@@ -1,10 +1,14 @@
 import axios from 'axios';
 
+// 生成一个会话ID，用于临时区数据隔离
+const sessionId = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
 const api = axios.create({
   baseURL: '/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
+    'x-session-id': sessionId,
   },
 });
 
