@@ -9,24 +9,36 @@
         <el-row :gutter="20">
           <el-col :span="6" v-for="field in conditionFields" :key="field.key">
             <el-form-item :label="field.label" :required="field.required">
-              <!-- 下拉选择框 -->
-              <el-select
-                v-if="field.type === 'select'"
-                v-model="conditions[field.key]"
-                :placeholder="'请选择' + field.label"
-                filterable
-                :disabled="field.disabled(conditions)"
-                clearable
-                @change="onConditionChange(field.key)"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="item in dictOptions[field.key] || []"
-                  :key="item.code"
-                  :label="item.code + ' ' + item.name"
-                  :value="item.code"
-                />
-              </el-select>
+              <!-- 下拉选择框（带快捷选择） -->
+              <div v-if="field.type === 'select'" class="input-with-quick-options">
+                <el-select
+                  v-model="conditions[field.key]"
+                  :placeholder="'请选择' + field.label"
+                  filterable
+                  :disabled="field.disabled(conditions)"
+                  clearable
+                  @change="onConditionChange(field.key)"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="item in dictOptions[field.key] || []"
+                    :key="item.code"
+                    :label="item.code + ' ' + item.name"
+                    :value="item.code"
+                  />
+                </el-select>
+                <div v-if="field.quickOptions && field.quickOptions.length > 0" class="quick-options">
+                  <el-tag
+                    v-for="option in field.quickOptions"
+                    :key="option"
+                    size="small"
+                    class="quick-option-tag"
+                    @click="conditions[field.key] = option; onConditionChange(field.key)"
+                  >
+                    {{ option }}
+                  </el-tag>
+                </div>
+              </div>
 
               <!-- 输入框（带快捷选择） -->
               <div v-else-if="field.type === 'input'" class="input-with-quick-options">
@@ -208,7 +220,7 @@ interface ConditionField {
 
 const conditionFields: ConditionField[] = [
   { key: 'stationCode', label: '场站', required: true, disabled: () => false, type: 'select' },
-  { key: 'typeCode', label: '类型', required: true, disabled: () => false, type: 'select' },
+  { key: 'typeCode', label: '类型', required: true, disabled: () => false, type: 'select', quickOptions: ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'Y0'] },
   { key: 'projectLineCode', label: '项目期号&并网线路', required: true, disabled: () => false, type: 'input', quickOptions: ['111', '112', '121', '122'] },
   { key: 'prefixNo', label: '前缀号', required: true, disabled: () => false, type: 'select' },
   { key: 'firstClassCode', label: '一级类码', required: true, disabled: () => false, type: 'select' },
@@ -698,6 +710,7 @@ async function handleExport() {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
 }
 
 .quick-options {
