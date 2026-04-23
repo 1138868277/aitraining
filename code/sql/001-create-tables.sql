@@ -203,3 +203,25 @@ COMMENT ON COLUMN cec_new_energy_checkdata.file_source IS '数据来源文件';
 CREATE INDEX IF NOT EXISTS idx_checkdata_result ON cec_new_energy_checkdata(result);
 CREATE INDEX IF NOT EXISTS idx_checkdata_domain ON cec_new_energy_checkdata(management_domain);
 CREATE INDEX IF NOT EXISTS idx_checkdata_station ON cec_new_energy_checkdata(station);
+
+-- 9. 二级类码类型关联表
+DROP TABLE IF EXISTS cec_new_energy_second_class_type_dict CASCADE;
+CREATE TABLE cec_new_energy_second_class_type_dict (
+    id BIGSERIAL NOT NULL,
+    type_code VARCHAR(2) NOT NULL,
+    second_class_code VARCHAR(3) NOT NULL,
+    second_class_name VARCHAR(100) NOT NULL,
+    tenant_id VARCHAR(20) DEFAULT '0',
+    creator VARCHAR(50),
+    modifier VARCHAR(50),
+    create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    if_delete CHAR(1) DEFAULT '0',
+    PRIMARY KEY (id)
+);
+COMMENT ON TABLE cec_new_energy_second_class_type_dict IS '二级类码类型关联表';
+COMMENT ON COLUMN cec_new_energy_second_class_type_dict.type_code IS '类型编码';
+COMMENT ON COLUMN cec_new_energy_second_class_type_dict.second_class_code IS '二级类码编码';
+COMMENT ON COLUMN cec_new_energy_second_class_type_dict.second_class_name IS '二级类码名称';
+CREATE INDEX IF NOT EXISTS idx_second_class_type ON cec_new_energy_second_class_type_dict(type_code, second_class_code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_second_class_type_unique ON cec_new_energy_second_class_type_dict(type_code, second_class_code) WHERE if_delete = '0';

@@ -19,3 +19,9 @@ export async function getDataCodes(dataTypeCode: string): Promise<DictItem[]> {
   const res = await api.get(`/dict/data-code/${dataTypeCode}`);
   return res.data.items;
 }
+
+/** 根据类型代码获取二级类码列表 */
+export async function getSecondClassByType(typeCode: string): Promise<DictItem[]> {
+  const res = await api.get(`/dict/second-class/${typeCode}`);
+  return res.data.items;
+}

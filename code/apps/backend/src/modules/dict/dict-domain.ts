@@ -50,12 +50,20 @@ function getTypeDomainCode(typeCode?: string): string | null {
     return null;
   }
 
-  // F1-F4 -> F, G1-G2 -> G, Y0 -> Y (或不过滤)
-  if (typeCode.startsWith('F')) {
+  // 支持多种类型代码格式：
+  // 1. F1, F2, F3, F4 -> F (风力发电)
+  // 2. G1, G2 -> G (光伏发电)
+  // 3. Y0 -> Y (通用)
+  // 4. 01 -> F (假设01对应风力发电)
+  // 5. 02 -> G (假设02对应光伏发电)
+  // 6. 03 -> Y (假设03对应水力发电)
+  // 7. 04 -> Y (假设04对应储能电站)
+
+  if (typeCode.startsWith('F') || typeCode === '01') {
     return 'F';
-  } else if (typeCode.startsWith('G')) {
+  } else if (typeCode.startsWith('G') || typeCode === '02') {
     return 'G';
-  } else if (typeCode === 'Y0') {
+  } else if (typeCode === 'Y0' || typeCode === '03' || typeCode === '04') {
     return 'Y';
   }
   return null;
@@ -90,18 +98,25 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
     const checkResult = await query<{ cnt: number }>(checkFirstSql, [parentCode]);
     if (checkResult[0].cnt > 0) {
       // 是一级类码，返回对应的二级类码
-      let level2Sql = `SELECT DISTINCT second_class_code AS code, second_class_name AS name
-        FROM ${schema}.cec_new_energy_code_dict
-        WHERE if_delete = '0' AND first_class_code = $1 AND second_class_code IS NOT NULL`;
+      // 如果typeCode是类型代码（长度2），则从二级类码类型表查询
+      if (typeCode && typeCode.length === 2) {
+        // 从二级类码类型表查询该类型下的所有二级类码
+        return getSecondClassByType(typeCode);
+      } else {
+        // 使用原来的逻辑，从标准编码字典表查询
+        let level2Sql = `SELECT DISTINCT second_class_code AS code, second_class_name AS name
+          FROM ${schema}.cec_new_energy_code_dict
+          WHERE if_delete = '0' AND first_class_code = $1 AND second_class_code IS NOT NULL`;
 
-      const params: any[] = [parentCode];
-      if (typeDomainCode) {
-        level2Sql += ` AND type_domain_code = $2`;
-        params.push(typeDomainCode);
+        const params: any[] = [parentCode];
+        if (typeDomainCode) {
+          level2Sql += ` AND type_domain_code = $2`;
+          params.push(typeDomainCode);
+        }
+
+        level2Sql += ` ORDER BY second_class_code`;
+        return query(level2Sql, params);
       }
-
-      level2Sql += ` ORDER BY second_class_code`;
-      return query(level2Sql, params);
     } else {
       // 可能是数据类码，返回对应的数据编码
       let dataCodeSql = `SELECT DISTINCT data_code AS code, data_name AS name
@@ -163,6 +178,15 @@ export async function getDataTypeDict(): Promise<DictItem[]> {
     FROM ${schema}.cec_new_energy_data_type_dict
     WHERE if_delete = '0' ORDER BY data_type_code`;
   return query(sql);
+}
+
+/** 根据类型代码获取二级类码列表 */
+export async function getSecondClassByType(typeCode: string): Promise<DictItem[]> {
+  const sql = `SELECT second_class_code AS code, second_class_name AS name
+    FROM ${schema}.cec_new_energy_second_class_type_dict
+    WHERE if_delete = '0' AND type_code = $1
+    ORDER BY second_class_code`;
+  return query(sql, [typeCode]);
 }
 
 /** 获取数据码（根据数据类码过滤） */

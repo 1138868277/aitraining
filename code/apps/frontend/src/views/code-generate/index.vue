@@ -51,17 +51,30 @@
                 </div>
               </div>
 
-              <!-- 扩展输入框（从X开始拓展X条） -->
-              <div v-else-if="field.type === 'extend-input'" class="extend-input">
-                <el-input
-                  v-model="conditions[field.key]"
-                  :placeholder="'格式：从X开始拓展X条，如：5,3'"
-                  :disabled="field.disabled(conditions)"
-                  clearable
-                  @change="onConditionChange(field.key)"
-                  style="width: 100%"
-                />
-                <div class="extend-hint">格式：从X开始拓展X条，如：5,3 生成0005,0006,0007</div>
+              <!-- 扩展数字输入框（两个独立输入框） -->
+              <div v-else-if="field.type === 'extend-number'" class="extend-number-input">
+                <div class="extend-number-row">
+                  <el-input
+                    v-model="conditions[field.key + 'Start']"
+                    placeholder="起始"
+                    :disabled="field.disabled(conditions)"
+                    type="number"
+                    min="0"
+                    max="9999"
+                    @change="onExtendNumberChange(field.key)"
+                    style="width: 48%"
+                  />
+                  <el-input
+                    v-model="conditions[field.key + 'Count']"
+                    placeholder="数量"
+                    :disabled="field.disabled(conditions)"
+                    type="number"
+                    min="1"
+                    max="100"
+                    @change="onExtendNumberChange(field.key)"
+                    style="width: 48%"
+                  />
+                </div>
               </div>
             </el-form-item>
           </el-col>
@@ -153,7 +166,7 @@ interface ConditionField {
   label: string;
   required: boolean;
   disabled: (conds: Record<string, string>) => boolean;
-  type?: 'select' | 'input' | 'extend-input'; // 字段类型：下拉选择、输入框、扩展输入框
+  type?: 'select' | 'input' | 'extend-input' | 'extend-number'; // 字段类型：下拉选择、输入框、扩展输入框、扩展数字输入框
   quickOptions?: string[]; // 快捷选择项
 }
 
@@ -164,9 +177,9 @@ const conditionFields: ConditionField[] = [
   { key: 'prefixNo', label: '前缀号', required: true, disabled: () => false, type: 'select' },
   { key: 'firstClassCode', label: '一级类码', required: true, disabled: () => false, type: 'select' },
   { key: 'secondClassCode', label: '二级类码', required: true, disabled: (c) => !c.firstClassCode, type: 'select' },
-  { key: 'secondExtCode', label: '二级类扩展码', required: true, disabled: (c) => !c.secondClassCode, type: 'extend-input' },
-  { key: 'thirdClassCode', label: '三级类码', required: true, disabled: (c) => !c.secondExtCode, type: 'select' },
-  { key: 'thirdExtCode', label: '三级类扩展码', required: true, disabled: (c) => !c.thirdClassCode, type: 'extend-input' },
+  { key: 'secondExtCode', label: '二级类扩展码', required: true, disabled: (c) => !c.secondClassCode, type: 'extend-number' },
+  { key: 'thirdClassCode', label: '三级类码', required: true, disabled: (c) => !c.secondClassCode, type: 'select' },
+  { key: 'thirdExtCode', label: '三级类扩展码', required: true, disabled: (c) => !c.thirdClassCode, type: 'extend-number' },
   { key: 'dataTypeCode', label: '数据类码', required: false, disabled: (c) => !c.secondClassCode, type: 'select' },
   { key: 'dataCode', label: '数据码', required: false, disabled: (c) => !c.dataTypeCode, type: 'select' },
 ];
@@ -178,8 +191,19 @@ const draftCodes = ref<Array<{ code: string; name: string; generateTime: string;
 const selectedDraftIds = ref<number[]>([]);
 const activeTab = ref('generated');
 
-const requiredFields = conditionFields.filter((f) => f.required).map((f) => f.key);
-const canGenerate = computed(() => requiredFields.every((k) => conditions[k]));
+const canGenerate = computed(() => {
+  return conditionFields.every((field) => {
+    if (!field.required) return true;
+
+    if (field.type === 'extend-number') {
+      // 对于扩展数字字段，检查起始值是否已填写
+      return !!conditions[field.key + 'Start'];
+    } else {
+      // 对于其他字段，检查字段值是否存在
+      return !!conditions[field.key];
+    }
+  });
+});
 
 // 初始化加载顶级字典
 onMounted(async () => {
@@ -218,9 +242,7 @@ onMounted(async () => {
 async function onConditionChange(key: string) {
   const cascadeMap: Record<string, string> = {
     firstClassCode: 'secondClassCode',
-    secondClassCode: 'secondExtCode',
-    secondExtCode: 'thirdClassCode',
-    thirdClassCode: 'thirdExtCode',
+    secondClassCode: 'thirdClassCode', // 二级类码变更时清空三级类码
     dataTypeCode: 'dataCode',
   };
 
@@ -248,6 +270,35 @@ async function onConditionChange(key: string) {
           conditions.thirdExtCode = '';
           dictOptions['secondClassCode'] = [];
           dictOptions['thirdClassCode'] = [];
+        } else {
+          // 一级类码仍然有效，重新加载二级类码（根据新类型）
+          try {
+            const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
+            dictOptions['secondClassCode'] = secondClassItems;
+            // 如果当前选择的二级类码不在新列表中，清空它
+            const currentSecondClass = conditions.secondClassCode;
+            if (currentSecondClass && !secondClassItems.find(item => item.code === currentSecondClass)) {
+              conditions.secondClassCode = '';
+              conditions.secondExtCode = '';
+              conditions.thirdClassCode = '';
+              conditions.thirdExtCode = '';
+              dictOptions['thirdClassCode'] = [];
+            }
+          } catch {}
+        }
+      } catch {}
+    } else {
+      // 即使一级类码未选择，也预加载二级类码列表（根据类型）
+      try {
+        const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
+        dictOptions['secondClassCode'] = secondClassItems;
+        // 如果当前有二级类码选择（不应该发生，因为一级类码未选择），清空它
+        if (conditions.secondClassCode) {
+          conditions.secondClassCode = '';
+          conditions.secondExtCode = '';
+          conditions.thirdClassCode = '';
+          conditions.thirdExtCode = '';
+          dictOptions['thirdClassCode'] = [];
         }
       } catch {}
     }
@@ -273,15 +324,38 @@ async function onConditionChange(key: string) {
   }
 
   // 联动加载子级字典
-  if (['firstClassCode', 'secondClassCode', 'secondExtCode', 'thirdClassCode'].includes(key) && conditions[key]) {
+  if (['firstClassCode', 'secondClassCode', 'thirdClassCode'].includes(key) && conditions[key]) {
     try {
-      let typeCode = conditions.typeCode;
-      // 查询三级类码时，需要传递二级类码作为过滤条件
-      if (key === 'secondExtCode') {
-        typeCode = conditions.secondClassCode; // 使用二级类码作为typeCode参数
+      if (key === 'firstClassCode') {
+        // 根据类型获取二级类码
+        if (conditions.typeCode) {
+          const secondClassItems = await dictService.getSecondClassByType(conditions.typeCode);
+          dictOptions['secondClassCode'] = secondClassItems;
+          // 如果当前选择的二级类码不在新列表中，清空它（虽然cascadeMap已清空，但为了安全）
+          const currentSecondClass = conditions.secondClassCode;
+          if (currentSecondClass && !secondClassItems.find(item => item.code === currentSecondClass)) {
+            conditions.secondClassCode = '';
+            conditions.secondExtCode = '';
+            conditions.thirdClassCode = '';
+            conditions.thirdExtCode = '';
+            dictOptions['thirdClassCode'] = [];
+          }
+        } else {
+          // 类型未选择，清空二级类码列表
+          dictOptions['secondClassCode'] = [];
+          conditions.secondClassCode = '';
+          conditions.secondExtCode = '';
+          conditions.thirdClassCode = '';
+          conditions.thirdExtCode = '';
+          dictOptions['thirdClassCode'] = [];
+        }
+      } else if (key === 'secondClassCode') {
+        // 查询三级类码（数据码），使用二级类码作为typeCode参数
+        const items = await dictService.getCascadedDictItems(conditions[key], conditions[key]);
+        dictOptions['thirdClassCode'] = items;
+      } else if (key === 'thirdClassCode') {
+        // 三级类码变化时，没有后续级联
       }
-      const items = await dictService.getCascadedDictItems(conditions[key], typeCode);
-      dictOptions[nextKey || ''] = items;
     } catch {}
   }
 
@@ -291,9 +365,40 @@ async function onConditionChange(key: string) {
   }
 }
 
+// 扩展数字输入框变化处理
+function onExtendNumberChange(key: string) {
+  // 扩展码不与其他筛选条件联动，只清空已生成的编码
+  if (generatedCodes.value.length > 0) {
+    generatedCodes.value = [];
+  }
+}
+
 async function handleGenerate() {
   try {
-    const parsed = generateCodeRequestSchema.parse(conditions);
+    // 组合扩展码：将起始值和数量组合成"5,3"格式
+    const processedConditions = { ...conditions };
+
+    // 处理二级类扩展码
+    if (conditions.secondExtCodeStart && conditions.secondExtCodeCount) {
+      processedConditions.secondExtCode = `${conditions.secondExtCodeStart},${conditions.secondExtCodeCount}`;
+    } else if (conditions.secondExtCodeStart) {
+      processedConditions.secondExtCode = conditions.secondExtCodeStart.toString().padStart(4, '0');
+    }
+
+    // 处理三级类扩展码
+    if (conditions.thirdExtCodeStart && conditions.thirdExtCodeCount) {
+      processedConditions.thirdExtCode = `${conditions.thirdExtCodeStart},${conditions.thirdExtCodeCount}`;
+    } else if (conditions.thirdExtCodeStart) {
+      processedConditions.thirdExtCode = conditions.thirdExtCodeStart.toString().padStart(4, '0');
+    }
+
+    // 删除扩展数字字段的原始Start/Count属性，避免schema验证问题
+    delete processedConditions.secondExtCodeStart;
+    delete processedConditions.secondExtCodeCount;
+    delete processedConditions.thirdExtCodeStart;
+    delete processedConditions.thirdExtCodeCount;
+
+    const parsed = generateCodeRequestSchema.parse(processedConditions);
     const result = await codeService.generateCode(parsed as any);
     generatedCodes.value = [result];
     activeTab.value = 'generated';
@@ -303,7 +408,21 @@ async function handleGenerate() {
 }
 
 function handleClear() {
+  // 清空所有条件
   Object.keys(conditions).forEach((k) => (conditions[k] = ''));
+
+  // 重置前缀号为默认值（内部数据）
+  const internalDataPrefix = dictOptions['prefixNo']?.find(p => p.name === '内部数据');
+  if (internalDataPrefix) {
+    conditions.prefixNo = internalDataPrefix.code;
+  }
+
+  // 重置一级类码为默认值（生产运行）
+  const productionOperation = dictOptions['firstClassCode']?.find(f => f.name === '生产运行');
+  if (productionOperation) {
+    conditions.firstClassCode = productionOperation.code;
+  }
+
   generatedCodes.value = [];
   draftCodes.value = [];
 }
@@ -422,15 +541,15 @@ async function handleExport() {
   border-color: #c6e2ff;
 }
 
-.extend-input {
+.extend-number-input {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.extend-hint {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.2;
+.extend-number-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>
