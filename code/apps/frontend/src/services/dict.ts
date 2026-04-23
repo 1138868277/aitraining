@@ -15,13 +15,28 @@ export async function getCascadedDictItems(parentCode: string, typeCode?: string
   return res.data.items;
 }
 
-export async function getDataCodes(dataTypeCode: string): Promise<DictItem[]> {
-  const res = await api.get(`/dict/data-code/${dataTypeCode}`);
+export async function getDataCodes(dataTypeCode: string, secondClassCode?: string, typeCode?: string): Promise<DictItem[]> {
+  const params: any = {};
+  if (secondClassCode) {
+    params.secondClassCode = secondClassCode;
+  }
+  if (typeCode) {
+    params.typeCode = typeCode;
+  }
+  const res = await api.get(`/dict/data-code/${dataTypeCode}`, { params });
   return res.data.items;
 }
 
 /** 根据类型代码获取二级类码列表 */
 export async function getSecondClassByType(typeCode: string): Promise<DictItem[]> {
   const res = await api.get(`/dict/second-class/${typeCode}`);
+  return res.data.items;
+}
+
+/** 根据类型代码和二级类码获取数据类码 */
+export async function getDataTypeBySecondClass(typeCode: string, secondClassCode: string): Promise<DictItem[]> {
+  const res = await api.get(`/dict/data-type/filter`, {
+    params: { typeCode, secondClassCode }
+  });
   return res.data.items;
 }

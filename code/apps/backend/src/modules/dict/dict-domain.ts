@@ -53,7 +53,7 @@ function getTypeDomainCode(typeCode?: string): string | null {
   // 支持多种类型代码格式：
   // 1. F1, F2, F3, F4 -> F (风力发电)
   // 2. G1, G2 -> G (光伏发电)
-  // 3. Y0 -> Y (通用)
+  // 3. Y0 -> 返回null，表示不过滤类型（通用）
   // 4. 01 -> F (假设01对应风力发电)
   // 5. 02 -> G (假设02对应光伏发电)
   // 6. 03 -> Y (假设03对应水力发电)
@@ -64,7 +64,8 @@ function getTypeDomainCode(typeCode?: string): string | null {
   } else if (typeCode.startsWith('G') || typeCode === '02') {
     return 'G';
   } else if (typeCode === 'Y0' || typeCode === '03' || typeCode === '04') {
-    return 'Y';
+    // Y表示通用，不过滤类型
+    return null;
   }
   return null;
 }
@@ -137,34 +138,26 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
     const checkSecondSql = `SELECT COUNT(*) as cnt FROM ${schema}.cec_new_energy_code_dict WHERE second_class_code = $1`;
     const checkResult = await query<{ cnt: number }>(checkSecondSql, [parentCode]);
     if (checkResult[0].cnt > 0) {
-      // 是二级类码，返回对应的数据类码
-      let dataCategorySql = `SELECT DISTINCT data_category_code AS code, data_category_name AS name
-        FROM ${schema}.cec_new_energy_code_dict
-        WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code IS NOT NULL`;
+      // 是二级类码，返回对应的三级类码（从三级类码关联表）
+      let thirdClassSql = `SELECT DISTINCT third_class_code AS code, third_class_name AS name
+        FROM ${schema}.cec_new_energy_third_class_dict
+        WHERE if_delete = '0' AND second_class_code = $1`;
 
       const params: any[] = [parentCode];
-      if (typeDomainCode) {
-        dataCategorySql += ` AND type_domain_code = $2`;
-        params.push(typeDomainCode);
+      let paramIndex = 2;
+
+      // 类型过滤：如果typeCode存在，过滤type_code字段
+      if (typeCode) {
+        thirdClassSql += ` AND type_code = $${paramIndex}`;
+        params.push(typeCode);
+        paramIndex++;
       }
 
-      dataCategorySql += ` ORDER BY data_category_code`;
-      return query(dataCategorySql, params);
-    }
-  } else if (parentCode.length === 4) {
-    // parentCode可能是二级扩展码，typeCode参数可能是二级类码（3位）
-    // 查询三级类码：从数据类字典表获取data_code作为三级类码
-    if (typeCode && typeCode.length === 3) {
-      // typeCode是二级类码，根据它过滤
-      let thirdClassSql = `SELECT DISTINCT data_code AS code, data_name AS name
-        FROM ${schema}.cec_new_energy_data_type_dict
-        WHERE if_delete = '0' AND second_class_code = $1 AND data_code IS NOT NULL`;
-
-      const params: any[] = [typeCode];
-      thirdClassSql += ` ORDER BY data_code`;
+      thirdClassSql += ` ORDER BY third_class_code`;
       return query(thirdClassSql, params);
     }
-    // 如果没有二级类码，返回空数组
+  } else if (parentCode.length === 4) {
+    // parentCode可能是二级扩展码，不再使用，返回空数组
     return [];
   }
 
@@ -190,10 +183,49 @@ export async function getSecondClassByType(typeCode: string): Promise<DictItem[]
 }
 
 /** 获取数据码（根据数据类码过滤） */
-export async function getDataCodeByDataType(dataTypeCode: string): Promise<DictItem[]> {
-  const sql = `SELECT data_code AS code, data_name AS name
-    FROM ${schema}.cec_new_energy_data_type_dict
-    WHERE if_delete = '0' AND data_type_code = $1
-    ORDER BY data_code`;
-  return query(sql, [dataTypeCode]);
+export async function getDataCodeByDataType(dataTypeCode: string, secondClassCode?: string, typeCode?: string): Promise<DictItem[]> {
+  const typeDomainCode = getTypeDomainCode(typeCode);
+
+  let sql = `SELECT data_code AS code, data_name AS name
+    FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND data_category_code = $1`;
+
+  const params: any[] = [dataTypeCode];
+  let paramIndex = 2;
+
+  if (secondClassCode) {
+    sql += ` AND second_class_code = $${paramIndex}`;
+    params.push(secondClassCode);
+    paramIndex++;
+  }
+
+  if (typeDomainCode) {
+    sql += ` AND type_domain_code = $${paramIndex}`;
+    params.push(typeDomainCode);
+    paramIndex++;
+  }
+
+  sql += ` ORDER BY data_code`;
+  return query(sql, params);
+}
+
+/** 根据类型代码和二级类码获取数据类码 */
+export async function getDataTypeBySecondClass(typeCode: string, secondClassCode: string): Promise<DictItem[]> {
+  const typeDomainCode = getTypeDomainCode(typeCode);
+
+  let sql = `SELECT DISTINCT data_category_code AS code, data_category_name AS name
+    FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND second_class_code = $1`;
+
+  const params: any[] = [secondClassCode];
+  let paramIndex = 2;
+
+  if (typeDomainCode) {
+    sql += ` AND type_domain_code = $${paramIndex}`;
+    params.push(typeDomainCode);
+    paramIndex++;
+  }
+
+  sql += ` ORDER BY data_category_code`;
+  return query(sql, params);
 }

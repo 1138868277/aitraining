@@ -25,11 +25,16 @@ export async function getCascadedDictItems(parentCode: string, typeCode?: string
   return dictDomain.getCodeDictByParent(parentCode, typeCode);
 }
 
-export async function getDataCodes(dataTypeCode: string): Promise<DictItemResponse[]> {
-  return dictDomain.getDataCodeByDataType(dataTypeCode);
+export async function getDataCodes(dataTypeCode: string, secondClassCode?: string, typeCode?: string): Promise<DictItemResponse[]> {
+  return dictDomain.getDataCodeByDataType(dataTypeCode, secondClassCode, typeCode);
 }
 
 /** 根据类型代码获取二级类码列表 */
 export async function getSecondClassByType(typeCode: string): Promise<DictItemResponse[]> {
   return dictDomain.getSecondClassByType(typeCode);
+}
+
+/** 根据类型代码和二级类码获取数据类码 */
+export async function getDataTypeBySecondClass(typeCode: string, secondClassCode: string): Promise<DictItemResponse[]> {
+  return dictDomain.getDataTypeBySecondClass(typeCode, secondClassCode);
 }

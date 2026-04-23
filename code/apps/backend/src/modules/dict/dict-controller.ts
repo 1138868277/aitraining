@@ -32,11 +32,30 @@ router.get('/api/dict/:dictType/items', async (req: Request, res: Response) => {
   }
 });
 
+/** 根据类型代码和二级类码获取数据类码 */
+router.get('/api/dict/data-type/filter', async (req: Request, res: Response) => {
+  try {
+    const typeCode = req.query.typeCode as string | undefined;
+    const secondClassCode = req.query.secondClassCode as string | undefined;
+    if (!typeCode || !secondClassCode) {
+      error(res, ErrorCode.DICT_LOAD_FAILED, '类型代码和二级类码不能为空', 400);
+      return;
+    }
+    const items = await dictService.getDataTypeBySecondClass(typeCode, secondClassCode);
+    success(res, { items });
+  } catch (err) {
+    console.error('Failed to load data type by second class:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '数据类码加载失败，请刷新重试', 500);
+  }
+});
+
 /** 获取数据码（根据数据类码过滤） */
 router.get('/api/dict/data-code/:dataTypeCode', async (req: Request, res: Response) => {
   try {
     const { dataTypeCode } = req.params;
-    const items = await dictService.getDataCodes(dataTypeCode);
+    const secondClassCode = req.query.secondClassCode as string | undefined;
+    const typeCode = req.query.typeCode as string | undefined;
+    const items = await dictService.getDataCodes(dataTypeCode, secondClassCode, typeCode);
     success(res, { items });
   } catch (err) {
     console.error('Failed to load data codes:', err);

@@ -225,3 +225,29 @@ COMMENT ON COLUMN cec_new_energy_second_class_type_dict.second_class_code IS '�
 COMMENT ON COLUMN cec_new_energy_second_class_type_dict.second_class_name IS '二级类码名称';
 CREATE INDEX IF NOT EXISTS idx_second_class_type ON cec_new_energy_second_class_type_dict(type_code, second_class_code);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_second_class_type_unique ON cec_new_energy_second_class_type_dict(type_code, second_class_code) WHERE if_delete = '0';
+
+-- 10. 三级类码关联表
+DROP TABLE IF EXISTS cec_new_energy_third_class_dict CASCADE;
+CREATE TABLE cec_new_energy_third_class_dict (
+    third_class_id BIGSERIAL NOT NULL,
+    type_code VARCHAR(2) NOT NULL,
+    second_class_code VARCHAR(3) NOT NULL,
+    second_class_name VARCHAR(100) NOT NULL,
+    third_class_code VARCHAR(3) NOT NULL,
+    third_class_name VARCHAR(100) NOT NULL,
+    tenant_id VARCHAR(20) DEFAULT '0',
+    creator VARCHAR(50),
+    modifier VARCHAR(50),
+    create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    if_delete CHAR(1) DEFAULT '0',
+    PRIMARY KEY (third_class_id)
+);
+COMMENT ON TABLE cec_new_energy_third_class_dict IS '三级类码关联表';
+COMMENT ON COLUMN cec_new_energy_third_class_dict.type_code IS '类型编码';
+COMMENT ON COLUMN cec_new_energy_third_class_dict.second_class_code IS '二级类码编码';
+COMMENT ON COLUMN cec_new_energy_third_class_dict.second_class_name IS '二级类码名称';
+COMMENT ON COLUMN cec_new_energy_third_class_dict.third_class_code IS '三级类码编码';
+COMMENT ON COLUMN cec_new_energy_third_class_dict.third_class_name IS '三级类码名称';
+CREATE INDEX IF NOT EXISTS idx_third_class_type_second ON cec_new_energy_third_class_dict(type_code, second_class_code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_third_class_unique ON cec_new_energy_third_class_dict(type_code, second_class_code, third_class_code) WHERE if_delete = '0';

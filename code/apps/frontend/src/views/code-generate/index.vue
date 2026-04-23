@@ -23,7 +23,7 @@
                 <el-option
                   v-for="item in dictOptions[field.key] || []"
                   :key="item.code"
-                  :label="item.code + item.name"
+                  :label="item.code + ' ' + item.name"
                   :value="item.code"
                 />
               </el-select>
@@ -208,18 +208,17 @@ const canGenerate = computed(() => {
 // 初始化加载顶级字典
 onMounted(async () => {
   try {
-    const [stations, types, prefixes, firstClass, dataTypes] = await Promise.all([
+    const [stations, types, prefixes, firstClass] = await Promise.all([
       dictService.getDictItems('station'),
       dictService.getDictItems('type'),
       dictService.getDictItems('prefix'),
       dictService.getCascadedDictItems(''),
-      dictService.getDictItems('dataType'),
     ]);
     dictOptions['stationCode'] = stations;
     dictOptions['typeCode'] = types;
     dictOptions['prefixNo'] = prefixes;
     dictOptions['firstClassCode'] = firstClass;
-    dictOptions['dataTypeCode'] = dataTypes;
+    dictOptions['dataTypeCode'] = []; // 数据类码需要根据类型和二级类码加载，初始化为空
 
     // 设置默认值
     // 前缀号默认"内部数据"（编码为0）
@@ -311,14 +310,19 @@ async function onConditionChange(key: string) {
 
   if (key === 'secondClassCode' && conditions[key]) {
     try {
-      const dataTypes = await dictService.getDictItems('dataType');
-      dictOptions['dataTypeCode'] = dataTypes;
+      // 根据类型和二级类码获取数据类码
+      if (conditions.typeCode && conditions[key]) {
+        const dataTypes = await dictService.getDataTypeBySecondClass(conditions.typeCode, conditions[key]);
+        dictOptions['dataTypeCode'] = dataTypes;
+      } else {
+        dictOptions['dataTypeCode'] = [];
+      }
     } catch {}
   }
 
   if (key === 'dataTypeCode' && conditions[key]) {
     try {
-      const dataCodes = await dictService.getDataCodes(conditions[key]);
+      const dataCodes = await dictService.getDataCodes(conditions[key], conditions.secondClassCode, conditions.typeCode);
       dictOptions['dataCode'] = dataCodes;
     } catch {}
   }
@@ -350,8 +354,8 @@ async function onConditionChange(key: string) {
           dictOptions['thirdClassCode'] = [];
         }
       } else if (key === 'secondClassCode') {
-        // 查询三级类码（数据码），使用二级类码作为typeCode参数
-        const items = await dictService.getCascadedDictItems(conditions[key], conditions[key]);
+        // 查询三级类码，使用二级类码作为parentCode，类型代码作为typeCode参数
+        const items = await dictService.getCascadedDictItems(conditions[key], conditions.typeCode);
         dictOptions['thirdClassCode'] = items;
       } else if (key === 'thirdClassCode') {
         // 三级类码变化时，没有后续级联
