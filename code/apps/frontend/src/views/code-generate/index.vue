@@ -251,56 +251,26 @@ async function onConditionChange(key: string) {
     dictOptions[nextKey] = [];
   }
 
-  // 类型代码变更时，需要重新加载一级类码和二级类码（如果已选择）
+  // 类型代码变更时，重新加载二级类码（根据新类型）
   if (key === 'typeCode') {
-    if (conditions.firstClassCode) {
-      // 重新加载一级类码（根据新类型过滤）
-      try {
-        const firstClassItems = await dictService.getCascadedDictItems('', conditions[key]);
-        dictOptions['firstClassCode'] = firstClassItems;
-        // 如果当前选择的一级类码不在新列表中，清空它
-        const currentFirstClass = conditions.firstClassCode;
-        if (currentFirstClass && !firstClassItems.find(item => item.code === currentFirstClass)) {
-          conditions.firstClassCode = '';
-          // 清空后续所有字段
-          conditions.secondClassCode = '';
-          conditions.secondExtCode = '';
-          conditions.thirdClassCode = '';
-          conditions.thirdExtCode = '';
-          dictOptions['secondClassCode'] = [];
-          dictOptions['thirdClassCode'] = [];
-        } else {
-          // 一级类码仍然有效，重新加载二级类码（根据新类型）
-          try {
-            const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
-            dictOptions['secondClassCode'] = secondClassItems;
-            // 如果当前选择的二级类码不在新列表中，清空它
-            const currentSecondClass = conditions.secondClassCode;
-            if (currentSecondClass && !secondClassItems.find(item => item.code === currentSecondClass)) {
-              conditions.secondClassCode = '';
-              conditions.secondExtCode = '';
-              conditions.thirdClassCode = '';
-              conditions.thirdExtCode = '';
-              dictOptions['thirdClassCode'] = [];
-            }
-          } catch {}
-        }
-      } catch {}
-    } else {
-      // 即使一级类码未选择，也预加载二级类码列表（根据类型）
-      try {
-        const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
-        dictOptions['secondClassCode'] = secondClassItems;
-        // 如果当前有二级类码选择（不应该发生，因为一级类码未选择），清空它
-        if (conditions.secondClassCode) {
-          conditions.secondClassCode = '';
-          conditions.secondExtCode = '';
-          conditions.thirdClassCode = '';
-          conditions.thirdExtCode = '';
-          dictOptions['thirdClassCode'] = [];
-        }
-      } catch {}
-    }
+    // 预加载二级类码列表（根据类型）
+    try {
+      const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
+      dictOptions['secondClassCode'] = secondClassItems;
+      // 如果当前有二级类码选择，清空它（因为类型变了）
+      if (conditions.secondClassCode) {
+        conditions.secondClassCode = '';
+        conditions.secondExtCode = '';
+        conditions.thirdClassCode = '';
+        conditions.thirdExtCode = '';
+        dictOptions['thirdClassCode'] = [];
+      }
+      // 清空数据类码和数据码
+      dictOptions['dataTypeCode'] = [];
+      dictOptions['dataCode'] = [];
+      conditions.dataTypeCode = '';
+      conditions.dataCode = '';
+    } catch {}
     // 清空已生成的编码
     if (generatedCodes.value.length > 0) {
       generatedCodes.value = [];

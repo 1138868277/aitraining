@@ -75,19 +75,8 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
   const typeDomainCode = getTypeDomainCode(typeCode);
 
   if (!parentCode) {
-    // 第一级：返回所有一级类码
-    let sql = `SELECT DISTINCT first_class_code AS code, first_class_name AS name
-      FROM ${schema}.cec_new_energy_code_dict
-      WHERE if_delete = '0' AND first_class_code IS NOT NULL`;
-
-    const params: any[] = [];
-    if (typeDomainCode) {
-      sql += ` AND type_domain_code = $1`;
-      params.push(typeDomainCode);
-    }
-
-    sql += ` ORDER BY first_class_code`;
-    return query(sql, params);
+    // 第一级：返回所有一级类码（从一级类码表获取，不按类型过滤）
+    return getFirstClassDict();
   }
 
   // 判断parentCode的长度来确定层级
@@ -95,7 +84,7 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
   if (parentCode.length === 2) {
     // parentCode可能是一级类码或数据类码
     // 先检查是否是一级类码
-    const checkFirstSql = `SELECT COUNT(*) as cnt FROM ${schema}.cec_new_energy_code_dict WHERE first_class_code = $1`;
+    const checkFirstSql = `SELECT COUNT(*) as cnt FROM ${schema}.cec_new_energy_first_class_dict WHERE first_class_code = $1`;
     const checkResult = await query<{ cnt: number }>(checkFirstSql, [parentCode]);
     if (checkResult[0].cnt > 0) {
       // 是一级类码，返回对应的二级类码
@@ -134,28 +123,23 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
       return query(dataCodeSql, params);
     }
   } else if (parentCode.length === 3) {
-    // parentCode可能是二级类码
-    const checkSecondSql = `SELECT COUNT(*) as cnt FROM ${schema}.cec_new_energy_code_dict WHERE second_class_code = $1`;
-    const checkResult = await query<{ cnt: number }>(checkSecondSql, [parentCode]);
-    if (checkResult[0].cnt > 0) {
-      // 是二级类码，返回对应的三级类码（从三级类码关联表）
-      let thirdClassSql = `SELECT DISTINCT third_class_code AS code, third_class_name AS name
-        FROM ${schema}.cec_new_energy_third_class_dict
-        WHERE if_delete = '0' AND second_class_code = $1`;
+    // parentCode是二级类码，直接查询三级类码表
+    let thirdClassSql = `SELECT DISTINCT third_class_code AS code, third_class_name AS name
+      FROM ${schema}.cec_new_energy_third_class_dict
+      WHERE if_delete = '0' AND second_class_code = $1`;
 
-      const params: any[] = [parentCode];
-      let paramIndex = 2;
+    const params: any[] = [parentCode];
+    let paramIndex = 2;
 
-      // 类型过滤：如果typeCode存在，过滤type_code字段
-      if (typeCode) {
-        thirdClassSql += ` AND type_code = $${paramIndex}`;
-        params.push(typeCode);
-        paramIndex++;
-      }
-
-      thirdClassSql += ` ORDER BY third_class_code`;
-      return query(thirdClassSql, params);
+    // 类型过滤：如果typeCode存在，过滤type_code字段
+    if (typeCode) {
+      thirdClassSql += ` AND type_code = $${paramIndex}`;
+      params.push(typeCode);
+      paramIndex++;
     }
+
+    thirdClassSql += ` ORDER BY third_class_code`;
+    return query(thirdClassSql, params);
   } else if (parentCode.length === 4) {
     // parentCode可能是二级扩展码，不再使用，返回空数组
     return [];
@@ -167,9 +151,17 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
 
 /** 获取数据类字典 */
 export async function getDataTypeDict(): Promise<DictItem[]> {
-  const sql = `SELECT DISTINCT data_type_code AS code, data_type_name AS name
-    FROM ${schema}.cec_new_energy_data_type_dict
-    WHERE if_delete = '0' ORDER BY data_type_code`;
+  const sql = `SELECT DISTINCT data_category_code AS code, data_category_name AS name
+    FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND data_category_code IS NOT NULL ORDER BY data_category_code`;
+  return query(sql);
+}
+
+/** 获取一级类码字典 */
+export async function getFirstClassDict(): Promise<DictItem[]> {
+  const sql = `SELECT first_class_code AS code, first_class_name AS name
+    FROM ${schema}.cec_new_energy_first_class_dict
+    WHERE if_delete = '0' ORDER BY first_class_code`;
   return query(sql);
 }
 

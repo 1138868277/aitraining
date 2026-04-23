@@ -25,7 +25,7 @@ function getSessionId(req: Request): string {
 router.post('/api/codes/generate', (req: Request, res: Response) => {
   try {
     const parsed = generateCodeRequestSchema.parse(req.body);
-    const result = codeService.generateSingleCode(parsed);
+    const result = codeService.generateCode(parsed);
     success(res, result);
   } catch (err: any) {
     if (err instanceof AppError) {
@@ -44,7 +44,7 @@ router.post('/api/codes/batch-generate', (req: Request, res: Response) => {
       return error(res, ErrorCode.GENERATE_LIMIT_EXCEEDED, '单次生成数量超出限制（上限100条）');
     }
 
-    const codes = parsed.conditions.map((c) => codeService.generateSingleCode(c));
+    const codes = parsed.conditions.map((c) => codeService.generateCode(c));
     success(res, { codes, totalCount: codes.length });
   } catch (err: any) {
     if (err instanceof AppError) {
