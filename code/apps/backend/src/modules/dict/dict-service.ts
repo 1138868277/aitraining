@@ -6,8 +6,11 @@ export interface DictItemResponse {
 }
 
 export interface QuickSearchItem {
+  typeCode: string;
   secondClassCode: string;
   secondClassName: string;
+  dataCategoryCode: string;
+  dataCategoryName: string;
   dataCode: string;
   dataName: string;
 }

@@ -5,6 +5,22 @@ import { ErrorCode } from '@cec/contracts';
 
 const router = Router();
 
+/** 快捷搜索：根据数据码名称模糊匹配（必须在 :dictType 通配路由之前注册） */
+router.get('/api/dict/quick-search', async (req: Request, res: Response) => {
+  try {
+    const searchText = (req.query.q as string || '').trim();
+    if (!searchText) {
+      success(res, { items: [] });
+      return;
+    }
+    const items = await dictService.quickSearchDict(searchText);
+    success(res, { items });
+  } catch (err) {
+    console.error('Failed to quick search dict:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '快捷搜索失败，请重试', 500);
+  }
+});
+
 /** 获取指定类型的字典数据 */
 router.get('/api/dict/:dictType', async (req: Request, res: Response) => {
   try {
@@ -72,22 +88,6 @@ router.get('/api/dict/second-class/:typeCode', async (req: Request, res: Respons
   } catch (err) {
     console.error('Failed to load second class by type:', err);
     error(res, ErrorCode.DICT_LOAD_FAILED, '二级类码加载失败，请刷新重试', 500);
-  }
-});
-
-/** 快捷搜索：根据数据码名称模糊匹配 */
-router.get('/api/dict/quick-search', async (req: Request, res: Response) => {
-  try {
-    const searchText = (req.query.q as string || '').trim();
-    if (!searchText) {
-      success(res, { items: [] });
-      return;
-    }
-    const items = await dictService.quickSearchDict(searchText);
-    success(res, { items });
-  } catch (err) {
-    console.error('Failed to quick search dict:', err);
-    error(res, ErrorCode.DICT_LOAD_FAILED, '快捷搜索失败，请重试', 500);
   }
 });
 

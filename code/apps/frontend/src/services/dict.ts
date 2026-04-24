@@ -43,7 +43,7 @@ export async function getDataTypeBySecondClass(typeCode: string, secondClassCode
 
 /** 快捷搜索：根据数据码名称模糊匹配 */
 export async function quickSearchDict(q: string): Promise<Array<{
-  typeCode: string; typeName: string;
+  typeCode: string;
   secondClassCode: string; secondClassName: string;
   dataCategoryCode: string; dataCategoryName: string;
   dataCode: string; dataName: string;

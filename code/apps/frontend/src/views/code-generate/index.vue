@@ -4,21 +4,37 @@
     <el-card class="quick-filter-card">
       <template #header>
         <div class="quick-filter-header">
-          <span>快捷筛选</span>
+          <span>快捷搜索</span>
         </div>
       </template>
       <div class="quick-filter-body">
-        <el-input
-          v-model="quickSearchText"
-          placeholder="输入数据码名称进行模糊搜索"
-          clearable
-          @input="onQuickSearchInput"
-          @clear="onQuickSearchClear"
-        >
-          <template #prefix>
-            <span class="search-prefix">搜索</span>
-          </template>
-        </el-input>
+        <div class="quick-search-row">
+          <el-input
+            v-model="quickSearchText"
+            placeholder="输入数据码名称进行模糊搜索"
+            clearable
+            @input="onQuickSearchInput"
+            @clear="onQuickSearchClear"
+          >
+            <template #prefix>
+              <span class="search-prefix">搜索</span>
+            </template>
+          </el-input>
+          <div v-if="recentSearchTags.length > 0" class="recent-search-tags">
+            <span class="recent-tags-label">最近搜索：</span>
+            <el-tag
+              v-for="tag in recentSearchTags"
+              :key="tag"
+              size="small"
+              class="recent-tag"
+              closable
+              @click="onRecentTagClick(tag)"
+              @close="removeRecentTag(tag)"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+        </div>
         <div v-if="quickSearchLoading" class="quick-search-loading">
           <span>搜索中...</span>
         </div>
@@ -30,41 +46,40 @@
             style="width: 100%"
             max-height="360"
             size="small"
-            @row-click="onQuickSearchRowClick"
           >
-            <el-table-column label="类型" min-width="90">
+            <el-table-column label="类型域" min-width="70">
               <template #default="{ row }">
                 <span class="code-highlight">{{ row.typeCode }}</span>
-                <span class="name-muted"> {{ row.typeName }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="二级类码" min-width="140">
+            <el-table-column label="二级类码" min-width="160">
               <template #default="{ row }">
                 <span class="code-highlight">{{ row.secondClassCode }}</span>
-                <span class="name-muted"> {{ row.secondClassName }}</span>
+                <span class="name-muted">&nbsp;{{ row.secondClassName }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="数据类码" min-width="120">
+            <el-table-column label="数据类码" min-width="140">
               <template #default="{ row }">
                 <span class="code-highlight">{{ row.dataCategoryCode }}</span>
-                <span class="name-muted"> {{ row.dataCategoryName }}</span>
+                <span class="name-muted">&nbsp;{{ row.dataCategoryName }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="数据编码" width="100">
+            <el-table-column label="数据码" min-width="180">
               <template #default="{ row }">
                 <span class="code-highlight">{{ row.dataCode }}</span>
+                <span class="name-muted">&nbsp;{{ row.dataName }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="数据码" min-width="150">
+            <el-table-column label="操作" width="70" fixed="right">
               <template #default="{ row }">
-                {{ row.dataName }}
+                <el-button link type="primary" size="small" @click="onQuickSearchRowClick(row)">筛选</el-button>
               </template>
             </el-table-column>
           </el-table>
-          <div class="quick-search-count">共 {{ quickSearchResults.length }} 条结果（点击行可应用到筛选条件）</div>
+          <div class="quick-search-count">共 {{ quickSearchResults.length }} 条结果</div>
         </div>
         <el-empty
-          v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading"
+          v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading && quickSearchText.trim()"
           description="未找到匹配的数据码"
         />
       </div>
@@ -428,7 +443,7 @@ const nameInputRef = ref<any>(null);
 /** 快捷筛选 */
 const quickSearchText = ref('');
 const quickSearchResults = ref<Array<{
-  typeCode: string; typeName: string;
+  typeCode: string;
   secondClassCode: string; secondClassName: string;
   dataCategoryCode: string; dataCategoryName: string;
   dataCode: string; dataName: string;
@@ -436,6 +451,37 @@ const quickSearchResults = ref<Array<{
 const quickSearchLoading = ref(false);
 const quickSearchSearched = ref(false);
 let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 最近搜索标签 */
+const RECENT_SEARCH_KEY = 'quick_recent_searches';
+const recentSearchTags = ref<string[]>(loadRecentSearchTags());
+
+function loadRecentSearchTags(): string[] {
+  try {
+    const saved = localStorage.getItem(RECENT_SEARCH_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentSearchTag(text: string) {
+  const tags = recentSearchTags.value.filter(t => t !== text);
+  tags.unshift(text);
+  if (tags.length > 5) tags.length = 5;
+  recentSearchTags.value = tags;
+  localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(tags));
+}
+
+function removeRecentTag(tag: string) {
+  recentSearchTags.value = recentSearchTags.value.filter(t => t !== tag);
+  localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(recentSearchTags.value));
+}
+
+function onRecentTagClick(tag: string) {
+  quickSearchText.value = tag;
+  onQuickSearchInput();
+}
 
 function onQuickSearchInput() {
   if (quickSearchTimer) clearTimeout(quickSearchTimer);
@@ -450,6 +496,9 @@ function onQuickSearchInput() {
     quickSearchSearched.value = true;
     try {
       quickSearchResults.value = await dictService.quickSearchDict(text);
+      if (quickSearchResults.value.length > 0) {
+        saveRecentSearchTag(text);
+      }
     } catch {
       quickSearchResults.value = [];
     } finally {
@@ -465,15 +514,19 @@ function onQuickSearchClear() {
 
 /** 点击快捷搜索结果行，自动填入筛选条件 */
 async function onQuickSearchRowClick(row: {
-  typeCode: string; typeName: string;
+  typeCode: string;
   secondClassCode: string; secondClassName: string;
   dataCategoryCode: string; dataCategoryName: string;
   dataCode: string; dataName: string;
 }) {
-  ElMessage.info(`正在应用条件：${row.typeCode} / ${row.secondClassCode} / ${row.dataCategoryCode} / ${row.dataCode}`);
+  ElMessage.success('筛选成功');
 
-  // 1. 设置类型
-  conditions.typeCode = row.typeCode;
+  // 类型域 -> 具体类型码映射（type_domain_code 如 'F' 需转为 'F1'）
+  const typeCodeMap: Record<string, string> = {
+    F: 'F1',
+    G: 'G1',
+  };
+  conditions.typeCode = typeCodeMap[row.typeCode] || row.typeCode;
   // 2. 触发类型级联，加载二级类码列表
   await onConditionChange('typeCode');
 
@@ -625,27 +678,12 @@ async function onConditionChange(key: string) {
     dictOptions[nextKey] = [];
   }
 
-  // 类型代码变更时，重新加载二级类码（根据新类型）
+  // 类型代码变更时，重新加载二级类码列表，但保持其他筛选条件不变
   if (key === 'typeCode') {
-    // 预加载二级类码列表（根据类型）
     try {
       const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
       dictOptions['secondClassCode'] = secondClassItems;
-      // 如果当前有二级类码选择，清空它（因为类型变了）
-      if (conditions.secondClassCode) {
-        conditions.secondClassCode = '';
-        conditions.secondExtCode = '';
-        conditions.thirdClassCode = '';
-        conditions.thirdExtCode = '';
-        dictOptions['thirdClassCode'] = [];
-      }
-      // 清空数据类码和数据码
-      dictOptions['dataTypeCode'] = [];
-      dictOptions['dataCode'] = [];
-      conditions.dataTypeCode = '';
-      conditions.dataCode = [];
     } catch {}
-    // 清空已生成的编码
     if (generatedCodes.value.length > 0) {
       generatedCodes.value = [];
     }
@@ -1229,8 +1267,38 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   gap: 12px;
 }
 
-.quick-filter-body .el-input {
-  max-width: 400px;
+.quick-search-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-search-row .el-input {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.recent-search-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.recent-tags-label {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+.recent-tag {
+  cursor: pointer;
+}
+
+.recent-tag:hover {
+  opacity: 0.8;
 }
 
 .search-prefix {

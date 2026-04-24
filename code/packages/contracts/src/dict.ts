@@ -30,7 +30,6 @@ export type DictItemListResponse = z.infer<typeof dictItemListResponseSchema>;
 /** 快捷搜索字典项 */
 export const dictQuickSearchItemSchema = z.object({
   typeCode: z.string(),
-  typeName: z.string(),
   secondClassCode: z.string(),
   secondClassName: z.string(),
   dataCategoryCode: z.string(),
