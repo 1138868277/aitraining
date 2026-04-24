@@ -1,5 +1,75 @@
 <template>
   <div class="code-generate">
+    <!-- 快捷筛选面板 -->
+    <el-card class="quick-filter-card">
+      <template #header>
+        <div class="quick-filter-header">
+          <span>快捷筛选</span>
+        </div>
+      </template>
+      <div class="quick-filter-body">
+        <el-input
+          v-model="quickSearchText"
+          placeholder="输入数据码名称进行模糊搜索"
+          clearable
+          @input="onQuickSearchInput"
+          @clear="onQuickSearchClear"
+        >
+          <template #prefix>
+            <span class="search-prefix">搜索</span>
+          </template>
+        </el-input>
+        <div v-if="quickSearchLoading" class="quick-search-loading">
+          <span>搜索中...</span>
+        </div>
+        <div v-if="quickSearchResults.length > 0" class="quick-search-results">
+          <el-table
+            :data="quickSearchResults"
+            border
+            stripe
+            style="width: 100%"
+            max-height="360"
+            size="small"
+            @row-click="onQuickSearchRowClick"
+          >
+            <el-table-column label="类型" min-width="90">
+              <template #default="{ row }">
+                <span class="code-highlight">{{ row.typeCode }}</span>
+                <span class="name-muted"> {{ row.typeName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="二级类码" min-width="140">
+              <template #default="{ row }">
+                <span class="code-highlight">{{ row.secondClassCode }}</span>
+                <span class="name-muted"> {{ row.secondClassName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="数据类码" min-width="120">
+              <template #default="{ row }">
+                <span class="code-highlight">{{ row.dataCategoryCode }}</span>
+                <span class="name-muted"> {{ row.dataCategoryName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="数据编码" width="100">
+              <template #default="{ row }">
+                <span class="code-highlight">{{ row.dataCode }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="数据码" min-width="150">
+              <template #default="{ row }">
+                {{ row.dataName }}
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="quick-search-count">共 {{ quickSearchResults.length }} 条结果（点击行可应用到筛选条件）</div>
+        </div>
+        <el-empty
+          v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading"
+          description="未找到匹配的数据码"
+        />
+      </div>
+    </el-card>
+
     <!-- 顶部筛选条件面板 -->
     <el-card class="condition-card">
       <template #header>
@@ -15,7 +85,6 @@
             <template #reference>
               <el-button size="small">
                 最近记录
-                <el-tag v-if="recentConditions.length > 0" size="small" type="primary" class="recent-count-tag">{{ recentConditions.length }}</el-tag>
               </el-button>
             </template>
             <div class="recent-conditions-list">
@@ -187,7 +256,20 @@
           <el-table :data="generatedCodes" border stripe style="width: 100%">
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column prop="code" label="编码" width="320" />
-            <el-table-column prop="name" label="编码名称" min-width="200" />
+            <el-table-column label="编码名称" min-width="260">
+              <template #default="{ row, $index }">
+                <div v-if="editingIndex === $index" class="name-editor">
+                  <el-input
+                    v-model="editingName"
+                    size="small"
+                    class="name-editor-input"
+                    @keyup.enter="confirmEditName"
+                    @blur="confirmEditName"
+                  />
+                </div>
+                <span v-else class="name-display" @click="startEditName($index)">{{ row.name }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="generateTime" label="生成时间" width="180" />
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
@@ -248,6 +330,7 @@
               <el-button size="small" @click="clearSavedSelection">取消选中</el-button>
             </span>
             <el-button size="small" @click="copySelectedSaved">复制选中</el-button>
+            <el-button size="small" @click="exportSelectedSaved">导出选中</el-button>
             <el-button size="small" @click="deleteSelectedSaved">删除选中</el-button>
           </div>
 
@@ -288,6 +371,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import * as XLSX from 'xlsx';
 import * as dictService from '@/services/dict';
 import * as codeService from '@/services/code-generation';
 import { generateCodeRequestSchema } from '@cec/contracts';
@@ -337,6 +421,75 @@ const savedLoading = ref(false);
 const activeTab = ref('preview');
 const recentConditions = ref<Array<{ id: number; conditionData: Record<string, any>; conditionSummary: string; generateTime: string }>>([]);
 const recentPopoverRef = ref<any>(null);
+const editingIndex = ref<number | null>(null);
+const editingName = ref('');
+const nameInputRef = ref<any>(null);
+
+/** 快捷筛选 */
+const quickSearchText = ref('');
+const quickSearchResults = ref<Array<{
+  typeCode: string; typeName: string;
+  secondClassCode: string; secondClassName: string;
+  dataCategoryCode: string; dataCategoryName: string;
+  dataCode: string; dataName: string;
+}>>([]);
+const quickSearchLoading = ref(false);
+const quickSearchSearched = ref(false);
+let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onQuickSearchInput() {
+  if (quickSearchTimer) clearTimeout(quickSearchTimer);
+  const text = quickSearchText.value.trim();
+  if (!text) {
+    quickSearchResults.value = [];
+    quickSearchSearched.value = false;
+    return;
+  }
+  quickSearchTimer = setTimeout(async () => {
+    quickSearchLoading.value = true;
+    quickSearchSearched.value = true;
+    try {
+      quickSearchResults.value = await dictService.quickSearchDict(text);
+    } catch {
+      quickSearchResults.value = [];
+    } finally {
+      quickSearchLoading.value = false;
+    }
+  }, 300);
+}
+
+function onQuickSearchClear() {
+  quickSearchResults.value = [];
+  quickSearchSearched.value = false;
+}
+
+/** 点击快捷搜索结果行，自动填入筛选条件 */
+async function onQuickSearchRowClick(row: {
+  typeCode: string; typeName: string;
+  secondClassCode: string; secondClassName: string;
+  dataCategoryCode: string; dataCategoryName: string;
+  dataCode: string; dataName: string;
+}) {
+  ElMessage.info(`正在应用条件：${row.typeCode} / ${row.secondClassCode} / ${row.dataCategoryCode} / ${row.dataCode}`);
+
+  // 1. 设置类型
+  conditions.typeCode = row.typeCode;
+  // 2. 触发类型级联，加载二级类码列表
+  await onConditionChange('typeCode');
+
+  // 3. 设置二级类码
+  conditions.secondClassCode = row.secondClassCode;
+  // 4. 触发二级类级联，加载三级类码/数据类码列表
+  await onConditionChange('secondClassCode');
+
+  // 5. 设置数据类码
+  conditions.dataTypeCode = row.dataCategoryCode;
+  // 6. 触发数据类码级联，加载数据码列表
+  await onConditionChange('dataTypeCode');
+
+  // 7. 设置数据码
+  conditions.dataCode = [row.dataCode];
+}
 
 const canGenerate = computed(() => {
   return conditionFields.every((field) => {
@@ -827,6 +980,28 @@ function copySelectedSaved() {
   );
 }
 
+/** 导出选中记录为 Excel */
+function exportSelectedSaved() {
+  const rows = savedTableRef.value?.getSelectionRows();
+  if (!rows || rows.length === 0) {
+    ElMessage.warning('请先选择要导出的编码');
+    return;
+  }
+
+  const data = rows.map((r: any, i: number) => ({
+    '序号': i + 1,
+    '编码': r.code,
+    '编码名称': r.name,
+    '生成时间': r.generateTime,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '编码记录');
+  XLSX.writeFile(wb, `编码记录_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  ElMessage.success(`已导出 ${data.length} 条记录`);
+}
+
 /** 删除选中记录（逻辑删除） */
 async function deleteSelectedSaved() {
   if (selectedSavedIds.value.length === 0) {
@@ -862,6 +1037,32 @@ function copyCode(code: string) {
     () => ElMessage.success('已复制'),
     () => ElMessage.warning('复制失败，请手动选择复制'),
   );
+}
+
+/** 开始编辑编码名称 */
+function startEditName(index: number) {
+  editingIndex.value = index;
+  editingName.value = generatedCodes.value[index].name;
+  nextTick(() => {
+    const input = document.querySelector('.name-editor-input') as HTMLInputElement;
+    input?.focus();
+    input?.select();
+  });
+}
+
+/** 确认编辑编码名称 */
+function confirmEditName() {
+  if (editingIndex.value !== null) {
+    generatedCodes.value[editingIndex.value].name = editingName.value;
+    editingIndex.value = null;
+    editingName.value = '';
+  }
+}
+
+/** 取消编辑编码名称 */
+function cancelEditName() {
+  editingIndex.value = null;
+  editingName.value = '';
 }
 
 /** 加载最近条件记录 */
@@ -1012,6 +1213,57 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   overflow-anchor: none;
 }
 
+.quick-filter-card {
+  margin-bottom: 16px;
+}
+
+.quick-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quick-filter-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quick-filter-body .el-input {
+  max-width: 400px;
+}
+
+.search-prefix {
+  color: #909399;
+  font-size: 13px;
+}
+
+.quick-search-loading {
+  font-size: 13px;
+  color: #909399;
+}
+
+.quick-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quick-search-count {
+  font-size: 12px;
+  color: #909399;
+  text-align: right;
+}
+
+.code-highlight {
+  font-weight: 600;
+  color: #409eff;
+}
+
+.name-muted {
+  color: #606266;
+}
+
 .condition-card {
   margin-bottom: 20px;
 }
@@ -1020,10 +1272,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.recent-count-tag {
-  margin-left: 4px;
 }
 
 .recent-conditions-list {
@@ -1221,6 +1469,23 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   color: #67c23a;
   display: flex;
   align-items: center;
+}
+
+.name-display {
+  cursor: text;
+  display: block;
+  min-height: 22px;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.name-display:hover {
+  background-color: #f5f7fa;
+}
+
+.name-editor {
+  width: 100%;
 }
 
 </style>

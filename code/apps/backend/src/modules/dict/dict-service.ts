@@ -5,6 +5,13 @@ export interface DictItemResponse {
   name: string;
 }
 
+export interface QuickSearchItem {
+  secondClassCode: string;
+  secondClassName: string;
+  dataCode: string;
+  dataName: string;
+}
+
 const DICT_TYPE_MAP: Record<string, () => Promise<DictItemResponse[]>> = {
   station: dictDomain.getStationDict,
   type: dictDomain.getTypeDict,
@@ -37,4 +44,9 @@ export async function getSecondClassByType(typeCode: string): Promise<DictItemRe
 /** 根据类型代码和二级类码获取数据类码 */
 export async function getDataTypeBySecondClass(typeCode: string, secondClassCode: string): Promise<DictItemResponse[]> {
   return dictDomain.getDataTypeBySecondClass(typeCode, secondClassCode);
+}
+
+/** 快捷搜索：根据数据码名称模糊匹配 */
+export async function quickSearchDict(searchText: string): Promise<QuickSearchItem[]> {
+  return dictDomain.quickSearchDict(searchText);
 }

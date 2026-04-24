@@ -1,7 +1,7 @@
 <template>
   <el-container class="app-container">
     <el-header class="app-header">
-      <div class="header-title">华电新能源 - 测点编码管理工具</div>
+      <div class="header-title">华电新能源 - 编码工具</div>
       <el-menu
         :default-active="currentRoute"
         mode="horizontal"

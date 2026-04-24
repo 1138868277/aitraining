@@ -201,6 +201,28 @@ export async function getDataCodeByDataType(dataTypeCode: string, secondClassCod
   return query(sql, params);
 }
 
+/** 快捷搜索：根据数据码名称模糊匹配 */
+export async function quickSearchDict(searchText: string): Promise<Array<{
+  typeCode: string; typeName: string;
+  secondClassCode: string; secondClassName: string;
+  dataCategoryCode: string; dataCategoryName: string;
+  dataCode: string; dataName: string;
+}>> {
+  const sql = `SELECT DISTINCT t.type_code AS "typeCode", t.type_name AS "typeName",
+    cd.second_class_code AS "secondClassCode", cd.second_class_name AS "secondClassName",
+    cd.data_category_code AS "dataCategoryCode", cd.data_category_name AS "dataCategoryName",
+    cd.data_code AS "dataCode", cd.data_name AS "dataName"
+    FROM ${schema}.cec_new_energy_code_dict cd
+    JOIN ${schema}.cec_new_energy_second_class_type_dict sc
+      ON cd.second_class_code = sc.second_class_code AND sc.if_delete = '0'
+    JOIN ${schema}.cec_new_energy_type_dict t
+      ON sc.type_code = t.type_code AND t.if_delete = '0'
+    WHERE cd.if_delete = '0' AND cd.data_name LIKE $1
+    ORDER BY cd.data_code
+    LIMIT 50`;
+  return query(sql, [`%${searchText}%`]);
+}
+
 /** 根据类型代码和二级类码获取数据类码 */
 export async function getDataTypeBySecondClass(typeCode: string, secondClassCode: string): Promise<DictItem[]> {
   const typeDomainCode = getTypeDomainCode(typeCode);

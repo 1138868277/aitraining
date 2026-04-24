@@ -79,52 +79,55 @@ export function generateCodeFromConditions(conditions: GenerateCodeRequest): str
   return results;
 }
 
-/** 根据编码段名称拼接编码名称（支持单条或批量） */
+/** 拼接编码名称
+ *
+ * 格式：场站名称 + 二级类扩展码名称 + 二级类码名称 + 三级类扩展码 + 三级类码 + 数据码
+ * - F类型且二级类扩展码数量>1：XX号机
+ * - G类型且二级类扩展码数量>1：XX号方阵
+ * - 三级类扩展码数量>1：#XX，否则为空
+ * - 数据编码去掉括号及括号中的内容
+ */
 export function generateCodeName(conditions: GenerateCodeRequest, dictNames: Record<string, string>): string | string[] {
-  // 解析扩展格式
   const secondExtCodes = parseExtendFormat(conditions.secondExtCode);
   const thirdExtCodes = parseExtendFormat(conditions.thirdExtCode);
 
-  // 如果两个扩展码都只有1个值，生成单条名称
-  if (secondExtCodes.length === 1 && thirdExtCodes.length === 1) {
-    const parts = [
-      dictNames.stationName || conditions.stationCode,
-      dictNames.typeName || conditions.typeCode,
-      dictNames.projectLineName || conditions.projectLineCode,
-      dictNames.prefixName || conditions.prefixNo,
-      dictNames.firstClassName || conditions.firstClassCode,
-      dictNames.secondClassName || conditions.secondClassCode,
-      secondExtCodes[0],
-      dictNames.thirdClassName || conditions.thirdClassCode,
-      thirdExtCodes[0],
-      dictNames.dataTypeName || conditions.dataTypeCode || '00',
-      dictNames.dataName || conditions.dataCode || '000',
-    ];
-    return parts.join('-');
-  }
+  const isFType = conditions.typeCode.startsWith('F');
+  const isGType = conditions.typeCode.startsWith('G');
 
-  // 否则生成多条名称（笛卡尔积）
+  const stationName = dictNames.stationName || conditions.stationCode;
+  const secondClassName = dictNames.secondClassName || conditions.secondClassCode;
+  const thirdClassName = dictNames.thirdClassName || conditions.thirdClassCode;
+
+  // 数据编码去掉括号及括号中的内容
+  let dataName = dictNames.dataName || conditions.dataCode || '000';
+  dataName = dataName.replace(/\([^)]*\)/g, '').trim();
+  if (!dataName) dataName = conditions.dataCode || '000';
+
   const results: string[] = [];
+
   for (const secondExt of secondExtCodes) {
+    let secondExtName: string;
+    if (isFType && secondExtCodes.length > 1) {
+      secondExtName = `${parseInt(secondExt, 10)}号机`;
+    } else if (isGType && secondExtCodes.length > 1) {
+      secondExtName = `${parseInt(secondExt, 10)}号方阵`;
+    } else {
+      secondExtName = '';
+    }
+
     for (const thirdExt of thirdExtCodes) {
-      const parts = [
-        dictNames.stationName || conditions.stationCode,
-        dictNames.typeName || conditions.typeCode,
-        dictNames.projectLineName || conditions.projectLineCode,
-        dictNames.prefixName || conditions.prefixNo,
-        dictNames.firstClassName || conditions.firstClassCode,
-        dictNames.secondClassName || conditions.secondClassCode,
-        secondExt,
-        dictNames.thirdClassName || conditions.thirdClassCode,
-        thirdExt,
-        dictNames.dataTypeName || conditions.dataTypeCode || '00',
-        dictNames.dataName || conditions.dataCode || '000',
-      ];
-      results.push(parts.join('-'));
+      let thirdExtName: string;
+      if (thirdExtCodes.length > 1) {
+        thirdExtName = `#${parseInt(thirdExt, 10)}`;
+      } else {
+        thirdExtName = '';
+      }
+
+      results.push([stationName, secondExtName, secondClassName, thirdExtName, thirdClassName, dataName].join(''));
     }
   }
 
-  return results;
+  return results.length === 1 ? results[0] : results;
 }
 
 /** 校验编码是否为31位且只包含字母和数字 */

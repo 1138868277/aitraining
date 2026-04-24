@@ -26,3 +26,24 @@ export const dictItemListResponseSchema = z.object({
 });
 
 export type DictItemListResponse = z.infer<typeof dictItemListResponseSchema>;
+
+/** 快捷搜索字典项 */
+export const dictQuickSearchItemSchema = z.object({
+  typeCode: z.string(),
+  typeName: z.string(),
+  secondClassCode: z.string(),
+  secondClassName: z.string(),
+  dataCategoryCode: z.string(),
+  dataCategoryName: z.string(),
+  dataCode: z.string(),
+  dataName: z.string(),
+});
+
+export type DictQuickSearchItem = z.infer<typeof dictQuickSearchItemSchema>;
+
+/** 快捷搜索响应 */
+export const dictQuickSearchResponseSchema = z.object({
+  items: z.array(dictQuickSearchItemSchema),
+});
+
+export type DictQuickSearchResponse = z.infer<typeof dictQuickSearchResponseSchema>;

@@ -9,12 +9,55 @@ const schema = config.db.schema;
 /** 临时区存储（内存，页面刷新丢失） */
 const draftStore: Map<string, DraftCodeItem[]> = new Map();
 
+/** 查询编码各段对应的字典名称 */
+async function lookupCodeNames(conditions: GenerateCodeRequest): Promise<Record<string, string>> {
+  const names: Record<string, string> = {};
+
+  const [stationName, secondClassName, thirdClassName, dataName] = await Promise.all([
+    // 场站名称
+    (async () => {
+      if (!conditions.stationCode) return null;
+      const sql = `SELECT station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE station_code = $1 AND if_delete = '0' LIMIT 1`;
+      const r = await query<{ name: string }>(sql, [conditions.stationCode]);
+      return r.length > 0 ? r[0].name : null;
+    })(),
+    // 二级类码名称（按类型过滤）
+    (async () => {
+      if (!conditions.secondClassCode) return null;
+      const sql = `SELECT second_class_name AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE second_class_code = $1 AND type_code = $2 AND if_delete = '0' LIMIT 1`;
+      const r = await query<{ name: string }>(sql, [conditions.secondClassCode, conditions.typeCode]);
+      return r.length > 0 ? r[0].name : null;
+    })(),
+    // 三级类码名称（按二级类码和类型过滤）
+    (async () => {
+      if (!conditions.thirdClassCode) return null;
+      const sql = `SELECT third_class_name AS name FROM ${schema}.cec_new_energy_third_class_dict WHERE third_class_code = $1 AND second_class_code = $2 AND type_code = $3 AND if_delete = '0' LIMIT 1`;
+      const r = await query<{ name: string }>(sql, [conditions.thirdClassCode, conditions.secondClassCode, conditions.typeCode]);
+      return r.length > 0 ? r[0].name : null;
+    })(),
+    // 数据码名称（按数据类码和二级类码过滤）
+    (async () => {
+      if (!conditions.dataCode) return null;
+      const sql = `SELECT data_name AS name FROM ${schema}.cec_new_energy_code_dict WHERE data_code = $1 AND data_category_code = $2 AND second_class_code = $3 AND if_delete = '0' LIMIT 1`;
+      const r = await query<{ name: string }>(sql, [conditions.dataCode, conditions.dataTypeCode || '00', conditions.secondClassCode]);
+      return r.length > 0 ? r[0].name : null;
+    })(),
+  ]);
+
+  if (stationName) names.stationName = stationName;
+  if (secondClassName) names.secondClassName = secondClassName;
+  if (thirdClassName) names.thirdClassName = thirdClassName;
+  if (dataName) names.dataName = dataName;
+
+  return names;
+}
+
 /** 生成编码（支持单条或批量） */
-export function generateCode(
+export async function generateCode(
   conditions: GenerateCodeRequest,
-  dictNames: Record<string, string> = {},
-): GenerateCodeResponse | GenerateCodeResponse[] {
+): Promise<GenerateCodeResponse | GenerateCodeResponse[]> {
   const codes = generateCodeFromConditions(conditions);
+  const dictNames = await lookupCodeNames(conditions);
   const names = generateCodeName(conditions, dictNames);
 
   // 如果是单条

@@ -22,10 +22,10 @@ function getSessionId(req: Request): string {
 }
 
 /** 生成编码 */
-router.post('/api/codes/generate', (req: Request, res: Response) => {
+router.post('/api/codes/generate', async (req: Request, res: Response) => {
   try {
     const parsed = generateCodeRequestSchema.parse(req.body);
-    const result = codeService.generateCode(parsed);
+    const result = await codeService.generateCode(parsed);
     success(res, result);
   } catch (err: any) {
     if (err instanceof AppError) {
@@ -36,7 +36,7 @@ router.post('/api/codes/generate', (req: Request, res: Response) => {
 });
 
 /** 批量生成编码 */
-router.post('/api/codes/batch-generate', (req: Request, res: Response) => {
+router.post('/api/codes/batch-generate', async (req: Request, res: Response) => {
   try {
     const parsed = batchGenerateCodeRequestSchema.parse(req.body);
 
@@ -44,7 +44,7 @@ router.post('/api/codes/batch-generate', (req: Request, res: Response) => {
       return error(res, ErrorCode.GENERATE_LIMIT_EXCEEDED, '单次生成数量超出限制（上限100条）');
     }
 
-    const codes = parsed.conditions.map((c) => codeService.generateCode(c));
+    const codes = await Promise.all(parsed.conditions.map((c) => codeService.generateCode(c)));
     success(res, { codes, totalCount: codes.length });
   } catch (err: any) {
     if (err instanceof AppError) {
