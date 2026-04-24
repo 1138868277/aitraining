@@ -252,18 +252,19 @@
             <el-form-item :label="field.label" :required="field.required">
               <!-- 下拉选择框（带快捷选择） -->
               <div v-if="field.type === 'select'" class="input-with-quick-options">
-                <el-select
-                  v-model="conditions[field.key]"
-                  :placeholder="'请选择' + field.label"
-                  filterable
-                  :disabled="field.disabled(conditions)"
-                  :multiple="field.multiple"
-                  collapse-tags
-                  collapse-tags-tooltip
-                  clearable
-                  @change="onConditionChange(field.key)"
-                  style="width: 100%"
-                >
+                <div class="select-with-lock" :class="{ 'is-locked': lockedFields[field.key] }">
+                  <el-select
+                    v-model="conditions[field.key]"
+                    :placeholder="'请选择' + field.label"
+                    filterable
+                    :disabled="field.disabled(conditions) || lockedFields[field.key]"
+                    :multiple="field.multiple"
+                    collapse-tags
+                    collapse-tags-tooltip
+                    :clearable="!lockedFields[field.key]"
+                    @change="onConditionChange(field.key)"
+                    style="width: 100%"
+                  >
                   <el-option
                     v-for="item in dictOptions[field.key] || []"
                     :key="item.code"
@@ -271,13 +272,25 @@
                     :value="item.code"
                   />
                 </el-select>
+                <el-button
+                  v-if="LOCKABLE_FIELDS.includes(field.key)"
+                  size="small"
+                  :type="lockedFields[field.key] ? 'warning' : 'default'"
+                  :plain="!lockedFields[field.key]"
+                  class="lock-btn"
+                  @click="toggleLock(field.key)"
+                >
+                  {{ lockedFields[field.key] ? '已锁定' : '锁定' }}
+                </el-button>
+                </div>
                 <div v-if="field.quickOptions && field.quickOptions.length > 0" class="quick-options">
                   <el-tag
                     v-for="option in field.quickOptions"
                     :key="option"
                     size="small"
                     class="quick-option-tag"
-                    @click="conditions[field.key] = option; onConditionChange(field.key)"
+                    :class="{ 'is-disabled': lockedFields[field.key] }"
+                    @click="lockedFields[field.key] || (conditions[field.key] = option, onConditionChange(field.key))"
                   >
                     {{ option }}
                   </el-tag>
@@ -286,21 +299,34 @@
 
               <!-- 输入框（带快捷选择） -->
               <div v-else-if="field.type === 'input'" class="input-with-quick-options">
-                <el-input
-                  v-model="conditions[field.key]"
-                  :placeholder="'请输入' + field.label"
-                  :disabled="field.disabled(conditions)"
-                  clearable
-                  @change="onConditionChange(field.key)"
-                  style="width: 100%"
-                />
+                <div class="select-with-lock">
+                  <el-input
+                    v-model="conditions[field.key]"
+                    :placeholder="'请输入' + field.label"
+                    :disabled="field.disabled(conditions) || lockedFields[field.key]"
+                    :clearable="!lockedFields[field.key]"
+                    @change="onConditionChange(field.key)"
+                    style="width: 100%"
+                  />
+                  <el-button
+                    v-if="LOCKABLE_FIELDS.includes(field.key)"
+                    size="small"
+                    :type="lockedFields[field.key] ? 'warning' : 'default'"
+                    :plain="!lockedFields[field.key]"
+                    class="lock-btn"
+                    @click="toggleLock(field.key)"
+                  >
+                    {{ lockedFields[field.key] ? '已锁定' : '锁定' }}
+                  </el-button>
+                </div>
                 <div v-if="field.quickOptions && field.quickOptions.length > 0" class="quick-options">
                   <el-tag
                     v-for="option in field.quickOptions"
                     :key="option"
                     size="small"
                     class="quick-option-tag"
-                    @click="conditions[field.key] = option"
+                    :class="{ 'is-disabled': lockedFields[field.key] }"
+                    @click="lockedFields[field.key] || (conditions[field.key] = option)"
                   >
                     {{ option }}
                   </el-tag>
@@ -518,6 +544,54 @@ const conditionFields: ConditionField[] = [
 const conditions = reactive<Record<string, any>>({});
 const dictOptions = reactive<Record<string, Array<{ code: string; name: string }>>>({});
 const generatedCodes = ref<Array<{ code: string; name: string; generateTime: string }>>([]);
+
+/** 锁定筛选条件（本地存储持久化） */
+const LOCKED_FIELDS_KEY = 'locked_filter_fields';
+const LOCKED_VALUES_KEY = 'locked_filter_values';
+const LOCKABLE_FIELDS = ['stationCode', 'typeCode', 'projectLineCode', 'prefixNo', 'firstClassCode', 'secondClassCode'];
+const lockedFields = reactive<Record<string, boolean>>({
+  stationCode: false,
+  typeCode: false,
+  projectLineCode: false,
+  prefixNo: false,
+  firstClassCode: false,
+  secondClassCode: false,
+});
+
+function loadLockedState() {
+  try {
+    const saved = localStorage.getItem(LOCKED_FIELDS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      LOCKABLE_FIELDS.forEach(key => {
+        if (parsed[key]) lockedFields[key] = true;
+      });
+    }
+  } catch {}
+}
+
+function saveLockedState() {
+  localStorage.setItem(LOCKED_FIELDS_KEY, JSON.stringify({ ...lockedFields }));
+  const values: Record<string, any> = {};
+  LOCKABLE_FIELDS.forEach(key => {
+    if (lockedFields[key]) values[key] = conditions[key];
+  });
+  localStorage.setItem(LOCKED_VALUES_KEY, JSON.stringify(values));
+}
+
+function loadLockedValues(): Record<string, any> {
+  try {
+    const saved = localStorage.getItem(LOCKED_VALUES_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+}
+
+function toggleLock(key: string) {
+  lockedFields[key] = !lockedFields[key];
+  saveLockedState();
+}
 
 /** 最近保存分页数据 */
 const savedCodes = ref<Array<{ id?: number; code: string; name: string; generateTime: string; creator: string }>>([]);
@@ -899,12 +973,16 @@ async function onQuickSearchRowClick(row: {
     F: 'F1',
     G: 'G1',
   };
-  conditions.typeCode = typeCodeMap[row.typeCode] || row.typeCode;
+  // 如果类型已锁定，使用当前值；否则使用快捷搜索的映射值
+  const resolvedTypeCode = lockedFields.typeCode
+    ? conditions.typeCode
+    : (typeCodeMap[row.typeCode] || row.typeCode);
+  conditions.typeCode = resolvedTypeCode;
   // 2. 触发类型级联，加载二级类码列表
   await onConditionChange('typeCode');
 
-  // 3. 设置二级类码
-  conditions.secondClassCode = row.secondClassCode;
+  // 3. 设置二级类码（锁定字段使用原值）
+  conditions.secondClassCode = lockedFields.secondClassCode ? conditions.secondClassCode : row.secondClassCode;
   // 4. 触发二级类级联，加载三级类码/数据类码列表
   await onConditionChange('secondClassCode');
 
@@ -983,6 +1061,9 @@ const expectedCodeCount = computed(() => {
 // 初始化加载顶级字典
 onMounted(async () => {
   try {
+    // 加载锁定的筛选条件状态
+    loadLockedState();
+
     const [stations, types, prefixes, firstClass] = await Promise.all([
       dictService.getDictItems('station'),
       dictService.getDictItems('type'),
@@ -1008,8 +1089,14 @@ onMounted(async () => {
       conditions.firstClassCode = productionOperation.code;
     }
 
-    // 类型默认"F1"
-    conditions.typeCode = 'F1';
+    // 如果字段已锁定，从localStorage恢复锁定的值；否则使用默认值
+    const lockedValues = loadLockedValues();
+    conditions.stationCode = lockedFields.stationCode ? (lockedValues.stationCode || '') : '';
+    conditions.typeCode = lockedFields.typeCode ? (lockedValues.typeCode || '') : 'F1';
+    conditions.prefixNo = lockedFields.prefixNo ? (lockedValues.prefixNo || '') : (internalDataPrefix ? internalDataPrefix.code : '');
+    conditions.firstClassCode = lockedFields.firstClassCode ? (lockedValues.firstClassCode || '') : (productionOperation ? productionOperation.code : '');
+    conditions.projectLineCode = lockedFields.projectLineCode ? (lockedValues.projectLineCode || '') : '111';
+    conditions.secondClassCode = lockedFields.secondClassCode ? (lockedValues.secondClassCode || '') : '';
 
     // 项目期号&并网线路默认"111"
     conditions.projectLineCode = '111';
@@ -1235,27 +1322,32 @@ async function handleGenerate() {
 }
 
 function handleClear() {
-  // 清空所有条件（多选字段置为空数组）
+  // 清空所有条件（多选字段置为空数组），跳过锁定的字段
   conditionFields.forEach((field) => {
+    if (lockedFields[field.key]) return;
     conditions[field.key] = field.multiple ? [] : '';
   });
-  // 清空可能残留的扩展字段
+  // 清空可能残留的扩展字段，跳过锁定字段相关
   Object.keys(conditions).forEach((k) => {
     if (!conditionFields.find(f => f.key === k)) {
       conditions[k] = '';
     }
   });
 
-  // 重置前缀号为默认值（内部数据）
-  const internalDataPrefix = dictOptions['prefixNo']?.find(p => p.name === '内部数据');
-  if (internalDataPrefix) {
-    conditions.prefixNo = internalDataPrefix.code;
+  // 重置前缀号为默认值（内部数据）（跳过锁定字段）
+  if (!lockedFields.prefixNo) {
+    const internalDataPrefix = dictOptions['prefixNo']?.find(p => p.name === '内部数据');
+    if (internalDataPrefix) {
+      conditions.prefixNo = internalDataPrefix.code;
+    }
   }
 
-  // 重置一级类码为默认值（生产运行）
-  const productionOperation = dictOptions['firstClassCode']?.find(f => f.name === '生产运行');
-  if (productionOperation) {
-    conditions.firstClassCode = productionOperation.code;
+  // 重置一级类码为默认值（生产运行）（跳过锁定字段）
+  if (!lockedFields.firstClassCode) {
+    const productionOperation = dictOptions['firstClassCode']?.find(f => f.name === '生产运行');
+    if (productionOperation) {
+      conditions.firstClassCode = productionOperation.code;
+    }
   }
 
   // 重置扩展码默认值
@@ -1566,6 +1658,12 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   const saved = item.conditionData;
   if (!saved || Object.keys(saved).length === 0) return;
 
+  // 保存锁定的字段值，清空后再恢复
+  const lockedSnapshot: Record<string, any> = {};
+  LOCKABLE_FIELDS.forEach(key => {
+    if (lockedFields[key]) lockedSnapshot[key] = conditions[key];
+  });
+
   // 1. 清空所有条件
   conditionFields.forEach((field) => {
     conditions[field.key] = field.multiple ? [] : '';
@@ -1575,18 +1673,18 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   });
 
   // 2. 按依赖顺序设置条件并触发级联加载
-  // 2a. 设置独立字段
-  conditions.stationCode = saved.stationCode || '';
-  conditions.typeCode = saved.typeCode || '';
-  conditions.projectLineCode = saved.projectLineCode || '';
-  conditions.prefixNo = saved.prefixNo || '';
-  conditions.firstClassCode = saved.firstClassCode || '';
+  // 2a. 设置独立字段（锁定字段使用原值）
+  conditions.stationCode = lockedFields.stationCode ? lockedSnapshot.stationCode : (saved.stationCode || '');
+  conditions.typeCode = lockedFields.typeCode ? lockedSnapshot.typeCode : (saved.typeCode || '');
+  conditions.projectLineCode = lockedFields.projectLineCode ? lockedSnapshot.projectLineCode : (saved.projectLineCode || '');
+  conditions.prefixNo = lockedFields.prefixNo ? lockedSnapshot.prefixNo : (saved.prefixNo || '');
+  conditions.firstClassCode = lockedFields.firstClassCode ? lockedSnapshot.firstClassCode : (saved.firstClassCode || '');
 
   // 2b. 触发类型级联（加载二级类码列表）
   await onConditionChange('typeCode');
 
-  // 2c. 设置二级类码
-  conditions.secondClassCode = saved.secondClassCode || '';
+  // 2c. 设置二级类码（锁定字段使用原值）
+  conditions.secondClassCode = lockedFields.secondClassCode ? lockedSnapshot.secondClassCode : (saved.secondClassCode || '');
 
   // 2d. 触发二级类级联（加载三级类码和数据类码列表，会重置扩展码）
   await onConditionChange('secondClassCode');
@@ -1889,6 +1987,27 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   flex-direction: column;
   gap: 8px;
   width: 100%;
+}
+
+.select-with-lock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.select-with-lock .el-select {
+  flex: 1;
+}
+
+.lock-btn {
+  flex-shrink: 0;
+  min-width: 60px;
+}
+
+.quick-option-tag.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .quick-options {
