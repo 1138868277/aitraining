@@ -40,6 +40,21 @@
           <span>搜索中...</span>
         </div>
         <div v-if="quickSearchResults.length > 0" class="quick-search-results">
+          <div class="quick-search-filter-bar">
+            <span class="quick-search-filter-label">类型：</span>
+            <el-select v-model="quickSearchTypeFilter" placeholder="全部" clearable size="small" style="width: 100px" @change="onQuickSearchFilterChange">
+              <el-option v-for="item in quickSearchTypeOptions" :key="item" :label="item" :value="item" />
+            </el-select>
+            <span class="quick-search-filter-label">二级类码：</span>
+            <el-select v-model="quickSearchSecondClassFilter" placeholder="全部" clearable size="small" style="width: 200px" @change="onQuickSearchFilterChange">
+              <el-option
+                v-for="item in quickSearchFilteredSecondClassOptions"
+                :key="item.code"
+                :label="item.code + ' ' + item.name"
+                :value="item.code"
+              />
+            </el-select>
+          </div>
           <el-table
             :data="quickSearchResults"
             border
@@ -83,7 +98,19 @@
               </template>
             </el-table-column>
           </el-table>
-          <div class="quick-search-count">共 {{ quickSearchTotal }} 条, 已显示{{ quickSearchResults.length }}条</div>
+          <div class="quick-search-pagination">
+            <el-pagination
+              v-if="quickSearchTotal > 0"
+              v-model:current-page="quickSearchPageNum"
+              v-model:page-size="quickSearchPageSize"
+              :total="quickSearchTotal"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next"
+              small
+              @current-change="onQuickSearchPageChange"
+              @size-change="onQuickSearchPageChange"
+            />
+          </div>
         </div>
         <el-empty
           v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading && quickSearchText.trim()"
@@ -525,7 +552,59 @@ const quickSearchResults = ref<Array<{
 const quickSearchLoading = ref(false);
 const quickSearchSearched = ref(false);
 const quickSearchTotal = ref(0);
+const quickSearchPageNum = ref(1);
+const quickSearchPageSize = ref(20);
+const quickSearchTypeFilter = ref('');
+const quickSearchSecondClassFilter = ref('');
+const quickSearchTypeOptions = ref<string[]>([]);
 let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
+
+const quickSearchFilteredSecondClassOptions = computed(() => {
+  if (!quickSearchTypeFilter.value) return quickSearchSecondClassOptions.value;
+  return quickSearchSecondClassOptions.value.filter(s => s.typeCode === quickSearchTypeFilter.value);
+});
+
+function onQuickSearchFilterChange() {
+  // 类型筛选变化时，若当前二级类码不属于该类型则清空
+  if (quickSearchTypeFilter.value && quickSearchSecondClassFilter.value) {
+    const match = quickSearchSecondClassOptions.value.find(
+      s => s.code === quickSearchSecondClassFilter.value && s.typeCode === quickSearchTypeFilter.value
+    );
+    if (!match) {
+      quickSearchSecondClassFilter.value = '';
+    }
+  }
+  // 重新请求服务端带筛选条件的分页数据
+  doQuickSearch();
+}
+
+/** 执行带当前筛选条件的服务端搜索 */
+async function doQuickSearch(resetPage: boolean = true) {
+  const text = quickSearchText.value.trim();
+  if (!text) return;
+  quickSearchLoading.value = true;
+  if (resetPage) quickSearchPageNum.value = 1;
+  try {
+    const typeFilter = quickSearchTypeFilter.value || undefined;
+    const secondClassFilter = quickSearchSecondClassFilter.value || undefined;
+    const result = await dictService.quickSearchDict(text, quickSearchPageNum.value, quickSearchPageSize.value, typeFilter, secondClassFilter);
+    quickSearchResults.value = result.items;
+    quickSearchTotal.value = result.total;
+    quickSearchTypeOptions.value = result.typeOptions || [];
+    quickSearchSecondClassOptions.value = (result.secondClassOptions || []).map(s => ({ code: s.secondClassCode, name: s.secondClassName, typeCode: s.typeCode }));
+  } catch {
+    quickSearchResults.value = [];
+    quickSearchTotal.value = 0;
+  } finally {
+    quickSearchLoading.value = false;
+  }
+}
+
+async function onQuickSearchPageChange() {
+  doQuickSearch(false);
+}
 
 /** 手动新增编码字典对话框 */
 const showAddDialog = ref(false);
@@ -776,23 +855,21 @@ function onQuickSearchInput() {
   if (!text) {
     quickSearchResults.value = [];
     quickSearchSearched.value = false;
+    quickSearchTotal.value = 0;
+    quickSearchPageNum.value = 1;
+    quickSearchTypeFilter.value = '';
+    quickSearchSecondClassFilter.value = '';
+    quickSearchSecondClassOptions.value = [];
+    quickSearchTypeOptions.value = [];
     return;
   }
   quickSearchTimer = setTimeout(async () => {
-    quickSearchLoading.value = true;
     quickSearchSearched.value = true;
-    try {
-      const result = await dictService.quickSearchDict(text);
-      quickSearchResults.value = result.items;
-      quickSearchTotal.value = result.total;
-      if (result.items.length > 0) {
-        saveRecentSearchTag(text);
-      }
-    } catch {
-      quickSearchResults.value = [];
-      quickSearchTotal.value = 0;
-    } finally {
-      quickSearchLoading.value = false;
+    quickSearchTypeFilter.value = '';
+    quickSearchSecondClassFilter.value = '';
+    await doQuickSearch();
+    if (quickSearchResults.value.length > 0) {
+      saveRecentSearchTag(text);
     }
   }, 300);
 }
@@ -801,6 +878,11 @@ function onQuickSearchClear() {
   quickSearchResults.value = [];
   quickSearchSearched.value = false;
   quickSearchTotal.value = 0;
+  quickSearchPageNum.value = 1;
+  quickSearchTypeFilter.value = '';
+  quickSearchSecondClassFilter.value = '';
+  quickSearchSecondClassOptions.value = [];
+  quickSearchTypeOptions.value = [];
 }
 
 /** 点击快捷搜索结果行，自动填入筛选条件 */
@@ -1614,6 +1696,31 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   font-size: 12px;
   color: #909399;
   text-align: right;
+}
+
+.quick-search-pagination {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.quick-search-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.quick-search-filter-label {
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.quick-search-filter-count {
+  font-size: 12px;
+  color: #909399;
+  margin-left: auto;
 }
 
 .code-highlight {

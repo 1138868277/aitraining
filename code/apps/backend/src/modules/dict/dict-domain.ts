@@ -201,8 +201,14 @@ export async function getDataCodeByDataType(dataTypeCode: string, secondClassCod
   return query(sql, params);
 }
 
-/** 快捷搜索：根据数据码名称模糊匹配 */
-export async function quickSearchDict(searchText: string): Promise<{
+/** 快捷搜索：根据数据码名称模糊匹配（支持类型和二级类码筛选） */
+export async function quickSearchDict(
+  searchText: string,
+  pageNum: number,
+  pageSize: number,
+  typeFilter?: string,
+  secondClassFilter?: string,
+): Promise<{
   items: Array<{
     typeCode: string;
     secondClassCode: string; secondClassName: string;
@@ -211,23 +217,65 @@ export async function quickSearchDict(searchText: string): Promise<{
     isManual: string;
   }>;
   total: number;
+  typeOptions: string[];
+  secondClassOptions: Array<{ secondClassCode: string; secondClassName: string; typeCode: string }>;
 }> {
-  const countSql = `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_name LIKE $1`;
-  const countResult = await query<{ cnt: number }>(countSql, [`%${searchText}%`]);
+  const likePattern = `%${searchText}%`;
+  const filterClauses: string[] = [];
+  const filterParams: any[] = [];
+  let filterIdx = 2;
+
+  if (typeFilter) {
+    filterClauses.push(`AND type_domain_code = $${filterIdx++}`);
+    filterParams.push(typeFilter);
+  }
+  if (secondClassFilter) {
+    filterClauses.push(`AND second_class_code = $${filterIdx++}`);
+    filterParams.push(secondClassFilter);
+  }
+
+  const filterSql = filterClauses.join(' ');
+
+  // 1. 总数（带筛选条件）
+  const countResult = await query<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_name LIKE $1 ${filterSql}`,
+    [likePattern, ...filterParams],
+  );
   const total = Number(countResult[0].cnt);
 
-  const sql = `SELECT DISTINCT type_domain_code AS "typeCode",
-    second_class_code AS "secondClassCode", second_class_name AS "secondClassName",
-    data_category_code AS "dataCategoryCode", data_category_name AS "dataCategoryName",
-    data_code AS "dataCode", data_name AS "dataName",
-    is_manual AS "isManual"
-    FROM ${schema}.cec_new_energy_code_dict
-    WHERE if_delete = '0' AND data_name LIKE $1
-    ORDER BY is_manual, type_domain_code, second_class_code, data_category_code, data_code
-    LIMIT 50`;
-  const items = await query(sql, [`%${searchText}%`]);
+  // 2. 全量类型列表（不限分页）
+  const typeRows = await query<{ typeCode: string }>(
+    `SELECT DISTINCT type_domain_code AS "typeCode" FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0' AND data_name LIKE $1 ORDER BY type_domain_code`,
+    [likePattern],
+  );
 
-  return { items, total };
+  // 3. 全量二级类码列表（不限分页，含类型信息用于前端联动筛选）
+  const secondClassRows = await query<{ secondClassCode: string; secondClassName: string; typeCode: string }>(
+    `SELECT DISTINCT second_class_code AS "secondClassCode", second_class_name AS "secondClassName", type_domain_code AS "typeCode"
+     FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0' AND data_name LIKE $1 ORDER BY second_class_code`,
+    [likePattern],
+  );
+
+  // 4. 分页数据（带筛选条件）
+  const offset = (pageNum - 1) * pageSize;
+  const itemsSql = `SELECT type_domain_code AS "typeCode", second_class_code AS "secondClassCode",
+      second_class_name AS "secondClassName", data_category_code AS "dataCategoryCode",
+      data_category_name AS "dataCategoryName", data_code AS "dataCode", data_name AS "dataName",
+      is_manual AS "isManual"
+    FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND data_name LIKE $1 ${filterSql}
+    ORDER BY second_class_code, data_category_code, data_code
+    LIMIT $${filterIdx} OFFSET $${filterIdx + 1}`;
+  const items = await query(itemsSql, [likePattern, ...filterParams, pageSize, offset]);
+
+  return {
+    items,
+    total,
+    typeOptions: typeRows.map(r => r.typeCode),
+    secondClassOptions: secondClassRows,
+  };
 }
 
 /** 手动新增编码字典项 */

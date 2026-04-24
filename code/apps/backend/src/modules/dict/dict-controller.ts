@@ -9,11 +9,15 @@ const router = Router();
 router.get('/api/dict/quick-search', async (req: Request, res: Response) => {
   try {
     const searchText = (req.query.q as string || '').trim();
+    const pageNum = Math.max(1, parseInt(req.query.pageNum as string) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+    const typeFilter = (req.query.typeFilter as string) || undefined;
+    const secondClassFilter = (req.query.secondClassFilter as string) || undefined;
     if (!searchText) {
-      success(res, { items: [] });
+      success(res, { items: [], total: 0, typeOptions: [], secondClassOptions: [] });
       return;
     }
-    const result = await dictService.quickSearchDict(searchText);
+    const result = await dictService.quickSearchDict(searchText, pageNum, pageSize, typeFilter, secondClassFilter);
     success(res, result);
   } catch (err) {
     console.error('Failed to quick search dict:', err);

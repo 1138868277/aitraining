@@ -42,7 +42,7 @@ export async function getDataTypeBySecondClass(typeCode: string, secondClassCode
 }
 
 /** 快捷搜索：根据数据码名称模糊匹配 */
-export async function quickSearchDict(q: string): Promise<{
+export async function quickSearchDict(q: string, pageNum: number = 1, pageSize: number = 20, typeFilter?: string, secondClassFilter?: string): Promise<{
   items: Array<{
     typeCode: string;
     secondClassCode: string; secondClassName: string;
@@ -51,8 +51,10 @@ export async function quickSearchDict(q: string): Promise<{
     isManual?: string;
   }>;
   total: number;
+  typeOptions: string[];
+  secondClassOptions: Array<{ secondClassCode: string; secondClassName: string; typeCode: string }>;
 }> {
-  const res = await api.get(`/dict/quick-search`, { params: { q } });
+  const res = await api.get(`/dict/quick-search`, { params: { q, pageNum, pageSize, typeFilter, secondClassFilter } });
   return res.data;
 }
 
