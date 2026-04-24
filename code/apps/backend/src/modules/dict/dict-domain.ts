@@ -236,7 +236,9 @@ export async function createManualCode(input: {
   secondClassCode: string;
   secondClassName: string;
   dataCategoryCode: string;
+  dataCategoryName?: string;
   dataCode: string;
+  dataName?: string;
   creator: string;
 }): Promise<{ codeDictId: number; isManual: string }> {
   const typeDomainCode = getTypeDomainCode(input.typeCode) || 'Y';
@@ -244,8 +246,8 @@ export async function createManualCode(input: {
   // 默认一级类码
   const firstClassCode = 'B1';
   const firstClassName = '生产运行';
-  const dataCategoryName = input.dataCategoryCode;
-  const dataName = input.dataCode;
+  const dataCategoryName = input.dataCategoryName || input.dataCategoryCode;
+  const dataName = input.dataName || input.dataCode;
 
   const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
     (type_domain_code, first_class_code, first_class_name,
@@ -269,6 +271,117 @@ export async function createManualCode(input: {
   ]);
 
   return { codeDictId: result[0].code_dict_id, isManual: '1' };
+}
+
+/** 获取指定数据类码下最大数据码 */
+export async function getMaxDataCode(
+  secondClassCode: string,
+  dataCategoryCode: string,
+  typeCode: string,
+): Promise<string | null> {
+  const typeDomainCode = getTypeDomainCode(typeCode) || 'Y';
+  const sql = `SELECT MAX(data_code) AS max_code FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code = $2 AND type_domain_code = $3`;
+  const result = await query<{ max_code: string | null }>(sql, [secondClassCode, dataCategoryCode, typeDomainCode]);
+  return result[0]?.max_code || null;
+}
+
+/** 获取指定二级类码下最大数据类码 */
+export async function getMaxDataCategoryCode(
+  secondClassCode: string,
+  typeCode: string,
+): Promise<string | null> {
+  const typeDomainCode = getTypeDomainCode(typeCode) || 'Y';
+  const sql = `SELECT MAX(data_category_code) AS max_code FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND second_class_code = $1 AND type_domain_code = $2`;
+  const result = await query<{ max_code: string | null }>(sql, [secondClassCode, typeDomainCode]);
+  return result[0]?.max_code || null;
+}
+
+/** 检查数据类码是否已存在（返回已存在的编码列表） */
+export async function checkExistingDataCategories(
+  secondClassCode: string,
+  typeCode: string,
+  categoryCodes: string[],
+): Promise<string[]> {
+  const typeDomainCode = getTypeDomainCode(typeCode) || 'Y';
+  const uniqueCodes = [...new Set(categoryCodes)];
+  if (uniqueCodes.length === 0) return [];
+
+  const placeholders = uniqueCodes.map((_, i) => `$${i + 3}`);
+  const sql = `SELECT DISTINCT data_category_code FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND second_class_code = $1 AND type_domain_code = $2
+    AND data_category_code IN (${placeholders.join(',')})`;
+  const rows = await query<{ data_category_code: string }>(sql, [secondClassCode, typeDomainCode, ...uniqueCodes]);
+  return rows.map(r => r.data_category_code);
+}
+
+/** 检查数据码是否已存在（返回已存在的编码列表） */
+export async function checkExistingDataCodes(
+  secondClassCode: string,
+  dataCategoryCode: string,
+  typeCode: string,
+  dataCodes: string[],
+): Promise<string[]> {
+  const typeDomainCode = getTypeDomainCode(typeCode) || 'Y';
+  const uniqueCodes = [...new Set(dataCodes)];
+  if (uniqueCodes.length === 0) return [];
+
+  const placeholders = uniqueCodes.map((_, i) => `$${i + 4}`);
+  const sql = `SELECT DISTINCT data_code FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code = $2
+    AND type_domain_code = $3 AND data_code IN (${placeholders.join(',')})`;
+  const rows = await query<{ data_code: string }>(sql, [secondClassCode, dataCategoryCode, typeDomainCode, ...uniqueCodes]);
+  return rows.map(r => r.data_code);
+}
+
+/** 批量新增编码字典项 */
+export async function batchCreateManualCode(input: {
+  typeCode: string;
+  secondClassCode: string;
+  secondClassName: string;
+  entries: Array<{
+    dataCategoryCode: string;
+    dataCategoryName?: string;
+    dataCode: string;
+    dataName?: string;
+  }>;
+  creator: string;
+}): Promise<{ insertedCount: number }> {
+  const typeDomainCode = getTypeDomainCode(input.typeCode) || 'Y';
+  const firstClassCode = 'B1';
+  const firstClassName = '生产运行';
+
+  const valuePlaceholders: string[] = [];
+  const params: any[] = [];
+  let idx = 1;
+
+  for (const entry of input.entries) {
+    const dataCategoryName = entry.dataCategoryName || entry.dataCategoryCode;
+    const dataName = entry.dataName || entry.dataCode;
+
+    valuePlaceholders.push(
+      `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, '1', $${idx + 9}, NOW(), $${idx + 9}, NOW())`,
+    );
+    params.push(
+      typeDomainCode, firstClassCode, firstClassName,
+      input.secondClassCode, input.secondClassName,
+      entry.dataCategoryCode, dataCategoryName,
+      entry.dataCode, dataName,
+      input.creator,
+    );
+    idx += 10;
+  }
+
+  const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
+    (type_domain_code, first_class_code, first_class_name,
+     second_class_code, second_class_name,
+     data_category_code, data_category_name, data_code, data_name,
+     is_manual, creator, create_tm, modifier, modify_tm)
+    VALUES ${valuePlaceholders.join(', ')}`;
+
+  await query(sql, params);
+  return { insertedCount: input.entries.length };
 }
 
 /** 根据类型代码和二级类码获取数据类码 */

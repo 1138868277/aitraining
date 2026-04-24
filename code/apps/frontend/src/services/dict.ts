@@ -62,8 +62,39 @@ export async function createManualCode(data: {
   secondClassCode: string;
   secondClassName: string;
   dataCategoryCode: string;
+  dataCategoryName: string;
   dataCode: string;
+  dataName: string;
 }): Promise<{ codeDictId: number; isManual: string }> {
   const res = await api.post('/dict/manual-code', data);
+  return res.data;
+}
+
+/** 获取指定数据类码下最大数据码 */
+export async function getMaxDataCode(secondClassCode: string, dataCategoryCode: string, typeCode: string): Promise<string | null> {
+  const res = await api.get('/dict/max-data-code', { params: { secondClassCode, dataCategoryCode, typeCode } });
+  return res.data.maxDataCode;
+}
+
+/** 获取指定二级类码下最大数据类码 */
+export async function getMaxDataCategoryCode(secondClassCode: string, typeCode: string): Promise<string | null> {
+  const res = await api.get('/dict/max-data-category-code', { params: { secondClassCode, typeCode } });
+  return res.data.maxDataCategoryCode;
+}
+
+/** 批量新增编码字典项 */
+export async function batchCreateManualCode(data: {
+  mode: 'existing' | 'new';
+  typeCode: string;
+  secondClassCode: string;
+  secondClassName?: string;
+  entries: Array<{
+    dataCategoryCode: string;
+    dataCategoryName?: string;
+    dataCode: string;
+    dataName?: string;
+  }>;
+}): Promise<{ insertedCount: number }> {
+  const res = await api.post('/dict/manual-code/batch', data);
   return res.data;
 }

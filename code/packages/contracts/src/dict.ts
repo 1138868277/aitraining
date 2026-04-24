@@ -65,3 +65,30 @@ export const createManualDictCodeResponseSchema = z.object({
 });
 
 export type CreateManualDictCodeResponse = z.infer<typeof createManualDictCodeResponseSchema>;
+
+/** 批量新增编码字典 - 单条记录 */
+export const manualDictCodeEntrySchema = z.object({
+  dataCategoryCode: z.string().min(1, '请输入数据类码'),
+  dataCategoryName: z.string().optional().default(''),
+  dataCode: z.string().min(1, '请输入数据码'),
+  dataName: z.string().optional().default(''),
+});
+
+export type ManualDictCodeEntry = z.infer<typeof manualDictCodeEntrySchema>;
+
+/** 批量新增编码字典请求 */
+export const batchCreateManualDictCodeSchema = z.object({
+  typeCode: z.string().min(1, '请选择类型'),
+  secondClassCode: z.string().min(1, '请选择二级类码'),
+  secondClassName: z.string().optional(),
+  entries: z.array(manualDictCodeEntrySchema).min(1, '请至少添加一条数据码记录'),
+});
+
+export type BatchCreateManualDictCodeRequest = z.infer<typeof batchCreateManualDictCodeSchema>;
+
+/** 批量新增编码字典响应 */
+export const batchCreateManualDictCodeResponseSchema = z.object({
+  insertedCount: z.number(),
+});
+
+export type BatchCreateManualDictCodeResponse = z.infer<typeof batchCreateManualDictCodeResponseSchema>;

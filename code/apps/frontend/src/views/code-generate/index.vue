@@ -71,13 +71,13 @@
                 <span class="name-muted">&nbsp;{{ row.dataName }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="来源" width="70">
+            <el-table-column label="来源" width="140">
               <template #default="{ row }">
-                <el-tag v-if="row.isManual === '1'" size="small" type="warning">手动</el-tag>
-                <el-tag v-else size="small" type="info">统一</el-tag>
+                <el-tag v-if="row.isManual === '1'" size="small" type="warning">手动添加</el-tag>
+                <el-tag v-else size="small" type="info">集团统一</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="70" fixed="right">
+            <el-table-column label="操作" width="140" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="onQuickSearchRowClick(row)">筛选</el-button>
               </template>
@@ -92,37 +92,67 @@
       </div>
     </el-card>
 
-    <!-- 手动新增编码字典对话框 -->
-    <el-dialog v-model="showAddDialog" title="新增编码字典" width="500px" :close-on-click-modal="false">
+    <!-- 手动新增编码字典对话框（批量） -->
+    <el-dialog v-model="showAddDialog" title="新增编码字典" width="820px" :close-on-click-modal="false">
       <el-form :model="addForm" label-width="120px" label-position="top">
-        <el-form-item label="类型" required>
-          <el-select v-model="addForm.typeCode" placeholder="请选择类型" filterable clearable style="width: 100%" @change="onAddTypeChange">
-            <el-option
-              v-for="item in addTypeOptions"
-              :key="item.code"
-              :label="item.code + ' ' + item.name"
-              :value="item.code"
-            />
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="类型" required>
+              <el-select v-model="addForm.typeCode" placeholder="请选择类型" filterable clearable style="width: 100%" @change="onAddTypeChange">
+                <el-option label="F 风力发电" value="F" />
+                <el-option label="G 光伏发电" value="G" />
+                <el-option label="Y 通用" value="Y" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="二级类码" required>
+              <el-select v-model="addForm.secondClassCode" placeholder="请选择二级类码" filterable clearable style="width: 100%" :disabled="!addForm.typeCode" @change="onAddSecondClassChange">
+                <el-option
+                  v-for="item in addSecondClassOptions"
+                  :key="item.code"
+                  :label="item.code + ' ' + item.name"
+                  :value="item.code"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="添加方式">
+          <el-radio-group v-model="addMode">
+            <el-radio value="existing">选择已有数据类码</el-radio>
+            <el-radio value="new">新增数据类码</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="addMode === 'existing'" label="数据类码" required>
+          <el-select v-model="addForm.dataCategoryCode" placeholder="请选择已有数据类码" filterable clearable style="width: 100%" @change="onAddDataCategorySelect">
+            <el-option v-for="item in addDataTypeOptions" :key="item.code" :label="item.code + ' ' + item.name" :value="item.code" />
           </el-select>
         </el-form-item>
-        <el-form-item label="二级类码" required>
-          <el-select v-model="addForm.secondClassCode" placeholder="请选择二级类码" filterable clearable style="width: 100%" :disabled="!addForm.typeCode">
-            <el-option
-              v-for="item in addSecondClassOptions"
-              :key="item.code"
-              :label="item.code + ' ' + item.name"
-              :value="item.code"
-            />
-          </el-select>
+        <el-form-item v-if="addMode === 'new'" label="数据类码" required>
+          <div class="code-name-pair">
+            <el-input v-model="addForm.dataCategoryCode" placeholder="2位数字" clearable maxlength="2" style="width: 120px" @input="onDataCategoryCodeInput" />
+            <el-input v-model="addForm.dataCategoryName" placeholder="名称（必填）" clearable maxlength="100" />
+          </div>
         </el-form-item>
-        <el-form-item label="数据类码" required>
-          <el-input v-model="addForm.dataCategoryCode" placeholder="请输入数据类码" clearable maxlength="2" />
-        </el-form-item>
-        <el-form-item label="数据码" required>
-          <el-input v-model="addForm.dataCode" placeholder="请输入数据码" clearable maxlength="3" />
+        <el-form-item label="数据码列表">
+          <div class="batch-entry-table">
+            <div class="batch-entry-header">
+              <span class="batch-entry-col batch-entry-col-code">数据码</span>
+              <span class="batch-entry-col batch-entry-col-name">数据码名称</span>
+              <span class="batch-entry-col batch-entry-col-action">操作</span>
+            </div>
+            <div v-for="(entry, index) in addEntries" :key="index" class="batch-entry-row">
+              <el-input v-model="entry.dataCode" placeholder="3位数字" clearable maxlength="3" class="batch-entry-col batch-entry-col-code" size="small" @input="onDataCodeInput(entry)" />
+              <el-input v-model="entry.dataName" placeholder="名称（必填）" clearable maxlength="100" class="batch-entry-col batch-entry-col-name" size="small" />
+              <el-button type="danger" link size="small" @click="removeEntryRow(index)">删除</el-button>
+            </div>
+            <el-button class="batch-entry-add-btn" size="small" @click="addEntryRow">+ 添加一行</el-button>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
+        <span class="batch-entry-count">已添加 {{ addEntries.length }} 条记录</span>
         <el-button @click="showAddDialog = false">取消</el-button>
         <el-button type="primary" :loading="addLoading" :disabled="!addFormValid" @click="handleAddSave">保存</el-button>
       </template>
@@ -500,35 +530,158 @@ let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
 /** 手动新增编码字典对话框 */
 const showAddDialog = ref(false);
 const addLoading = ref(false);
+const addMode = ref<'existing' | 'new'>('existing');
 const addForm = reactive({
   typeCode: '',
   secondClassCode: '',
   dataCategoryCode: '',
-  dataCode: '',
+  dataCategoryName: '',
 });
-const addTypeOptions = ref<Array<{ code: string; name: string }>>([]);
+const addEntries = ref<Array<{
+  dataCode: string;
+  dataName: string;
+}>>([{ dataCode: '', dataName: '' }]);
 const addSecondClassOptions = ref<Array<{ code: string; name: string }>>([]);
+const addDataTypeOptions = ref<Array<{ code: string; name: string }>>([]);
 
 const addFormValid = computed(() => {
-  return addForm.typeCode && addForm.secondClassCode && addForm.dataCategoryCode && addForm.dataCode;
+  if (!addForm.typeCode || !addForm.secondClassCode) return false;
+  if (addMode.value === 'existing') {
+    return !!addForm.dataCategoryCode
+      && addEntries.value.length > 0
+      && addEntries.value.every(e => /^\d{3}$/.test(e.dataCode) && e.dataName);
+  }
+  return /^\d{2}$/.test(addForm.dataCategoryCode) && addForm.dataCategoryName
+    && addEntries.value.length > 0
+    && addEntries.value.every(e => /^\d{3}$/.test(e.dataCode) && e.dataName);
 });
 
-async function loadAddTypeOptions() {
+/** 编码递增工具 */
+function padStart3(num: number): string {
+  return String(num).padStart(3, '0');
+}
+function getNextDataCode(prev: string): string {
+  const n = parseInt(prev, 10);
+  return padStart3(isNaN(n) ? 1 : n + 1);
+}
+function getNextCategoryCode(prev: string): string {
+  const n = parseInt(prev, 10);
+  return String(isNaN(n) ? 1 : n + 1).padStart(2, '0');
+}
+
+/** 用起始数据码填充编码列表（连续递增） */
+function fillEntries(startCode: string) {
+  const start = parseInt(startCode, 10);
+  addEntries.value = [{ dataCode: padStart3(isNaN(start) ? 1 : start), dataName: '' }];
+}
+
+function addEntryRow() {
+  const last = addEntries.value[addEntries.value.length - 1];
+  addEntries.value.push({ dataCode: getNextDataCode(last.dataCode), dataName: '' });
+}
+
+function removeEntryRow(index: number) {
+  if (addEntries.value.length <= 1) return;
+  addEntries.value.splice(index, 1);
+}
+
+/** 数据类码输入：只允许数字，最多2位 */
+function onDataCategoryCodeInput(value: string) {
+  addForm.dataCategoryCode = value.replace(/\D/g, '').slice(0, 2);
+}
+
+/** 数据码输入：只允许数字，最多3位 */
+function onDataCodeInput(entry: { dataCode: string }) {
+  entry.dataCode = entry.dataCode.replace(/\D/g, '').slice(0, 3);
+}
+
+/** 切换添加方式时清空数据类码相关字段和数据码列表 */
+watch(addMode, () => {
+  addForm.dataCategoryCode = '';
+  addForm.dataCategoryName = '';
+  addEntries.value = [{ dataCode: '', dataName: '' }];
+  if (addForm.typeCode && addForm.secondClassCode) {
+    if (addMode.value === 'existing') {
+      loadAddDataTypeOptions();
+    } else {
+      fillNewCategoryCodeAndEntries();
+    }
+  }
+});
+
+/** 选择已有数据类码 → 自动填充名称 + 获取最大数据码并自动编号 */
+async function onAddDataCategorySelect(code: string) {
+  if (!code) { addForm.dataCategoryName = ''; return; }
+  const selected = addDataTypeOptions.value.find(o => o.code === code);
+  addForm.dataCategoryName = selected?.name || '';
   try {
-    addTypeOptions.value = await dictService.getDictItems('type');
+    const mappedType = TYPE_CODE_MAP[addForm.typeCode] || addForm.typeCode;
+    const maxDataCode = await dictService.getMaxDataCode(addForm.secondClassCode, code, mappedType);
+    fillEntries(maxDataCode ? getNextDataCode(maxDataCode) : '001');
   } catch {
-    addTypeOptions.value = [];
+    fillEntries('001');
   }
 }
 
+/** 二级类码变更 → 加载已有数据类码 或 自动填充新增数据类码 */
+async function onAddSecondClassChange() {
+  addForm.dataCategoryCode = '';
+  addForm.dataCategoryName = '';
+  addDataTypeOptions.value = [];
+  addEntries.value = [{ dataCode: '', dataName: '' }];
+  if (!addForm.typeCode || !addForm.secondClassCode) return;
+
+  if (addMode.value === 'existing') {
+    await loadAddDataTypeOptions();
+  } else {
+    await fillNewCategoryCodeAndEntries();
+  }
+}
+
+/** 新增数据类码模式：取最大数据类码+1 并初始化数据码从001开始 */
+async function fillNewCategoryCodeAndEntries() {
+  try {
+    const mappedType = TYPE_CODE_MAP[addForm.typeCode] || addForm.typeCode;
+    const maxCategoryCode = await dictService.getMaxDataCategoryCode(addForm.secondClassCode, mappedType);
+    addForm.dataCategoryCode = maxCategoryCode ? getNextCategoryCode(maxCategoryCode) : '01';
+    fillEntries('001');
+  } catch {
+    addForm.dataCategoryCode = '01';
+    fillEntries('001');
+  }
+}
+
+async function loadAddDataTypeOptions() {
+  try {
+    const mappedType = TYPE_CODE_MAP[addForm.typeCode] || addForm.typeCode;
+    addDataTypeOptions.value = await dictService.getDataTypeBySecondClass(mappedType, addForm.secondClassCode);
+  } catch {
+    addDataTypeOptions.value = [];
+  }
+}
+
+// F/G/Y 映射到具体类型码，用于加载二级类码
+const TYPE_CODE_MAP: Record<string, string> = {
+  F: 'F1',
+  G: 'G1',
+  Y: 'Y0',
+};
+
 async function onAddTypeChange() {
   addForm.secondClassCode = '';
+  addForm.dataCategoryCode = '';
+  addForm.dataCategoryName = '';
+  addEntries.value = [{ dataCode: '', dataName: '' }];
   addSecondClassOptions.value = [];
+  addDataTypeOptions.value = [];
   if (addForm.typeCode) {
-    try {
-      addSecondClassOptions.value = await dictService.getSecondClassByType(addForm.typeCode);
-    } catch {
-      addSecondClassOptions.value = [];
+    const mappedType = TYPE_CODE_MAP[addForm.typeCode];
+    if (mappedType) {
+      try {
+        addSecondClassOptions.value = await dictService.getSecondClassByType(mappedType);
+      } catch {
+        addSecondClassOptions.value = [];
+      }
     }
   }
 }
@@ -537,23 +690,30 @@ async function handleAddSave() {
   if (!addFormValid.value) return;
   addLoading.value = true;
   try {
-    // 获取二级类名称
     const secondClass = addSecondClassOptions.value.find(item => item.code === addForm.secondClassCode);
-    await dictService.createManualCode({
+    await dictService.batchCreateManualCode({
+      mode: addMode.value,
       typeCode: addForm.typeCode,
       secondClassCode: addForm.secondClassCode,
       secondClassName: secondClass?.name || '',
-      dataCategoryCode: addForm.dataCategoryCode,
-      dataCode: addForm.dataCode,
+      entries: addEntries.value.map(e => ({
+        dataCategoryCode: addForm.dataCategoryCode,
+        dataCategoryName: addForm.dataCategoryName,
+        dataCode: e.dataCode,
+        dataName: e.dataName,
+      })),
     });
-    ElMessage.success('新增成功');
+    ElMessage.success(`新增成功，共 ${addEntries.value.length} 条`);
     showAddDialog.value = false;
     // 重置表单
+    addMode.value = 'existing';
     addForm.typeCode = '';
     addForm.secondClassCode = '';
     addForm.dataCategoryCode = '';
-    addForm.dataCode = '';
+    addForm.dataCategoryName = '';
+    addEntries.value = [{ dataCode: '', dataName: '' }];
     addSecondClassOptions.value = [];
+    addDataTypeOptions.value = [];
     // 如果当前有搜索文本，刷新搜索结果
     if (quickSearchText.value.trim()) {
       onQuickSearchInput();
@@ -565,16 +725,17 @@ async function handleAddSave() {
   }
 }
 
-// 监听对话框打开，加载类型选项
+// 监听对话框打开
 watch(showAddDialog, (val) => {
-  if (val) {
-    loadAddTypeOptions();
-  } else {
+  if (!val) {
+    addMode.value = 'existing';
     addForm.typeCode = '';
     addForm.secondClassCode = '';
     addForm.dataCategoryCode = '';
-    addForm.dataCode = '';
+    addForm.dataCategoryName = '';
+    addEntries.value = [{ dataCode: '', dataName: '' }];
     addSecondClassOptions.value = [];
+    addDataTypeOptions.value = [];
   }
 });
 
@@ -1686,6 +1847,69 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 
 .name-editor {
   width: 100%;
+}
+
+.code-name-pair {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+/* 批量新增编码字典 - 表格列表 */
+.batch-entry-table {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 12px;
+  width: 100%;
+}
+
+.batch-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 8px 0;
+  font-size: 12px;
+  color: #909399;
+  font-weight: 600;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 8px;
+}
+
+.batch-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.batch-entry-row:last-child {
+  margin-bottom: 0;
+}
+
+.batch-entry-col-code {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.batch-entry-col-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-entry-col-action {
+  width: 50px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.batch-entry-add-btn {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.batch-entry-count {
+  font-size: 13px;
+  color: #909399;
 }
 
 </style>
