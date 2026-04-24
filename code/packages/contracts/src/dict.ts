@@ -46,3 +46,22 @@ export const dictQuickSearchResponseSchema = z.object({
 });
 
 export type DictQuickSearchResponse = z.infer<typeof dictQuickSearchResponseSchema>;
+
+/** 手动新增编码字典请求 */
+export const createManualDictCodeSchema = z.object({
+  typeCode: z.string().min(1, '请选择类型'),
+  secondClassCode: z.string().min(1, '请选择二级类码'),
+  secondClassName: z.string().optional(),
+  dataCategoryCode: z.string().min(1, '请输入数据类码'),
+  dataCode: z.string().min(1, '请输入数据码'),
+});
+
+export type CreateManualDictCodeRequest = z.infer<typeof createManualDictCodeSchema>;
+
+/** 手动新增编码字典响应 */
+export const createManualDictCodeResponseSchema = z.object({
+  codeDictId: z.number(),
+  isManual: z.string(),
+});
+
+export type CreateManualDictCodeResponse = z.infer<typeof createManualDictCodeResponseSchema>;

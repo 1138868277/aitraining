@@ -207,16 +207,59 @@ export async function quickSearchDict(searchText: string): Promise<Array<{
   secondClassCode: string; secondClassName: string;
   dataCategoryCode: string; dataCategoryName: string;
   dataCode: string; dataName: string;
+  isManual: string;
 }>> {
   const sql = `SELECT DISTINCT type_domain_code AS "typeCode",
     second_class_code AS "secondClassCode", second_class_name AS "secondClassName",
     data_category_code AS "dataCategoryCode", data_category_name AS "dataCategoryName",
-    data_code AS "dataCode", data_name AS "dataName"
+    data_code AS "dataCode", data_name AS "dataName",
+    is_manual AS "isManual"
     FROM ${schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND data_name LIKE $1
-    ORDER BY type_domain_code, second_class_code, data_category_code, data_code
+    ORDER BY is_manual, type_domain_code, second_class_code, data_category_code, data_code
     LIMIT 50`;
   return query(sql, [`%${searchText}%`]);
+}
+
+/** 手动新增编码字典项 */
+export async function createManualCode(input: {
+  typeCode: string;
+  secondClassCode: string;
+  secondClassName: string;
+  dataCategoryCode: string;
+  dataCode: string;
+  creator: string;
+}): Promise<{ codeDictId: number; isManual: string }> {
+  const typeDomainCode = getTypeDomainCode(input.typeCode) || 'Y';
+
+  // 默认一级类码
+  const firstClassCode = 'B1';
+  const firstClassName = '生产运行';
+  const dataCategoryName = input.dataCategoryCode;
+  const dataName = input.dataCode;
+
+  const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
+    (type_domain_code, first_class_code, first_class_name,
+     second_class_code, second_class_name,
+     data_category_code, data_category_name, data_code, data_name,
+     is_manual, creator, create_tm, modifier, modify_tm)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '1', $10, NOW(), $10, NOW())
+    RETURNING code_dict_id`;
+
+  const result = await query<{ code_dict_id: number }>(sql, [
+    typeDomainCode,
+    firstClassCode,
+    firstClassName,
+    input.secondClassCode,
+    input.secondClassName,
+    input.dataCategoryCode,
+    dataCategoryName,
+    input.dataCode,
+    dataName,
+    input.creator,
+  ]);
+
+  return { codeDictId: result[0].code_dict_id, isManual: '1' };
 }
 
 /** 根据类型代码和二级类码获取数据类码 */

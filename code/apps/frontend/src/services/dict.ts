@@ -47,7 +47,20 @@ export async function quickSearchDict(q: string): Promise<Array<{
   secondClassCode: string; secondClassName: string;
   dataCategoryCode: string; dataCategoryName: string;
   dataCode: string; dataName: string;
+  isManual?: string;
 }>> {
   const res = await api.get(`/dict/quick-search`, { params: { q } });
   return res.data.items;
+}
+
+/** 手动新增编码字典项 */
+export async function createManualCode(data: {
+  typeCode: string;
+  secondClassCode: string;
+  secondClassName: string;
+  dataCategoryCode: string;
+  dataCode: string;
+}): Promise<{ codeDictId: number; isManual: string }> {
+  const res = await api.post('/dict/manual-code', data);
+  return res.data;
 }

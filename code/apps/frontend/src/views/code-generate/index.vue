@@ -5,6 +5,7 @@
       <template #header>
         <div class="quick-filter-header">
           <span>快捷搜索</span>
+          <el-button size="small" type="primary" @click="showAddDialog = true">新增</el-button>
         </div>
       </template>
       <div class="quick-filter-body">
@@ -70,6 +71,12 @@
                 <span class="name-muted">&nbsp;{{ row.dataName }}</span>
               </template>
             </el-table-column>
+            <el-table-column label="来源" width="70">
+              <template #default="{ row }">
+                <el-tag v-if="row.isManual === '1'" size="small" type="warning">手动</el-tag>
+                <el-tag v-else size="small" type="info">统一</el-tag>
+              </template>
+            </el-table-column>
             <el-table-column label="操作" width="70" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="onQuickSearchRowClick(row)">筛选</el-button>
@@ -84,6 +91,42 @@
         />
       </div>
     </el-card>
+
+    <!-- 手动新增编码字典对话框 -->
+    <el-dialog v-model="showAddDialog" title="新增编码字典" width="500px" :close-on-click-modal="false">
+      <el-form :model="addForm" label-width="120px" label-position="top">
+        <el-form-item label="类型" required>
+          <el-select v-model="addForm.typeCode" placeholder="请选择类型" filterable clearable style="width: 100%" @change="onAddTypeChange">
+            <el-option
+              v-for="item in addTypeOptions"
+              :key="item.code"
+              :label="item.code + ' ' + item.name"
+              :value="item.code"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="二级类码" required>
+          <el-select v-model="addForm.secondClassCode" placeholder="请选择二级类码" filterable clearable style="width: 100%" :disabled="!addForm.typeCode">
+            <el-option
+              v-for="item in addSecondClassOptions"
+              :key="item.code"
+              :label="item.code + ' ' + item.name"
+              :value="item.code"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="数据类码" required>
+          <el-input v-model="addForm.dataCategoryCode" placeholder="请输入数据类码" clearable maxlength="2" />
+        </el-form-item>
+        <el-form-item label="数据码" required>
+          <el-input v-model="addForm.dataCode" placeholder="请输入数据码" clearable maxlength="3" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddDialog = false">取消</el-button>
+        <el-button type="primary" :loading="addLoading" :disabled="!addFormValid" @click="handleAddSave">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 顶部筛选条件面板 -->
     <el-card class="condition-card">
@@ -384,7 +427,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as XLSX from 'xlsx';
 import * as dictService from '@/services/dict';
@@ -447,10 +490,92 @@ const quickSearchResults = ref<Array<{
   secondClassCode: string; secondClassName: string;
   dataCategoryCode: string; dataCategoryName: string;
   dataCode: string; dataName: string;
+  isManual?: string;
 }>>([]);
 const quickSearchLoading = ref(false);
 const quickSearchSearched = ref(false);
 let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 手动新增编码字典对话框 */
+const showAddDialog = ref(false);
+const addLoading = ref(false);
+const addForm = reactive({
+  typeCode: '',
+  secondClassCode: '',
+  dataCategoryCode: '',
+  dataCode: '',
+});
+const addTypeOptions = ref<Array<{ code: string; name: string }>>([]);
+const addSecondClassOptions = ref<Array<{ code: string; name: string }>>([]);
+
+const addFormValid = computed(() => {
+  return addForm.typeCode && addForm.secondClassCode && addForm.dataCategoryCode && addForm.dataCode;
+});
+
+async function loadAddTypeOptions() {
+  try {
+    addTypeOptions.value = await dictService.getDictItems('type');
+  } catch {
+    addTypeOptions.value = [];
+  }
+}
+
+async function onAddTypeChange() {
+  addForm.secondClassCode = '';
+  addSecondClassOptions.value = [];
+  if (addForm.typeCode) {
+    try {
+      addSecondClassOptions.value = await dictService.getSecondClassByType(addForm.typeCode);
+    } catch {
+      addSecondClassOptions.value = [];
+    }
+  }
+}
+
+async function handleAddSave() {
+  if (!addFormValid.value) return;
+  addLoading.value = true;
+  try {
+    // 获取二级类名称
+    const secondClass = addSecondClassOptions.value.find(item => item.code === addForm.secondClassCode);
+    await dictService.createManualCode({
+      typeCode: addForm.typeCode,
+      secondClassCode: addForm.secondClassCode,
+      secondClassName: secondClass?.name || '',
+      dataCategoryCode: addForm.dataCategoryCode,
+      dataCode: addForm.dataCode,
+    });
+    ElMessage.success('新增成功');
+    showAddDialog.value = false;
+    // 重置表单
+    addForm.typeCode = '';
+    addForm.secondClassCode = '';
+    addForm.dataCategoryCode = '';
+    addForm.dataCode = '';
+    addSecondClassOptions.value = [];
+    // 如果当前有搜索文本，刷新搜索结果
+    if (quickSearchText.value.trim()) {
+      onQuickSearchInput();
+    }
+  } catch (err: any) {
+    ElMessage.error(err.message || '新增失败');
+  } finally {
+    addLoading.value = false;
+  }
+}
+
+// 监听对话框打开，加载类型选项
+watch(showAddDialog, (val) => {
+  if (val) {
+    loadAddTypeOptions();
+  } else {
+    addForm.typeCode = '';
+    addForm.secondClassCode = '';
+    addForm.dataCategoryCode = '';
+    addForm.dataCode = '';
+    addSecondClassOptions.value = [];
+  }
+});
 
 /** 最近搜索标签 */
 const RECENT_SEARCH_KEY = 'quick_recent_searches';

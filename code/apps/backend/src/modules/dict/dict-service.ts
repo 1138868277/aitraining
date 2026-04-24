@@ -13,6 +13,7 @@ export interface QuickSearchItem {
   dataCategoryName: string;
   dataCode: string;
   dataName: string;
+  isManual?: string;
 }
 
 const DICT_TYPE_MAP: Record<string, () => Promise<DictItemResponse[]>> = {
@@ -52,4 +53,16 @@ export async function getDataTypeBySecondClass(typeCode: string, secondClassCode
 /** 快捷搜索：根据数据码名称模糊匹配 */
 export async function quickSearchDict(searchText: string): Promise<QuickSearchItem[]> {
   return dictDomain.quickSearchDict(searchText);
+}
+
+/** 手动新增编码字典项 */
+export async function createManualCode(input: {
+  typeCode: string;
+  secondClassCode: string;
+  secondClassName: string;
+  dataCategoryCode: string;
+  dataCode: string;
+  creator: string;
+}) {
+  return dictDomain.createManualCode(input);
 }

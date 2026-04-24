@@ -91,4 +91,35 @@ router.get('/api/dict/second-class/:typeCode', async (req: Request, res: Respons
   }
 });
 
+/** 手动新增编码字典项 */
+router.post('/api/dict/manual-code', async (req: Request, res: Response) => {
+  try {
+    const { typeCode, secondClassCode, secondClassName, dataCategoryCode, dataCode } = req.body;
+
+    if (!typeCode || !secondClassCode || !dataCategoryCode || !dataCode) {
+      error(res, ErrorCode.MISSING_PARAMETER, '类型、二级类码、数据类码和数据码不能为空', 400);
+      return;
+    }
+
+    // 获取二级类名称
+    const secondClassItems = await dictService.getSecondClassByType(typeCode);
+    const secondClass = secondClassItems.find(item => item.code === secondClassCode);
+    const resolvedSecondClassName = secondClassName || secondClass?.name || secondClassCode;
+
+    const result = await dictService.createManualCode({
+      typeCode,
+      secondClassCode,
+      secondClassName: resolvedSecondClassName,
+      dataCategoryCode,
+      dataCode,
+      creator: req.headers['x-session-id'] as string || 'manual',
+    });
+
+    success(res, result, 201);
+  } catch (err) {
+    console.error('Failed to create manual dict code:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '新增编码失败，请重试', 500);
+  }
+});
+
 export default router;
