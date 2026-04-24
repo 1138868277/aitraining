@@ -202,13 +202,20 @@ export async function getDataCodeByDataType(dataTypeCode: string, secondClassCod
 }
 
 /** 快捷搜索：根据数据码名称模糊匹配 */
-export async function quickSearchDict(searchText: string): Promise<Array<{
-  typeCode: string;
-  secondClassCode: string; secondClassName: string;
-  dataCategoryCode: string; dataCategoryName: string;
-  dataCode: string; dataName: string;
-  isManual: string;
-}>> {
+export async function quickSearchDict(searchText: string): Promise<{
+  items: Array<{
+    typeCode: string;
+    secondClassCode: string; secondClassName: string;
+    dataCategoryCode: string; dataCategoryName: string;
+    dataCode: string; dataName: string;
+    isManual: string;
+  }>;
+  total: number;
+}> {
+  const countSql = `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_name LIKE $1`;
+  const countResult = await query<{ cnt: number }>(countSql, [`%${searchText}%`]);
+  const total = Number(countResult[0].cnt);
+
   const sql = `SELECT DISTINCT type_domain_code AS "typeCode",
     second_class_code AS "secondClassCode", second_class_name AS "secondClassName",
     data_category_code AS "dataCategoryCode", data_category_name AS "dataCategoryName",
@@ -218,7 +225,9 @@ export async function quickSearchDict(searchText: string): Promise<Array<{
     WHERE if_delete = '0' AND data_name LIKE $1
     ORDER BY is_manual, type_domain_code, second_class_code, data_category_code, data_code
     LIMIT 50`;
-  return query(sql, [`%${searchText}%`]);
+  const items = await query(sql, [`%${searchText}%`]);
+
+  return { items, total };
 }
 
 /** 手动新增编码字典项 */

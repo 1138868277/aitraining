@@ -13,8 +13,8 @@ router.get('/api/dict/quick-search', async (req: Request, res: Response) => {
       success(res, { items: [] });
       return;
     }
-    const items = await dictService.quickSearchDict(searchText);
-    success(res, { items });
+    const result = await dictService.quickSearchDict(searchText);
+    success(res, result);
   } catch (err) {
     console.error('Failed to quick search dict:', err);
     error(res, ErrorCode.DICT_LOAD_FAILED, '快捷搜索失败，请重试', 500);

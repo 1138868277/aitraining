@@ -83,7 +83,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <div class="quick-search-count">共 {{ quickSearchResults.length }} 条结果</div>
+          <div class="quick-search-count">共 {{ quickSearchTotal }} 条, 已显示{{ quickSearchResults.length }}条</div>
         </div>
         <el-empty
           v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading && quickSearchText.trim()"
@@ -494,6 +494,7 @@ const quickSearchResults = ref<Array<{
 }>>([]);
 const quickSearchLoading = ref(false);
 const quickSearchSearched = ref(false);
+const quickSearchTotal = ref(0);
 let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 手动新增编码字典对话框 */
@@ -620,12 +621,15 @@ function onQuickSearchInput() {
     quickSearchLoading.value = true;
     quickSearchSearched.value = true;
     try {
-      quickSearchResults.value = await dictService.quickSearchDict(text);
-      if (quickSearchResults.value.length > 0) {
+      const result = await dictService.quickSearchDict(text);
+      quickSearchResults.value = result.items;
+      quickSearchTotal.value = result.total;
+      if (result.items.length > 0) {
         saveRecentSearchTag(text);
       }
     } catch {
       quickSearchResults.value = [];
+      quickSearchTotal.value = 0;
     } finally {
       quickSearchLoading.value = false;
     }
@@ -635,6 +639,7 @@ function onQuickSearchInput() {
 function onQuickSearchClear() {
   quickSearchResults.value = [];
   quickSearchSearched.value = false;
+  quickSearchTotal.value = 0;
 }
 
 /** 点击快捷搜索结果行，自动填入筛选条件 */
@@ -1337,24 +1342,26 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   // 2b. 触发类型级联（加载二级类码列表）
   await onConditionChange('typeCode');
 
-  // 2c. 设置二级类相关字段
+  // 2c. 设置二级类码
   conditions.secondClassCode = saved.secondClassCode || '';
+
+  // 2d. 触发二级类级联（加载三级类码和数据类码列表，会重置扩展码）
+  await onConditionChange('secondClassCode');
+
+  // 2e. 级联后再恢复二级类扩展码
   conditions.secondExtCodeStart = saved.secondExtCodeStart || '1';
   conditions.secondExtCodeCount = saved.secondExtCodeCount || '1';
 
-  // 2d. 触发二级类级联（加载三级类码和数据类码列表）
-  await onConditionChange('secondClassCode');
-
-  // 2e. 设置三级类、扩展和数据类字段
+  // 2f. 设置三级类、扩展和数据类字段
   conditions.thirdClassCode = saved.thirdClassCode || '';
   conditions.thirdExtCodeStart = saved.thirdExtCodeStart || '0';
   conditions.thirdExtCodeCount = saved.thirdExtCodeCount || '1';
   conditions.dataTypeCode = saved.dataTypeCode || '';
 
-  // 2f. 触发数据类码级联（加载数据码列表）
+  // 2g. 触发数据类码级联（加载数据码列表）
   await onConditionChange('dataTypeCode');
 
-  // 2g. 设置数据码
+  // 2h. 设置数据码
   if (saved.dataCode !== undefined && saved.dataCode !== null) {
     conditions.dataCode = saved.dataCode;
   }

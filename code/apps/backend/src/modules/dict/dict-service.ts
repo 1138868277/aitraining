@@ -16,6 +16,11 @@ export interface QuickSearchItem {
   isManual?: string;
 }
 
+export interface QuickSearchResult {
+  items: QuickSearchItem[];
+  total: number;
+}
+
 const DICT_TYPE_MAP: Record<string, () => Promise<DictItemResponse[]>> = {
   station: dictDomain.getStationDict,
   type: dictDomain.getTypeDict,
@@ -51,7 +56,7 @@ export async function getDataTypeBySecondClass(typeCode: string, secondClassCode
 }
 
 /** 快捷搜索：根据数据码名称模糊匹配 */
-export async function quickSearchDict(searchText: string): Promise<QuickSearchItem[]> {
+export async function quickSearchDict(searchText: string): Promise<QuickSearchResult> {
   return dictDomain.quickSearchDict(searchText);
 }
 
