@@ -35,7 +35,7 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
 export async function getManualStatistics(pageNum: number, pageSize: number, secondClassCode?: string): Promise<{
   items: ManualStatItem[];
   total: number;
-  secondClassOptions: string[];
+  secondClassOptions: Array<{ code: string; name: string }>;
 }> {
   const params: any = { pageNum, pageSize };
   if (secondClassCode) params.secondClassCode = secondClassCode;

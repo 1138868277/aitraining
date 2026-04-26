@@ -153,20 +153,34 @@
                   accept=".xlsx,.xls"
                   :auto-upload="false"
                   :on-change="handleFileUpload"
+                  :on-exceed="handleUploadExceed"
                   :limit="1"
+                  :file-list="uploadFileList"
                 >
-                  <el-icon class="el-icon--upload">
-                    <svg viewBox="0 0 1024 1024" width="40" height="40" fill="#909399">
-                      <path d="M544 864V288h-64v576H352l160 160 160-160z"/>
-                      <path d="M128 128h768v128H128z"/>
-                    </svg>
-                  </el-icon>
-                  <div class="el-upload__text">拖拽文件到此处，或<em>点击上传</em></div>
+                  <template #default>
+                    <template v-if="uploadFileList.length === 0">
+                      <el-icon class="el-icon--upload">
+                        <svg viewBox="0 0 1024 1024" width="40" height="40" fill="#909399">
+                          <path d="M544 864V288h-64v576H352l160 160 160-160z"/>
+                          <path d="M128 128h768v128H128z"/>
+                        </svg>
+                      </el-icon>
+                      <div class="el-upload__text">拖拽文件到此处，或<em>点击上传</em></div>
+                    </template>
+                    <template v-else>
+                      <div class="excel-file-display">
+                        <svg viewBox="0 0 1024 1024" width="64" height="64" fill="#67c23a">
+                          <path d="M854.6 288.7L639.4 73.4c-6-6-14.2-9.4-22.7-9.4H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V311.3c0-8.5-3.4-16.6-9.4-22.6zM790.2 326H602V137.8L790.2 326zM840 896H184V96h368v232c0 17.7 14.3 32 32 32h232v536h24zM421.1 476.4l-42.4 86.1-42.4-86.1h-39.9l60.9 124.3-67.6 132.3h40.6l45.5-93.8 45.5 93.8h41.5l-67.2-131.6 59.1-124.9zM544 599.8h72.3v-39.9H544v-45.6h82.4v-40.4H503.6V733h41.4l0.3-133.2h-0.6z"/>
+                        </svg>
+                        <div class="excel-file-name">{{ uploadFileList[0]?.name }}</div>
+                        <div class="excel-file-size">{{ formatFileSize(uploadFileList[0]?.size) }}</div>
+                      </div>
+                    </template>
+                  </template>
                   <template #tip>
-                    <div class="el-upload__tip">支持 .xlsx/.xls 文件，请确保包含"编码"和"编码名称"列</div>
+                    <div class="el-upload__tip">支持 .xlsx/.xls 文件，请确保包含"测点编码"和"测点描述"列</div>
                   </template>
                 </el-upload>
-                <div v-if="fileName" class="file-name">已选择：{{ fileName }}</div>
               </el-tab-pane>
             </el-tabs>
             <div class="validate-actions">
@@ -229,8 +243,15 @@
               </el-table-column>
               <el-table-column label="操作" width="160" fixed="right">
                 <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="handleAddItem(row)">新增</el-button>
-                  <el-button link type="primary" size="small" @click="handleModifyItem(row)">修改</el-button>
+                  <template v-if="processedKeys.has((row as any).rowKey)">
+                    <span class="processed-tag">已处理</span>
+                  </template>
+                  <template v-else-if="row.typeName !== '未识别' && row.secondClassName !== '未识别' && row.dataCategoryName !== '未识别' && row.dataName !== '未识别'">
+                    <span class="processed-tag">已识别</span>
+                  </template>
+                  <template v-else>
+                    <el-button link type="primary" size="small" @click="handleAddItem(row)">新增</el-button>
+                  </template>
                 </template>
               </el-table-column>
             </el-table>
@@ -240,16 +261,22 @@
     </el-card>
 
     <!-- 新增对话框 -->
-    <el-dialog v-model="addDialogVisible" title="新增编码字典" width="500px">
+    <el-dialog v-model="addDialogVisible" title="新增编码字典" width="500px" @close="resetAddForm">
       <el-form label-width="100px" label-position="top">
         <el-form-item label="二级类码">
           <el-input :model-value="addTarget?.secondClassCode + ' ' + addTarget?.secondClassName" disabled />
         </el-form-item>
         <el-form-item label="数据类码">
-          <el-input :model-value="addTarget?.dataCategoryCode + ' ' + addTarget?.dataCategoryName" disabled />
+          <el-input v-model="addForm.dataCategoryCode" placeholder="2位数字" maxlength="2" style="width: 80px" />
+        </el-form-item>
+        <el-form-item label="数据类名称">
+          <el-input v-model="addForm.dataCategoryName" placeholder="输入数据类名称" />
         </el-form-item>
         <el-form-item label="数据码">
-          <el-input :model-value="addTarget?.dataCode + ' ' + addTarget?.dataName" disabled />
+          <el-input v-model="addForm.dataCode" placeholder="3位数字" maxlength="3" style="width: 80px" />
+        </el-form-item>
+        <el-form-item label="数据名称">
+          <el-input v-model="addForm.dataName" placeholder="输入数据名称" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -258,82 +285,6 @@
       </template>
     </el-dialog>
 
-    <!-- 修改对话框 -->
-    <el-dialog v-model="modifyDialogVisible" title="编码修改" width="700px">
-      <div class="modify-list">
-        <div class="modify-list-header">
-          <span>修改列表（{{ modifyList.length }} 项）</span>
-        </div>
-        <el-table :data="modifyList" border stripe size="small" style="width: 100%">
-          <el-table-column type="index" label="序号" width="60" />
-          <el-table-column label="类型" width="130">
-            <template #default="{ row }">
-              <span class="code-val">{{ row.typeCode }}</span>
-              <span :class="row.typeName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.typeName }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="二级类码" width="160">
-            <template #default="{ row }">
-              <span class="code-val">{{ row.secondClassCode }}</span>
-              <span :class="row.secondClassName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.secondClassName }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="数据类码" width="160">
-            <template #default="{ row }">
-              <span class="code-val">{{ row.dataCategoryCode }}</span>
-              <span :class="row.dataCategoryName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.dataCategoryName }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="数据码" width="160">
-            <template #default="{ row }">
-              <span class="code-val">{{ row.dataCode }}</span>
-              <span :class="row.dataName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.dataName }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="80">
-            <template #default="{ $index }">
-              <el-button link type="danger" size="small" @click="removeModifyItem($index)">移除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-
-      <div class="modify-edit-section">
-        <div class="modify-edit-title">选择要修改的项</div>
-        <el-select v-model="selectedModifyIndex" placeholder="请选择" style="width: 100%" @change="onModifySelect">
-          <el-option
-            v-for="(item, idx) in modifyList"
-            :key="idx"
-            :label="item.typeCode + ' ' + item.typeName + ' / ' + item.secondClassCode + ' ' + item.secondClassName + ' / ' + item.dataCategoryCode + ' ' + item.dataCategoryName + ' / ' + item.dataCode + ' ' + item.dataName"
-            :value="idx"
-          />
-        </el-select>
-        <div v-if="selectedModifyIndex !== null" class="modify-form">
-          <el-form label-width="100px">
-            <el-form-item label="数据码名称">
-              <el-input v-model="modifyForm.dataName" placeholder="输入新的数据码名称" />
-            </el-form-item>
-            <el-form-item label="数据类码">
-              <el-input v-model="modifyForm.dataCategoryCode" placeholder="2位数字" maxlength="2" />
-            </el-form-item>
-            <el-form-item label="数据类名称">
-              <el-input v-model="modifyForm.dataCategoryName" placeholder="输入新的数据类名称" />
-            </el-form-item>
-          </el-form>
-          <div class="new-code-preview" v-if="modifyForm.dataCategoryCode || modifyForm.dataName">
-            <span class="preview-label">新编码预览：</span>
-            <span class="preview-code">{{ generateNewCode() }}</span>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <el-button @click="modifyDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingMapping" :disabled="modifyList.length === 0" @click="confirmModifyAll">
-          确定保存
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -503,34 +454,21 @@ async function handleExportStats() {
 // ========== Tab 3: 编码校验 ==========
 const inputMode = ref('paste');
 const batchInput = ref('');
-const fileName = ref('');
+const uploadFileList = ref<Array<{ name: string; size: number }>>([]);
 const parsedCodes = ref<Array<{ code: string; name: string }>>([]);
 const resolvingCodes = ref(false);
 const resolvedItems = ref<ResolvedCodeItem[]>([]);
+const processedKeys = ref<Set<string>>(new Set());
 const addDialogVisible = ref(false);
 const addTarget = ref<ResolvedCodeItem | null>(null);
 const addingCode = ref(false);
-
-// 修改相关
-const modifyDialogVisible = ref(false);
-const modifyList = ref<Array<{
-  typeCode: string;
-  typeName: string;
-  secondClassCode: string;
-  secondClassName: string;
-  dataCategoryCode: string;
-  dataCategoryName: string;
-  dataCode: string;
-  dataName: string;
-  matchedCodes: Array<{ code: string; name: string }>;
-}>>([]);
-const selectedModifyIndex = ref<number | null>(null);
-const modifyForm = reactive({
-  dataName: '',
+const addForm = reactive({
   dataCategoryCode: '',
   dataCategoryName: '',
+  dataCode: '',
+  dataName: '',
 });
-const savingMapping = ref(false);
+
 
 // 根据当前输入模式判断是否有编码可操作
 const hasCodes = computed(() => {
@@ -558,7 +496,7 @@ const pasteCodes = computed(() => {
 
 // 上传Excel
 function handleFileUpload(file: any) {
-  fileName.value = file.name;
+  uploadFileList.value = [{ name: file.name, size: file.size }];
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
@@ -569,8 +507,8 @@ function handleFileUpload(file: any) {
 
       const codes: Array<{ code: string; name: string }> = [];
       for (const row of jsonData) {
-        const code = row['编码'] || row['code'] || '';
-        const name = row['编码名称'] || row['name'] || '';
+        const code = row['测点编码'] || row['编码'] || row['code'] || '';
+        const name = row['测点描述'] || row['编码名称'] || row['name'] || '';
         if (code) {
           codes.push({ code: String(code).trim(), name: String(name).trim() });
         }
@@ -588,6 +526,17 @@ function handleFileUpload(file: any) {
   };
   reader.readAsArrayBuffer(file.raw);
   return false;
+}
+
+function handleUploadExceed() {
+  ElMessage.warning('只支持上传一个文件');
+}
+
+function formatFileSize(bytes: number): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 async function handleResolveCodes() {
@@ -613,9 +562,9 @@ async function handleResolveCodes() {
   resolvingCodes.value = true;
   try {
     resolvedItems.value = await validateService.resolveCodes(codes);
-    // 为每行添加唯一 key
+    // 为每行添加唯一 key（含类型）
     resolvedItems.value.forEach((item, idx) => {
-      (item as any).rowKey = `${item.secondClassCode}|${item.dataCategoryCode}|${item.dataCode}|${idx}`;
+      (item as any).rowKey = `${item.typeCode}|${item.secondClassCode}|${item.dataCategoryCode}|${item.dataCode}|${idx}`;
     });
     ElMessage.success(`解析完成，共 ${resolvedItems.value.length} 组去重编码`);
   } catch (err: any) {
@@ -629,31 +578,55 @@ function clearCodes() {
   batchInput.value = '';
   parsedCodes.value = [];
   resolvedItems.value = [];
-  fileName.value = '';
+  processedKeys.value = new Set();
+  uploadFileList.value = [];
 }
 
 // ---------- 新增操作 ----------
 function handleAddItem(row: ResolvedCodeItem) {
   addTarget.value = row;
+  addForm.dataCategoryCode = row.dataCategoryCode;
+  addForm.dataCategoryName = row.dataCategoryName === '未识别' ? '' : row.dataCategoryName;
+  addForm.dataCode = row.dataCode;
+  addForm.dataName = row.dataName === '未识别' ? '' : row.dataName;
   addDialogVisible.value = true;
+}
+
+function resetAddForm() {
+  addForm.dataCategoryCode = '';
+  addForm.dataCategoryName = '';
+  addForm.dataCode = '';
+  addForm.dataName = '';
 }
 
 async function confirmAddItem() {
   if (!addTarget.value) return;
+  if (!addForm.dataCategoryCode || !addForm.dataCode || !addForm.dataName) {
+    ElMessage.warning('请填写数据类码、数据码和数据名称');
+    return;
+  }
   addingCode.value = true;
   try {
     await dictService.createManualCode({
-      typeCode: 'Y',
+      typeCode: addTarget.value.typeCode,
       secondClassCode: addTarget.value.secondClassCode,
       secondClassName: addTarget.value.secondClassName,
-      dataCategoryCode: addTarget.value.dataCategoryCode,
-      dataCategoryName: addTarget.value.dataCategoryName,
-      dataCode: addTarget.value.dataCode,
-      dataName: addTarget.value.dataName,
+      dataCategoryCode: addForm.dataCategoryCode,
+      dataCategoryName: addForm.dataCategoryName || addForm.dataCategoryCode,
+      dataCode: addForm.dataCode,
+      dataName: addForm.dataName,
     });
     ElMessage.success('新增成功');
+    // 标记本行为已处理
+    if (addTarget.value) {
+      const key = (addTarget.value as any).rowKey;
+      const newSet = new Set(processedKeys.value);
+      newSet.add(key);
+      processedKeys.value = newSet;
+    }
     addDialogVisible.value = false;
     addTarget.value = null;
+    resetAddForm();
   } catch (err: any) {
     ElMessage.error(err.message || '新增失败');
   } finally {
@@ -661,107 +634,6 @@ async function confirmAddItem() {
   }
 }
 
-// ---------- 修改操作 ----------
-function handleModifyItem(row: ResolvedCodeItem) {
-  // 检查是否已存在
-  const exists = modifyList.value.find(
-    item => item.secondClassCode === row.secondClassCode
-      && item.dataCategoryCode === row.dataCategoryCode
-      && item.dataCode === row.dataCode
-  );
-  if (!exists) {
-    modifyList.value.push({ ...row });
-  }
-  modifyDialogVisible.value = true;
-}
-
-function removeModifyItem(index: number) {
-  modifyList.value.splice(index, 1);
-  if (selectedModifyIndex.value === index) {
-    selectedModifyIndex.value = null;
-    resetModifyForm();
-  } else if (selectedModifyIndex.value !== null && selectedModifyIndex.value > index) {
-    selectedModifyIndex.value--;
-  }
-}
-
-function onModifySelect(index: number) {
-  const item = modifyList.value[index];
-  if (item) {
-    modifyForm.dataName = item.dataName;
-    modifyForm.dataCategoryCode = item.dataCategoryCode;
-    modifyForm.dataCategoryName = item.dataCategoryName;
-  }
-}
-
-function resetModifyForm() {
-  modifyForm.dataName = '';
-  modifyForm.dataCategoryCode = '';
-  modifyForm.dataCategoryName = '';
-}
-
-function generateNewCode(): string {
-  // 从第一条匹配的编码构建新编码
-  const item = modifyList.value[selectedModifyIndex.value!];
-  if (!item || item.matchedCodes.length === 0) return '';
-
-  const oldCode = item.matchedCodes[0].code;
-  if (oldCode.length < 31) return oldCode;
-
-  // 替换数据类码(27-28位)和数据码名称相关
-  const newCategoryCode = modifyForm.dataCategoryCode.padEnd(2, '0').substring(0, 2);
-  const newDataCode = modifyForm.dataName ? oldCode.substring(28, 31) : oldCode.substring(28, 31);
-
-  // 重新组装：保持原编码其他部分不变
-  let newCode = oldCode;
-  if (modifyForm.dataCategoryCode) {
-    newCode = newCode.substring(0, 26) + newCategoryCode + newCode.substring(28);
-  }
-  return newCode;
-}
-
-async function confirmModifyAll() {
-  if (modifyList.value.length === 0) {
-    ElMessage.warning('修改列表为空');
-    return;
-  }
-  savingMapping.value = true;
-  try {
-    let savedCount = 0;
-    for (const item of modifyList.value) {
-      if (item.matchedCodes.length === 0) continue;
-      // 对每个匹配的测点编码做映射
-      for (const mc of item.matchedCodes) {
-        const oldCode = mc.code;
-        // 生成新编码
-        let newCode = oldCode;
-        if (modifyForm.dataCategoryCode) {
-          const newCategoryCode = modifyForm.dataCategoryCode.padEnd(2, '0').substring(0, 2);
-          newCode = newCode.substring(0, 26) + newCategoryCode + newCode.substring(28);
-        }
-        // 保存映射
-        await validateService.saveCodeMapping({
-          oldCode,
-          newCode,
-          oldName: mc.name,
-          newName: modifyForm.dataName || mc.name,
-        });
-        savedCount++;
-      }
-    }
-    ElMessage.success(`已保存 ${savedCount} 条映射记录`);
-    modifyDialogVisible.value = false;
-    modifyList.value = [];
-    selectedModifyIndex.value = null;
-    resetModifyForm();
-    // 刷新字典树
-    loadDictTree();
-  } catch (err: any) {
-    ElMessage.error(err.message || '保存失败');
-  } finally {
-    savingMapping.value = false;
-  }
-}
 
 // ========== 生命周期 ==========
 onMounted(() => {
@@ -895,16 +767,34 @@ onMounted(() => {
   max-width: 700px;
 }
 
+.processed-tag {
+  color: #909399;
+  font-size: 13px;
+}
+
 .input-hint {
   margin-top: 8px;
   font-size: 13px;
   color: #909399;
 }
 
-.file-name {
-  margin-top: 8px;
+.excel-file-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+}
+
+.excel-file-name {
+  font-size: 15px;
+  color: #303133;
+  font-weight: 600;
+}
+
+.excel-file-size {
   font-size: 13px;
-  color: #606266;
+  color: #909399;
 }
 
 .validate-actions {
@@ -950,49 +840,4 @@ onMounted(() => {
   margin-left: 6px;
 }
 
-/* Modify Dialog */
-.modify-list {
-  margin-bottom: 16px;
-}
-
-.modify-list-header {
-  font-size: 14px;
-  color: #303133;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.modify-edit-section {
-  border-top: 1px solid #ebeef5;
-  padding-top: 16px;
-}
-
-.modify-edit-title {
-  font-size: 14px;
-  color: #303133;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-
-.modify-form {
-  margin-top: 16px;
-}
-
-.new-code-preview {
-  margin-top: 12px;
-  padding: 8px 12px;
-  background: #f0f9eb;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.preview-label {
-  color: #606266;
-}
-
-.preview-code {
-  font-weight: 600;
-  color: #67c23a;
-  font-family: monospace;
-}
 </style>

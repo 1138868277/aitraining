@@ -322,7 +322,7 @@ export async function resolveCodesFromDB(
     });
   }
 
-  const keys = Array.from(extractedMap.keys());
+  const keys = Array.from(extractedMap.keys()).sort();
   const result: ResolvedCodeItem[] = [];
 
   for (const key of keys) {
