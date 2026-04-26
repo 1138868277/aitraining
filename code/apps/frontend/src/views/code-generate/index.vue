@@ -12,7 +12,7 @@
         <div class="quick-search-row">
           <el-input
             v-model="quickSearchText"
-            placeholder="输入数据码名称进行模糊搜索"
+            placeholder="输入数据码名称模糊搜索，或输入5位数字精确匹配"
             clearable
             @input="onQuickSearchInput"
             @clear="onQuickSearchClear"
@@ -667,7 +667,13 @@ async function doQuickSearch(resetPage: boolean = true) {
     quickSearchResults.value = result.items;
     quickSearchTotal.value = result.total;
     quickSearchTypeOptions.value = result.typeOptions || [];
-    quickSearchSecondClassOptions.value = (result.secondClassOptions || []).map(s => ({ code: s.secondClassCode, name: s.secondClassName, typeCode: s.typeCode }));
+    const seen = new Set<string>();
+    quickSearchSecondClassOptions.value = (result.secondClassOptions || []).filter(s => {
+      const key = s.secondClassCode;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).map(s => ({ code: s.secondClassCode, name: s.secondClassName, typeCode: s.typeCode }));
   } catch {
     quickSearchResults.value = [];
     quickSearchTotal.value = 0;

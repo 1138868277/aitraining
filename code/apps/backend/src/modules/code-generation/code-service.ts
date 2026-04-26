@@ -35,11 +35,22 @@ async function lookupCodeNames(conditions: GenerateCodeRequest): Promise<Record<
       const r = await query<{ name: string }>(sql, [conditions.thirdClassCode, conditions.secondClassCode, conditions.typeCode]);
       return r.length > 0 ? r[0].name : null;
     })(),
-    // 数据码名称（按数据类码和二级类码过滤）
+    // 数据码名称（按数据类码、二级类码和类型域过滤）
     (async () => {
       if (!conditions.dataCode) return null;
-      const sql = `SELECT data_name AS name FROM ${schema}.cec_new_energy_code_dict WHERE data_code = $1 AND data_category_code = $2 AND second_class_code = $3 AND if_delete = '0' LIMIT 1`;
-      const r = await query<{ name: string }>(sql, [conditions.dataCode, conditions.dataTypeCode || '00', conditions.secondClassCode]);
+      const typeDomainCode = conditions.typeCode
+        ? (conditions.typeCode.startsWith('F') || conditions.typeCode === '01' ? 'F'
+          : conditions.typeCode.startsWith('G') || conditions.typeCode === '02' ? 'G'
+          : null)
+        : null;
+      const params: any[] = [conditions.dataCode, conditions.dataTypeCode || '00', conditions.secondClassCode];
+      let sql = `SELECT data_name AS name FROM ${schema}.cec_new_energy_code_dict WHERE data_code = $1 AND data_category_code = $2 AND second_class_code = $3 AND if_delete = '0'`;
+      if (typeDomainCode) {
+        sql += ` AND type_domain_code = $4`;
+        params.push(typeDomainCode);
+      }
+      sql += ` LIMIT 1`;
+      const r = await query<{ name: string }>(sql, params);
       return r.length > 0 ? r[0].name : null;
     })(),
   ]);

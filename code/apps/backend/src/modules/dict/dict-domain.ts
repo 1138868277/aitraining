@@ -220,7 +220,13 @@ export async function quickSearchDict(
   typeOptions: string[];
   secondClassOptions: Array<{ secondClassCode: string; secondClassName: string; typeCode: string }>;
 }> {
-  const likePattern = `%${searchText}%`;
+  // 如果输入的是5位数字，按数据类码+数据码精确匹配或数据码名称精确匹配
+  const isFiveDigits = /^\d{5}$/.test(searchText);
+  const searchClause = isFiveDigits
+    ? `(data_category_code || data_code = $1 OR data_name = $1)`
+    : `data_name LIKE $1`;
+  const searchParams: any[] = isFiveDigits ? [searchText] : [`%${searchText}%`];
+
   const filterClauses: string[] = [];
   const filterParams: any[] = [];
   let filterIdx = 2;
@@ -238,24 +244,24 @@ export async function quickSearchDict(
 
   // 1. 总数（带筛选条件）
   const countResult = await query<{ cnt: number }>(
-    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_name LIKE $1 ${filterSql}`,
-    [likePattern, ...filterParams],
+    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND ${searchClause} ${filterSql}`,
+    [...searchParams, ...filterParams],
   );
   const total = Number(countResult[0].cnt);
 
   // 2. 全量类型列表（不限分页）
   const typeRows = await query<{ typeCode: string }>(
     `SELECT DISTINCT type_domain_code AS "typeCode" FROM ${schema}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND data_name LIKE $1 ORDER BY type_domain_code`,
-    [likePattern],
+     WHERE if_delete = '0' AND ${searchClause} ORDER BY type_domain_code`,
+    searchParams,
   );
 
   // 3. 全量二级类码列表（不限分页，含类型信息用于前端联动筛选）
   const secondClassRows = await query<{ secondClassCode: string; secondClassName: string; typeCode: string }>(
     `SELECT DISTINCT second_class_code AS "secondClassCode", second_class_name AS "secondClassName", type_domain_code AS "typeCode"
      FROM ${schema}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND data_name LIKE $1 ORDER BY second_class_code`,
-    [likePattern],
+     WHERE if_delete = '0' AND ${searchClause} ORDER BY second_class_code`,
+    searchParams,
   );
 
   // 4. 分页数据（带筛选条件）
@@ -265,10 +271,10 @@ export async function quickSearchDict(
       data_category_name AS "dataCategoryName", data_code AS "dataCode", data_name AS "dataName",
       is_manual AS "isManual"
     FROM ${schema}.cec_new_energy_code_dict
-    WHERE if_delete = '0' AND data_name LIKE $1 ${filterSql}
+    WHERE if_delete = '0' AND ${searchClause} ${filterSql}
     ORDER BY second_class_code, data_category_code, data_code
     LIMIT $${filterIdx} OFFSET $${filterIdx + 1}`;
-  const items = await query(itemsSql, [likePattern, ...filterParams, pageSize, offset]);
+  const items = await query(itemsSql, [...searchParams, ...filterParams, pageSize, offset]);
 
   return {
     items,
