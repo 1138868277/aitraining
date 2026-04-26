@@ -2,8 +2,17 @@ import { stringSimilarity } from '@cec/shared';
 import { parseCode, isValidCodeFormat } from '../code-generation/code-domain.js';
 import { query as dbQuery } from '../../db/index.js';
 import { config } from '../../config/index.js';
+import { MemoryCache } from '../../common/memory-cache.js';
 
 const schema = config.db.schema;
+
+const dictTreeCache = new MemoryCache<DictTreeNode[]>();
+const DICT_TREE_CACHE_KEY = 'dictTree';
+const DICT_TREE_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+
+export function invalidateDictTreeCache(): void {
+  dictTreeCache.del(DICT_TREE_CACHE_KEY);
+}
 
 /** 校验单条编码 */
 export function validateSingleCode(code: string, dictItems: Record<string, Set<string>>): {
@@ -101,6 +110,10 @@ export interface ResolvedCodeItem {
 
 /** 获取字典树数据（四层：类型域→二级类码→数据类码→数据码） */
 export async function getDictTree(): Promise<DictTreeNode[]> {
+  // 优先读缓存
+  const cached = dictTreeCache.get(DICT_TREE_CACHE_KEY);
+  if (cached) return cached;
+
   // 一次性查询所有数据，在内存中组装树结构
   const allRows = await dbQuery<{
     second_class_code: string;
@@ -200,7 +213,9 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
     td.childCount = td.children?.length || 0;
   }
 
-  return Array.from(typeDomainMap.values());
+  const result = Array.from(typeDomainMap.values());
+  dictTreeCache.set(DICT_TREE_CACHE_KEY, result, DICT_TREE_CACHE_TTL);
+  return result;
 }
 
 /** 分页查询手动添加的编码记录 */

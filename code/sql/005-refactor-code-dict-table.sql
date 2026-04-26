@@ -59,5 +59,8 @@ CREATE INDEX IF NOT EXISTS idx_code_dict_data_code ON cec_new_energy_code_dict(d
 CREATE INDEX IF NOT EXISTS idx_code_dict_type_first ON cec_new_energy_code_dict(type_domain_code, first_class_code);
 CREATE INDEX IF NOT EXISTS idx_code_dict_type_first_second ON cec_new_energy_code_dict(type_domain_code, first_class_code, second_class_code);
 
+-- 覆盖字典树查询的索引（if_delete 过滤 + 树排序字段）
+CREATE INDEX IF NOT EXISTS idx_code_dict_tree_query ON cec_new_energy_code_dict(if_delete, type_domain_code, second_class_code, data_category_code, data_code);
+
 -- 输出完成信息
 SELECT '标准编码字典表已重构完成' AS message;

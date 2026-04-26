@@ -1,4 +1,5 @@
 import * as dictDomain from './dict-domain.js';
+import { invalidateDictTreeCache } from '../code-validation/validate-domain.js';
 
 export interface DictItemResponse {
   code: string;
@@ -72,7 +73,9 @@ export async function createManualCode(input: {
   dataName?: string;
   creator: string;
 }) {
-  return dictDomain.createManualCode(input);
+  const result = await dictDomain.createManualCode(input);
+  invalidateDictTreeCache();
+  return result;
 }
 
 /** 批量新增编码字典项 */
@@ -88,7 +91,9 @@ export async function batchCreateManualCode(input: {
   }>;
   creator: string;
 }) {
-  return dictDomain.batchCreateManualCode(input);
+  const result = await dictDomain.batchCreateManualCode(input);
+  invalidateDictTreeCache();
+  return result;
 }
 
 /** 获取指定数据类码下最大数据码 */

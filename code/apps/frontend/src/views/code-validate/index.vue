@@ -19,6 +19,8 @@
               :data="dictTreeData"
               :props="treeProps"
               :filter-node-method="filterTreeNode"
+              v-loading="loadingTree"
+              element-loading-text="字典数据加载中..."
               highlight-current
               @node-click="onTreeNodeClick"
             >
@@ -169,10 +171,10 @@
             <div class="validate-actions">
               <el-button
                 type="primary"
-                :disabled="parsedCodes.length === 0 || resolvingCodes"
+                :disabled="!hasCodes || resolvingCodes"
                 @click="handleResolveCodes"
               >{{ resolvingCodes ? '解析中...' : '开始校验' }}</el-button>
-              <el-button :disabled="parsedCodes.length === 0" @click="clearCodes">清空</el-button>
+              <el-button :disabled="!hasCodes" @click="clearCodes">清空</el-button>
             </div>
           </el-card>
 
@@ -514,6 +516,14 @@ const modifyForm = reactive({
   dataCategoryName: '',
 });
 const savingMapping = ref(false);
+
+// 根据当前输入模式判断是否有编码可操作
+const hasCodes = computed(() => {
+  if (inputMode.value === 'paste') {
+    return pasteCodes.value.length > 0;
+  }
+  return parsedCodes.value.length > 0;
+});
 
 // 解析批量粘贴的内容
 const pasteCodes = computed(() => {
