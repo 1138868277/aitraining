@@ -141,6 +141,7 @@
                   v-model="batchInput"
                   type="textarea"
                   :rows="6"
+                  class="paste-textarea"
                   placeholder="请粘贴编码列表，每行一条：编码 名称（编码和名称之间用空格或Tab分隔）"
                 />
                 <div class="input-hint">已解析 {{ inputMode === 'paste' ? pasteCodes.length : parsedCodes.length }} 条编码</div>
@@ -202,22 +203,28 @@
                   </div>
                 </template>
               </el-table-column>
+              <el-table-column label="类型" width="210">
+                <template #default="{ row }">
+                  <span class="code-val">{{ row.typeCode }}</span>
+                  <span :class="row.typeName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.typeName }}</span>
+                </template>
+              </el-table-column>
               <el-table-column label="二级类码" width="180">
                 <template #default="{ row }">
                   <span class="code-val">{{ row.secondClassCode }}</span>
-                  <span class="name-muted"> {{ row.secondClassName }}</span>
+                  <span :class="row.secondClassName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.secondClassName }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="数据类码" width="180">
                 <template #default="{ row }">
                   <span class="code-val">{{ row.dataCategoryCode }}</span>
-                  <span class="name-muted"> {{ row.dataCategoryName }}</span>
+                  <span :class="row.dataCategoryName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.dataCategoryName }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="数据码" width="180">
                 <template #default="{ row }">
                   <span class="code-val">{{ row.dataCode }}</span>
-                  <span class="name-muted"> {{ row.dataName }}</span>
+                  <span :class="row.dataName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.dataName }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="160" fixed="right">
@@ -259,22 +266,28 @@
         </div>
         <el-table :data="modifyList" border stripe size="small" style="width: 100%">
           <el-table-column type="index" label="序号" width="60" />
+          <el-table-column label="类型" width="130">
+            <template #default="{ row }">
+              <span class="code-val">{{ row.typeCode }}</span>
+              <span :class="row.typeName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.typeName }}</span>
+            </template>
+          </el-table-column>
           <el-table-column label="二级类码" width="160">
             <template #default="{ row }">
               <span class="code-val">{{ row.secondClassCode }}</span>
-              <span class="name-muted"> {{ row.secondClassName }}</span>
+              <span :class="row.secondClassName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.secondClassName }}</span>
             </template>
           </el-table-column>
           <el-table-column label="数据类码" width="160">
             <template #default="{ row }">
               <span class="code-val">{{ row.dataCategoryCode }}</span>
-              <span class="name-muted"> {{ row.dataCategoryName }}</span>
+              <span :class="row.dataCategoryName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.dataCategoryName }}</span>
             </template>
           </el-table-column>
           <el-table-column label="数据码" width="160">
             <template #default="{ row }">
               <span class="code-val">{{ row.dataCode }}</span>
-              <span class="name-muted"> {{ row.dataName }}</span>
+              <span :class="row.dataName === '未识别' ? 'name-error' : 'name-muted'"> {{ row.dataName }}</span>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="80">
@@ -291,7 +304,7 @@
           <el-option
             v-for="(item, idx) in modifyList"
             :key="idx"
-            :label="item.secondClassCode + ' ' + item.secondClassName + ' / ' + item.dataCategoryCode + ' ' + item.dataCategoryName + ' / ' + item.dataCode + ' ' + item.dataName"
+            :label="item.typeCode + ' ' + item.typeName + ' / ' + item.secondClassCode + ' ' + item.secondClassName + ' / ' + item.dataCategoryCode + ' ' + item.dataCategoryName + ' / ' + item.dataCode + ' ' + item.dataName"
             :value="idx"
           />
         </el-select>
@@ -501,6 +514,8 @@ const addingCode = ref(false);
 // 修改相关
 const modifyDialogVisible = ref(false);
 const modifyList = ref<Array<{
+  typeCode: string;
+  typeName: string;
   secondClassCode: string;
   secondClassName: string;
   dataCategoryCode: string;
@@ -757,8 +772,7 @@ onMounted(() => {
 
 <style scoped>
 .code-validate {
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .main-card {
@@ -874,6 +888,11 @@ onMounted(() => {
 .input-section {
   margin-bottom: 16px;
   border: none;
+  max-width: 1400px;
+}
+
+.paste-textarea {
+  max-width: 700px;
 }
 
 .input-hint {
@@ -922,6 +941,13 @@ onMounted(() => {
 
 .name-muted {
   color: #606266;
+  margin-left: 6px;
+}
+
+.name-error {
+  color: #f56c6c;
+  font-weight: 700;
+  margin-left: 6px;
 }
 
 /* Modify Dialog */

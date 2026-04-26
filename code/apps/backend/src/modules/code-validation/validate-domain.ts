@@ -99,6 +99,8 @@ export interface ManualStatItem {
 }
 
 export interface ResolvedCodeItem {
+  typeCode: string;
+  typeName: string;
   secondClassCode: string;
   secondClassName: string;
   dataCategoryCode: string;
@@ -281,12 +283,13 @@ export async function getAllManualStatistics(secondClassCode?: string): Promise<
 
 /**
  * 批量解析编码列表
- * 从31位编码中截取: 二级类码(13-15位)、数据类码(27-28位)、数据码(29-31位)
+ * 从31位编码中截取: 类型(5-6位)、二级类码(13-15位)、数据类码(27-28位)、数据码(29-31位)
  */
 export async function resolveCodesFromDB(
   codeList: Array<{ code: string; name?: string }>,
 ): Promise<ResolvedCodeItem[]> {
   const extractedMap = new Map<string, {
+    typeCode: string;
     secondClassCode: string;
     dataCategoryCode: string;
     dataCode: string;
@@ -297,14 +300,16 @@ export async function resolveCodesFromDB(
     const code = item.code;
     if (code.length < 31) continue;
 
+    const typeCode = code.substring(4, 6);
     const secondClassCode = code.substring(12, 15);
     const dataCategoryCode = code.substring(26, 28);
     const dataCode = code.substring(28, 31);
 
-    const key = `${secondClassCode}|${dataCategoryCode}|${dataCode}`;
+    const key = `${typeCode}|${secondClassCode}|${dataCategoryCode}|${dataCode}`;
 
     if (!extractedMap.has(key)) {
       extractedMap.set(key, {
+        typeCode,
         secondClassCode,
         dataCategoryCode,
         dataCode,
@@ -322,43 +327,63 @@ export async function resolveCodesFromDB(
 
   for (const key of keys) {
     const entry = extractedMap.get(key)!;
+    const typeCode = entry.typeCode;
+    // 类型域编码：取类型第一位（如 F1→F, G1→G, Y0→Y）
+    const typeDomainCode = typeCode.substring(0, 1);
 
-    const rows = await dbQuery<{
-      second_class_name: string;
-      data_category_name: string;
-      data_name: string;
-    }>(
-      `SELECT second_class_name, data_category_name, data_name
-       FROM ${schema}.cec_new_energy_code_dict
-       WHERE if_delete = '0'
-         AND second_class_code = $1
-         AND data_category_code = $2
-         AND data_code = $3
-       LIMIT 1`,
-      [entry.secondClassCode, entry.dataCategoryCode, entry.dataCode],
+    // 查询类型名称
+    const typeRows = await dbQuery<{ type_name: string }>(
+      `SELECT type_name FROM ${schema}.cec_new_energy_type_dict
+       WHERE type_code = $1 AND if_delete = '0' LIMIT 1`,
+      [typeCode],
     );
+    const typeName = typeRows.length > 0 ? typeRows[0].type_name : typeCode;
 
-    if (rows.length > 0) {
-      result.push({
-        secondClassCode: entry.secondClassCode,
-        secondClassName: rows[0].second_class_name,
-        dataCategoryCode: entry.dataCategoryCode,
-        dataCategoryName: rows[0].data_category_name,
-        dataCode: entry.dataCode,
-        dataName: rows[0].data_name,
-        matchedCodes: entry.matchedCodes,
-      });
-    } else {
-      result.push({
-        secondClassCode: entry.secondClassCode,
-        secondClassName: entry.secondClassCode,
-        dataCategoryCode: entry.dataCategoryCode,
-        dataCategoryName: entry.dataCategoryCode,
-        dataCode: entry.dataCode,
-        dataName: entry.dataCode,
-        matchedCodes: entry.matchedCodes,
-      });
-    }
+    // 分层匹配：二级类码
+    const scRows = await dbQuery<{ second_class_name: string }>(
+      `SELECT DISTINCT second_class_name FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code = $2
+       LIMIT 1`,
+      [typeDomainCode, entry.secondClassCode],
+    );
+    const secondClassName = scRows.length > 0
+      ? scRows[0].second_class_name
+      : `未识别`;
+
+    // 分层匹配：数据类码（在类型域+二级类码下搜索）
+    const dcRows = await dbQuery<{ data_category_name: string }>(
+      `SELECT DISTINCT data_category_name FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code = $2 AND data_category_code = $3
+       LIMIT 1`,
+      [typeDomainCode, entry.secondClassCode, entry.dataCategoryCode],
+    );
+    const dataCategoryName = dcRows.length > 0
+      ? dcRows[0].data_category_name
+      : `未识别`;
+
+    // 分层匹配：数据码（在类型域+二级类码+数据类码下搜索）
+    const dRows = await dbQuery<{ data_name: string }>(
+      `SELECT data_name FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code = $2
+         AND data_category_code = $3 AND data_code = $4
+       LIMIT 1`,
+      [typeDomainCode, entry.secondClassCode, entry.dataCategoryCode, entry.dataCode],
+    );
+    const dataName = dRows.length > 0
+      ? dRows[0].data_name
+      : `未识别`;
+
+    result.push({
+      typeCode,
+      typeName,
+      secondClassCode: entry.secondClassCode,
+      secondClassName,
+      dataCategoryCode: entry.dataCategoryCode,
+      dataCategoryName,
+      dataCode: entry.dataCode,
+      dataName,
+      matchedCodes: entry.matchedCodes,
+    });
   }
 
   return result;

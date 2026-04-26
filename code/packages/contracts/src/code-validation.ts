@@ -169,6 +169,8 @@ export type MatchedCode = z.infer<typeof matchedCodeSchema>;
 
 /** 解析后的编码项 */
 export const resolvedCodeItemSchema = z.object({
+  typeCode: z.string(),
+  typeName: z.string(),
   secondClassCode: z.string(),
   secondClassName: z.string(),
   dataCategoryCode: z.string(),
