@@ -32,21 +32,29 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
 }
 
 /** 分页查询手动添加记录 */
-export async function getManualStatistics(pageNum: number, pageSize: number, secondClassCode?: string): Promise<{
+export async function getManualStatistics(
+  pageNum: number,
+  pageSize: number,
+  secondClassCode?: string,
+  typeCode?: string,
+): Promise<{
   items: ManualStatItem[];
   total: number;
   secondClassOptions: Array<{ code: string; name: string }>;
+  typeOptions: Array<{ code: string; name: string }>;
 }> {
   const params: any = { pageNum, pageSize };
   if (secondClassCode) params.secondClassCode = secondClassCode;
+  if (typeCode) params.typeCode = typeCode;
   const res = await api.get('/dict/manual-statistics', { params });
   return res.data;
 }
 
 /** 导出全部手动添加记录 */
-export async function exportManualStatistics(secondClassCode?: string): Promise<ManualStatItem[]> {
+export async function exportManualStatistics(secondClassCode?: string, typeCode?: string): Promise<ManualStatItem[]> {
   const params: any = {};
   if (secondClassCode) params.secondClassCode = secondClassCode;
+  if (typeCode) params.typeCode = typeCode;
   const res = await api.get('/dict/manual-statistics/export', { params });
   return res.data;
 }

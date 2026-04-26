@@ -75,7 +75,8 @@ router.get('/api/dict/manual-statistics', async (req: Request, res: Response) =>
     const pageNum = Math.max(1, parseInt(req.query.pageNum as string) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
     const secondClassCode = (req.query.secondClassCode as string) || undefined;
-    const result = await validateService.getManualStatistics(pageNum, pageSize, secondClassCode);
+    const typeCode = (req.query.typeCode as string) || undefined;
+    const result = await validateService.getManualStatistics(pageNum, pageSize, secondClassCode, typeCode);
     success(res, result);
   } catch (err) {
     console.error('Failed to get manual statistics:', err);
@@ -87,7 +88,8 @@ router.get('/api/dict/manual-statistics', async (req: Request, res: Response) =>
 router.get('/api/dict/manual-statistics/export', async (req: Request, res: Response) => {
   try {
     const secondClassCode = (req.query.secondClassCode as string) || undefined;
-    const items = await validateService.exportManualStatistics(secondClassCode);
+    const typeCode = (req.query.typeCode as string) || undefined;
+    const items = await validateService.exportManualStatistics(secondClassCode, typeCode);
     success(res, items);
   } catch (err) {
     console.error('Failed to export manual statistics:', err);

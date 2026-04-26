@@ -196,13 +196,14 @@ export async function getManualStatistics(
   pageNum: number,
   pageSize: number,
   secondClassCode?: string,
-): Promise<{ items: ManualStatItem[]; total: number; secondClassOptions: string[] }> {
-  return validateDomain.getManualStatistics(pageNum, pageSize, secondClassCode);
+  typeCode?: string,
+): Promise<{ items: ManualStatItem[]; total: number; secondClassOptions: any; typeOptions: any }> {
+  return validateDomain.getManualStatistics(pageNum, pageSize, secondClassCode, typeCode);
 }
 
 /** 导出全部手动添加记录 */
-export async function exportManualStatistics(secondClassCode?: string): Promise<ManualStatItem[]> {
-  return validateDomain.getAllManualStatistics(secondClassCode);
+export async function exportManualStatistics(secondClassCode?: string, typeCode?: string): Promise<ManualStatItem[]> {
+  return validateDomain.getAllManualStatistics(secondClassCode, typeCode);
 }
 
 /** 批量解析编码 */

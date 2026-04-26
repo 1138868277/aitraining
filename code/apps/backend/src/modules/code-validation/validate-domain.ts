@@ -96,6 +96,8 @@ export interface ManualStatItem {
   dataCode: string;
   dataName: string;
   createTm: string;
+  typeCode?: string;
+  typeName?: string;
 }
 
 export interface ResolvedCodeItem {
@@ -220,63 +222,198 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
   return result;
 }
 
+/** 根据 type_code 获取 type_domain_code（F1→F, G1→G, Y0→null） */
+function typeCodeToDomain(typeCode: string): string | null {
+  if (typeCode.startsWith('F')) return 'F';
+  if (typeCode.startsWith('G')) return 'G';
+  return null;
+}
+
 /** 分页查询手动添加的编码记录 */
 export async function getManualStatistics(
   pageNum: number,
   pageSize: number,
   secondClassCode?: string,
-): Promise<{ items: ManualStatItem[]; total: number; secondClassOptions: string[] }> {
-  const offset = (pageNum - 1) * pageSize;
-  const filterSql = secondClassCode ? ` AND second_class_code = $1` : '';
-  const filterParams = secondClassCode ? [secondClassCode] : [];
+  typeCode?: string,
+): Promise<{
+  items: ManualStatItem[];
+  total: number;
+  secondClassOptions: Array<{ code: string; name: string }>;
+  typeOptions: Array<{ code: string; name: string }>;
+}> {
+  // 动态构建过滤条件
+  const conditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
+  const params: any[] = [];
+  let paramIdx = 1;
 
+  if (secondClassCode) {
+    conditions.push(`d.second_class_code = $${paramIdx++}`);
+    params.push(secondClassCode);
+  }
+  if (typeCode) {
+    const domainCode = typeCodeToDomain(typeCode);
+    const tcIdx = paramIdx++;
+    params.push(typeCode);
+    if (domainCode) {
+      const domIdx = paramIdx++;
+      params.push(domainCode);
+      // 优先使用 d.type_code 精确匹配，兼容旧数据（type_code IS NULL）
+      conditions.push(`(
+        d.type_code = $${tcIdx}
+        OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx}
+          AND d.second_class_code IN (
+            SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
+            WHERE type_code = $${tcIdx} AND if_delete = '0'
+          )
+        )
+      )`);
+    } else {
+      conditions.push(`(
+        d.type_code = $${tcIdx}
+        OR (d.type_code IS NULL AND d.second_class_code IN (
+          SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
+          WHERE type_code = $${tcIdx} AND if_delete = '0'
+        ))
+      )`);
+    }
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  // 总数
   const countResult = await dbQuery<{ cnt: string }>(
-    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND is_manual = '1'${filterSql}`,
-    filterParams,
+    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict d WHERE ${whereClause}`,
+    params,
   );
   const total = Number(countResult[0].cnt);
 
-  // 获取所有二级类码选项（带名称）
+  // 二级类码选项（受 typeCode 过滤）
   const optionRows = await dbQuery<{ code: string; name: string }>(
-    `SELECT DISTINCT second_class_code AS code, second_class_name AS name FROM ${schema}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND is_manual = '1' ORDER BY code`,
-  );
-
-  const params: any[] = [...filterParams, pageSize, offset];
-  const items = await dbQuery<ManualStatItem>(
-    `SELECT second_class_code AS "secondClassCode",
-            second_class_name AS "secondClassName",
-            data_category_code AS "dataCategoryCode",
-            data_category_name AS "dataCategoryName",
-            data_code AS "dataCode",
-            data_name AS "dataName",
-            create_tm AS "createTm"
-     FROM ${schema}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND is_manual = '1'${filterSql}
-     ORDER BY create_tm DESC
-     LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}`,
+    `SELECT DISTINCT d.second_class_code AS code, d.second_class_name AS name
+     FROM ${schema}.cec_new_energy_code_dict d
+     WHERE ${whereClause} ORDER BY code`,
     params,
   );
 
-  return { items, total, secondClassOptions: optionRows.map((r) => ({ code: r.code, name: r.name })) };
+  // 所有类型选项（从 type_dict 获取）
+  const typeRows = await dbQuery<{ code: string; name: string }>(
+    `SELECT type_code AS code, type_name AS name
+     FROM ${schema}.cec_new_energy_type_dict
+     WHERE if_delete = '0' ORDER BY type_code`,
+  );
+
+  // 分页数据
+  const offset = (pageNum - 1) * pageSize;
+  const itemsParams = [...params, pageSize, offset];
+  const items = await dbQuery<ManualStatItem>(
+    `SELECT d.second_class_code AS "secondClassCode",
+            d.second_class_name AS "secondClassName",
+            d.data_category_code AS "dataCategoryCode",
+            d.data_category_name AS "dataCategoryName",
+            d.data_code AS "dataCode",
+            d.data_name AS "dataName",
+            d.create_tm AS "createTm",
+            COALESCE(d.type_code, (
+              SELECT t.type_code FROM ${schema}.cec_new_energy_second_class_type_dict sct
+              JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+              WHERE sct.second_class_code = d.second_class_code
+                AND sct.type_code LIKE d.type_domain_code || '%'
+                AND sct.if_delete = '0' AND t.if_delete = '0'
+              LIMIT 1
+            )) AS "typeCode",
+            COALESCE(
+              (SELECT t.type_name FROM ${schema}.cec_new_energy_type_dict t
+               WHERE t.type_code = d.type_code AND t.if_delete = '0' LIMIT 1),
+              (SELECT t.type_name FROM ${schema}.cec_new_energy_second_class_type_dict sct
+               JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+               WHERE sct.second_class_code = d.second_class_code
+                 AND sct.type_code LIKE d.type_domain_code || '%'
+                 AND sct.if_delete = '0' AND t.if_delete = '0'
+               LIMIT 1)
+            ) AS "typeName"
+     FROM ${schema}.cec_new_energy_code_dict d
+     WHERE ${whereClause}
+     ORDER BY d.create_tm DESC
+     LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
+    itemsParams,
+  );
+
+  return {
+    items,
+    total,
+    secondClassOptions: optionRows.map((r) => ({ code: r.code, name: r.name })),
+    typeOptions: typeRows.map((r) => ({ code: r.code, name: r.name })),
+  };
 }
 
 /** 获取所有手动添加记录（不分页，用于导出） */
-export async function getAllManualStatistics(secondClassCode?: string): Promise<ManualStatItem[]> {
-  const filterSql = secondClassCode ? ` AND second_class_code = $1` : '';
-  const params = secondClassCode ? [secondClassCode] : [];
+export async function getAllManualStatistics(secondClassCode?: string, typeCode?: string): Promise<ManualStatItem[]> {
+  const conditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
+  const params: any[] = [];
+  let paramIdx = 1;
+
+  if (secondClassCode) {
+    conditions.push(`d.second_class_code = $${paramIdx++}`);
+    params.push(secondClassCode);
+  }
+  if (typeCode) {
+    const domainCode = typeCodeToDomain(typeCode);
+    const tcIdx = paramIdx++;
+    params.push(typeCode);
+    if (domainCode) {
+      const domIdx = paramIdx++;
+      params.push(domainCode);
+      conditions.push(`(
+        d.type_code = $${tcIdx}
+        OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx}
+          AND d.second_class_code IN (
+            SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
+            WHERE type_code = $${tcIdx} AND if_delete = '0'
+          )
+        )
+      )`);
+    } else {
+      conditions.push(`(
+        d.type_code = $${tcIdx}
+        OR (d.type_code IS NULL AND d.second_class_code IN (
+          SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
+          WHERE type_code = $${tcIdx} AND if_delete = '0'
+        ))
+      )`);
+    }
+  }
+
+  const whereClause = conditions.join(' AND ');
+
   return dbQuery<ManualStatItem>(
-    `SELECT second_class_code AS "secondClassCode",
-            second_class_name AS "secondClassName",
-            data_category_code AS "dataCategoryCode",
-            data_category_name AS "dataCategoryName",
-            data_code AS "dataCode",
-            data_name AS "dataName",
-            create_tm AS "createTm"
-     FROM ${schema}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND is_manual = '1'${filterSql}
-     ORDER BY create_tm DESC`,
+    `SELECT d.second_class_code AS "secondClassCode",
+            d.second_class_name AS "secondClassName",
+            d.data_category_code AS "dataCategoryCode",
+            d.data_category_name AS "dataCategoryName",
+            d.data_code AS "dataCode",
+            d.data_name AS "dataName",
+            d.create_tm AS "createTm",
+            COALESCE(d.type_code, (
+              SELECT t.type_code FROM ${schema}.cec_new_energy_second_class_type_dict sct
+              JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+              WHERE sct.second_class_code = d.second_class_code
+                AND sct.type_code LIKE d.type_domain_code || '%'
+                AND sct.if_delete = '0' AND t.if_delete = '0'
+              LIMIT 1
+            )) AS "typeCode",
+            COALESCE(
+              (SELECT t.type_name FROM ${schema}.cec_new_energy_type_dict t
+               WHERE t.type_code = d.type_code AND t.if_delete = '0' LIMIT 1),
+              (SELECT t.type_name FROM ${schema}.cec_new_energy_second_class_type_dict sct
+               JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+               WHERE sct.second_class_code = d.second_class_code
+                 AND sct.type_code LIKE d.type_domain_code || '%'
+                 AND sct.if_delete = '0' AND t.if_delete = '0'
+               LIMIT 1)
+            ) AS "typeName"
+     FROM ${schema}.cec_new_energy_code_dict d
+     WHERE ${whereClause}
+     ORDER BY d.create_tm DESC`,
     params,
   );
 }

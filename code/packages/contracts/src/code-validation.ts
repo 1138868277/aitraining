@@ -147,6 +147,8 @@ export const manualStatItemSchema = z.object({
   dataCode: z.string(),
   dataName: z.string(),
   createTm: z.string(),
+  typeCode: z.string().optional(),
+  typeName: z.string().optional(),
 });
 
 export type ManualStatItem = z.infer<typeof manualStatItemSchema>;

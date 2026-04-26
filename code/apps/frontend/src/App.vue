@@ -9,7 +9,7 @@
         class="header-menu"
       >
         <el-menu-item index="/code-generate">编码生成</el-menu-item>
-        <el-menu-item index="/code-validate">编码校验</el-menu-item>
+        <el-menu-item index="/code-validate">字典管理</el-menu-item>
         <el-menu-item index="/statistics">统计分析</el-menu-item>
       </el-menu>
     </el-header>

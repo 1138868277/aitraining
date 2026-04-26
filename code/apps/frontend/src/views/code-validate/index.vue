@@ -60,78 +60,9 @@
           </div>
         </el-tab-pane>
 
-        <!-- Tab 2: 字典统计 -->
-        <el-tab-pane label="字典统计" name="statistics">
-          <div class="statistics-header">
-            <div class="statistics-left">
-              <span class="statistics-title">手动添加编码记录</span>
-              <el-select
-                v-model="statsSecondClassFilter"
-                placeholder="二级类码筛选"
-                clearable
-                size="small"
-                style="width: 200px"
-                @change="onStatsFilterChange"
-              >
-                <el-option
-                  v-for="item in secondClassOptions"
-                  :key="item.code"
-                  :label="item.code + ' ' + item.name"
-                  :value="item.code"
-                />
-              </el-select>
-            </div>
-            <el-button
-              v-if="manualStats.length > 0"
-              size="small"
-              type="primary"
-              @click="handleExportStats"
-            >导出Excel</el-button>
-          </div>
-          <el-table
-            :data="manualStats"
-            border
-            stripe
-            style="width: 100%"
-            v-loading="loadingStats"
-          >
-            <el-table-column type="index" label="序号" width="60" />
-            <el-table-column label="二级类码" width="390">
-              <template #default="{ row }">
-                <span class="code-second-class">{{ row.secondClassCode }}</span> <span class="name-muted">{{ row.secondClassName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="数据类码">
-              <template #default="{ row }">
-                <span class="code-data-category">{{ row.dataCategoryCode }}</span> <span class="name-muted">{{ row.dataCategoryName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="数据码">
-              <template #default="{ row }">
-                <span class="code-data-code">{{ row.dataCode }}</span> <span class="name-muted">{{ row.dataName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="增加时间" width="248">
-              <template #default="{ row }">
-                {{ formatTime(row.createTm) }}
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-if="!loadingStats && manualStats.length === 0" description="暂无手动添加记录" />
-          <div v-if="statsTotal > 0" class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="statsPageNum"
-              v-model:page-size="statsPageSize"
-              :total="statsTotal"
-              :page-sizes="[10, 20, 50, 100]"
-              layout="total, sizes, prev, pager, next"
-              @current-change="loadManualStats"
-              @size-change="loadManualStats"
-            />
-          </div>
-        </el-tab-pane>
+        
 
-        <!-- Tab 3: 编码校验 -->
+<!-- Tab 2: 编码校验 -->
         <el-tab-pane label="编码校验" name="validate">
           <!-- 输入区域 -->
           <el-card shadow="never" class="input-section">
@@ -146,6 +77,8 @@
                 />
                 <div class="input-hint">已解析 {{ inputMode === 'paste' ? pasteCodes.length : parsedCodes.length }} 条编码</div>
               </el-tab-pane>
+
+
               <el-tab-pane label="上传Excel" name="excel">
                 <el-upload
                   drag
@@ -182,6 +115,7 @@
                   </template>
                 </el-upload>
               </el-tab-pane>
+
             </el-tabs>
             <div class="validate-actions">
               <el-button
@@ -255,6 +189,97 @@
                 </template>
               </el-table-column>
             </el-table>
+          </div>
+        </el-tab-pane>
+        <!-- Tab 3: 新增字典记录 -->
+        <el-tab-pane label="新增字典记录" name="statistics">
+          <div class="statistics-header">
+            <span class="statistics-title">手动添加编码记录</span>
+            <el-button
+              v-if="manualStats.length > 0"
+              size="small"
+              type="primary"
+              @click="handleExportStats"
+            >导出Excel</el-button>
+          </div>
+          <div class="statistics-toolbar">
+            <el-select
+              v-model="statsTypeFilter"
+              placeholder="类型筛选"
+              clearable
+              style="width: 200px"
+              @change="onStatsTypeFilterChange"
+            >
+              <el-option
+                v-for="item in typeOptions"
+                :key="item.code"
+                :label="item.code + ' ' + item.name"
+                :value="item.code"
+              />
+            </el-select>
+            <el-select
+              v-model="statsSecondClassFilter"
+              placeholder="二级类码筛选"
+              clearable
+              style="width: 200px"
+              @change="onStatsFilterChange"
+            >
+              <el-option
+                v-for="item in secondClassOptions"
+                :key="item.code"
+                :label="item.code + ' ' + item.name"
+                :value="item.code"
+              />
+            </el-select>
+          </div>
+          <el-table
+            :data="manualStats"
+            border
+            stripe
+            style="width: 100%"
+            class="stats-table"
+            v-loading="loadingStats"
+          >
+            <el-table-column type="index" label="序号" width="60" />
+            <el-table-column label="类型">
+              <template #default="{ row }">
+                <span v-if="row.typeCode" class="code-type">{{ row.typeCode }}</span>
+                <span v-if="row.typeName" class="name-muted">{{ row.typeName }}</span>
+                <span v-else class="name-error">未识别</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="二级类码">
+              <template #default="{ row }">
+                <span class="code-second-class">{{ row.secondClassCode }}</span> <span class="name-muted">{{ row.secondClassName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="数据类码">
+              <template #default="{ row }">
+                <span class="code-data-category">{{ row.dataCategoryCode }}</span> <span class="name-muted">{{ row.dataCategoryName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="数据码">
+              <template #default="{ row }">
+                <span class="code-data-code">{{ row.dataCode }}</span> <span class="name-muted">{{ row.dataName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="增加时间" width="248">
+              <template #default="{ row }">
+                {{ formatTime(row.createTm) }}
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="!loadingStats && manualStats.length === 0" description="暂无手动添加记录" />
+          <div v-if="statsTotal > 0" class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="statsPageNum"
+              v-model:page-size="statsPageSize"
+              :total="statsTotal"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next"
+              @current-change="loadManualStats"
+              @size-change="loadManualStats"
+            />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -401,23 +426,27 @@ function onCollapseAll() {
   }
 }
 
-// ========== Tab 2: 字典统计 ==========
+// ========== Tab 3: 新增字典记录 ==========
 const manualStats = ref<ManualStatItem[]>([]);
 const loadingStats = ref(false);
 const statsTotal = ref(0);
 const statsPageNum = ref(1);
 const statsPageSize = ref(20);
+const statsTypeFilter = ref('');
 const statsSecondClassFilter = ref('');
+const typeOptions = ref<Array<{ code: string; name: string }>>([]);
 const secondClassOptions = ref<Array<{ code: string; name: string }>>([]);
 
 async function loadManualStats() {
   loadingStats.value = true;
   try {
-    const filter = statsSecondClassFilter.value || undefined;
-    const result = await validateService.getManualStatistics(statsPageNum.value, statsPageSize.value, filter);
+    const scFilter = statsSecondClassFilter.value || undefined;
+    const tFilter = statsTypeFilter.value || undefined;
+    const result = await validateService.getManualStatistics(statsPageNum.value, statsPageSize.value, scFilter, tFilter);
     manualStats.value = result.items;
     statsTotal.value = result.total;
     secondClassOptions.value = result.secondClassOptions || [];
+    typeOptions.value = result.typeOptions || [];
   } catch (err: any) {
     ElMessage.error('加载统计数据失败');
   } finally {
@@ -425,6 +454,14 @@ async function loadManualStats() {
   }
 }
 
+/** 类型筛选变化：重置二级类码和分页 */
+function onStatsTypeFilterChange() {
+  statsSecondClassFilter.value = '';
+  statsPageNum.value = 1;
+  loadManualStats();
+}
+
+/** 二级类码筛选变化：重置分页 */
 function onStatsFilterChange() {
   statsPageNum.value = 1;
   loadManualStats();
@@ -432,10 +469,12 @@ function onStatsFilterChange() {
 
 async function handleExportStats() {
   try {
-    const filter = statsSecondClassFilter.value || undefined;
-    const items = await validateService.exportManualStatistics(filter);
+    const scFilter = statsSecondClassFilter.value || undefined;
+    const tFilter = statsTypeFilter.value || undefined;
+    const items = await validateService.exportManualStatistics(scFilter, tFilter);
     const data = items.map((item, index) => ({
       '序号': index + 1,
+      '类型': item.typeCode && item.typeName ? `${item.typeCode} ${item.typeName}` : '未识别',
       '二级类码': `${item.secondClassCode} ${item.secondClassName}`,
       '数据类码': `${item.dataCategoryCode} ${item.dataCategoryName}`,
       '数据码': `${item.dataCode} ${item.dataName}`,
@@ -451,7 +490,7 @@ async function handleExportStats() {
   }
 }
 
-// ========== Tab 3: 编码校验 ==========
+// ========== Tab 2: 编码校验 ==========
 const inputMode = ref('paste');
 const batchInput = ref('');
 const uploadFileList = ref<Array<{ name: string; size: number }>>([]);
@@ -730,24 +769,44 @@ onMounted(() => {
   color: #909399;
 }
 
-/* Tab 2: Statistics */
+/* Tab 3: 新增字典记录 */
 .statistics-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-}
-
-.statistics-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .statistics-title {
-  font-size: 14px;
-  color: #606266;
-  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 12px;
+}
+
+.statistics-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: #409eff;
+}
+
+.statistics-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 16px 16px;
+  background: #f5f7fa;
+  border-radius: 6px;
+}
+
+.stats-table :deep(table) {
+  table-layout: fixed;
 }
 
 .pagination-wrapper {
@@ -756,7 +815,7 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-/* Tab 3: Validate */
+/* Tab 2: 编码校验 */
 .input-section {
   margin-bottom: 16px;
   border: none;
@@ -827,6 +886,11 @@ onMounted(() => {
 .code-val {
   font-weight: 600;
   color: #409eff;
+}
+
+.code-type {
+  font-weight: 600;
+  color: #9b59b6;
 }
 
 .name-muted {

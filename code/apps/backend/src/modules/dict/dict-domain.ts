@@ -304,15 +304,16 @@ export async function createManualCode(input: {
   const dataName = input.dataName || input.dataCode;
 
   const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
-    (type_domain_code, first_class_code, first_class_name,
+    (type_domain_code, type_code, first_class_code, first_class_name,
      second_class_code, second_class_name,
      data_category_code, data_category_name, data_code, data_name,
      is_manual, creator, create_tm, modifier, modify_tm)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '1', $10, NOW(), $10, NOW())
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '1', $11, NOW(), $11, NOW())
     RETURNING code_dict_id`;
 
   const result = await query<{ code_dict_id: number }>(sql, [
     typeDomainCode,
+    input.typeCode,
     firstClassCode,
     firstClassName,
     input.secondClassCode,
@@ -415,20 +416,20 @@ export async function batchCreateManualCode(input: {
     const dataName = entry.dataName || entry.dataCode;
 
     valuePlaceholders.push(
-      `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, '1', $${idx + 9}, NOW(), $${idx + 9}, NOW())`,
+      `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}, $${idx + 10}, '1', $${idx + 11}, NOW(), $${idx + 11}, NOW())`,
     );
     params.push(
-      typeDomainCode, firstClassCode, firstClassName,
+      typeDomainCode, input.typeCode, firstClassCode, firstClassName,
       input.secondClassCode, input.secondClassName,
       entry.dataCategoryCode, dataCategoryName,
       entry.dataCode, dataName,
       input.creator,
     );
-    idx += 10;
+    idx += 12;
   }
 
   const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
-    (type_domain_code, first_class_code, first_class_name,
+    (type_domain_code, type_code, first_class_code, first_class_name,
      second_class_code, second_class_name,
      data_category_code, data_category_name, data_code, data_name,
      is_manual, creator, create_tm, modifier, modify_tm)
