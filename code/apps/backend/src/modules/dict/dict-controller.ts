@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import * as dictService from './dict-service.js';
+import * as validateService from '../code-validation/validate-service.js';
 import { success, error } from '../../common/response.js';
 import { ErrorCode } from '@cec/contracts';
 
@@ -54,6 +55,43 @@ router.get('/api/dict/max-data-category-code', async (req: Request, res: Respons
   } catch (err) {
     console.error('Failed to get max data category code:', err);
     error(res, ErrorCode.SYSTEM_ERROR, '查询失败', 500);
+  }
+});
+
+/** 获取字典树数据（必须在通配路由之前注册） */
+router.get('/api/dict/tree', async (_req: Request, res: Response) => {
+  try {
+    const tree = await validateService.getDictTree();
+    success(res, tree);
+  } catch (err) {
+    console.error('Failed to get dict tree:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '字典树加载失败', 500);
+  }
+});
+
+/** 分页查询手动添加的编码统计（必须在通配路由之前注册） */
+router.get('/api/dict/manual-statistics', async (req: Request, res: Response) => {
+  try {
+    const pageNum = Math.max(1, parseInt(req.query.pageNum as string) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+    const secondClassCode = (req.query.secondClassCode as string) || undefined;
+    const result = await validateService.getManualStatistics(pageNum, pageSize, secondClassCode);
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to get manual statistics:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '查询手动统计失败', 500);
+  }
+});
+
+/** 导出手动添加记录（必须在通配路由之前注册） */
+router.get('/api/dict/manual-statistics/export', async (req: Request, res: Response) => {
+  try {
+    const secondClassCode = (req.query.secondClassCode as string) || undefined;
+    const items = await validateService.exportManualStatistics(secondClassCode);
+    success(res, items);
+  } catch (err) {
+    console.error('Failed to export manual statistics:', err);
+    error(res, ErrorCode.EXPORT_FAILED, '导出失败', 500);
   }
 });
 

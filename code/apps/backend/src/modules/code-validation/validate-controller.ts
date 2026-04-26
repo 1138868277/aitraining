@@ -142,4 +142,45 @@ router.get('/api/validate/template/download', (req: Request, res: Response) => {
   });
 });
 
+/** ---- 以下为编码校验页面3个模块新增的路由 ---- */
+
+/** 批量解析编码 */
+router.post('/api/validate/resolve-codes', async (req: Request, res: Response) => {
+  try {
+    const { codes } = req.body;
+    if (!codes || !Array.isArray(codes) || codes.length === 0) {
+      return error(res, ErrorCode.VALIDATE_LIST_EMPTY, '请先输入待解析的编码');
+    }
+    if (codes.length > 10000) {
+      return error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次解析数量超出限制（上限10000条）');
+    }
+    const result = await validateService.resolveCodes(codes);
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to resolve codes:', err);
+    error(res, ErrorCode.VALIDATE_SERVICE_ERROR, '编码解析失败', 500);
+  }
+});
+
+/** 保存编码修改映射 */
+router.post('/api/validate/save-code-mapping', async (req: Request, res: Response) => {
+  try {
+    const { oldCode, newCode, oldName, newName } = req.body;
+    if (!oldCode || !newCode) {
+      return error(res, ErrorCode.MISSING_PARAMETER, '旧编码和新编码不能为空');
+    }
+    const result = await validateService.saveCodeMapping({
+      oldCode,
+      newCode,
+      oldName: oldName || '',
+      newName: newName || '',
+      creator: req.headers['x-session-id'] as string || 'manual',
+    });
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to save code mapping:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '保存编码映射失败', 500);
+  }
+});
+
 export default router;

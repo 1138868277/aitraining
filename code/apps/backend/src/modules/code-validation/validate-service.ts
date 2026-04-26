@@ -2,6 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { validateSingleCode, getCorrectionSuggestions } from './validate-domain.js';
 import { query, queryOne } from '../../db/index.js';
 import { config } from '../../config/index.js';
+import * as validateDomain from './validate-domain.js';
+import type { DictTreeNode, ManualStatItem, ResolvedCodeItem } from './validate-domain.js';
 
 const schema = config.db.schema;
 
@@ -180,4 +182,44 @@ export function getSuggestions(code: string): any {
       { code: code.substring(0, 4) + 'XX' + code.substring(6), name: '建议编码1', similarity: 0.85 },
     ],
   };
+}
+
+/** ---- 以下为编码校验页面3个模块新增的 Service 方法 ---- */
+
+/** 获取字典树数据 */
+export async function getDictTree(): Promise<DictTreeNode[]> {
+  return validateDomain.getDictTree();
+}
+
+/** 分页查询手动添加记录 */
+export async function getManualStatistics(
+  pageNum: number,
+  pageSize: number,
+  secondClassCode?: string,
+): Promise<{ items: ManualStatItem[]; total: number; secondClassOptions: string[] }> {
+  return validateDomain.getManualStatistics(pageNum, pageSize, secondClassCode);
+}
+
+/** 导出全部手动添加记录 */
+export async function exportManualStatistics(secondClassCode?: string): Promise<ManualStatItem[]> {
+  return validateDomain.getAllManualStatistics(secondClassCode);
+}
+
+/** 批量解析编码 */
+export async function resolveCodes(
+  codes: Array<{ code: string; name?: string }>,
+): Promise<ResolvedCodeItem[]> {
+  return validateDomain.resolveCodesFromDB(codes);
+}
+
+/** 保存编码修改映射 */
+export async function saveCodeMapping(input: {
+  oldCode: string;
+  newCode: string;
+  oldName: string;
+  newName: string;
+  creator: string;
+}): Promise<{ success: boolean }> {
+  await validateDomain.saveCodeMapping(input);
+  return { success: true };
 }

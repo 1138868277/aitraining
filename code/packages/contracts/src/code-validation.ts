@@ -116,3 +116,86 @@ export const confirmCorrectionRequestSchema = z.object({
 });
 
 export type ConfirmCorrectionRequest = z.infer<typeof confirmCorrectionRequestSchema>;
+
+/** ---- 字典树、手动统计、编码解析 --- */
+
+/** 字典树节点 */
+export const dictTreeNodeSchema: z.ZodType<{
+  code: string;
+  name: string;
+  type: 'secondClass' | 'dataCategory' | 'dataCode';
+  isManual?: string;
+  childCount?: number;
+  children?: any[];
+}> = z.object({
+  code: z.string(),
+  name: z.string(),
+  type: z.enum(['typeDomain', 'secondClass', 'dataCategory', 'dataCode']),
+  isManual: z.string().optional(),
+  childCount: z.number().optional(),
+  children: z.array(z.lazy((): z.ZodType<any> => dictTreeNodeSchema)).optional(),
+});
+
+export type DictTreeNode = z.infer<typeof dictTreeNodeSchema>;
+
+/** 手动统计记录 */
+export const manualStatItemSchema = z.object({
+  secondClassCode: z.string(),
+  secondClassName: z.string(),
+  dataCategoryCode: z.string(),
+  dataCategoryName: z.string(),
+  dataCode: z.string(),
+  dataName: z.string(),
+  createTm: z.string(),
+});
+
+export type ManualStatItem = z.infer<typeof manualStatItemSchema>;
+
+/** 手动统计分页响应 */
+export const manualStatResponseSchema = z.object({
+  items: z.array(manualStatItemSchema),
+  total: z.number(),
+});
+
+export type ManualStatResponse = z.infer<typeof manualStatResponseSchema>;
+
+/** 已匹配的测点编码 */
+export const matchedCodeSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+});
+
+export type MatchedCode = z.infer<typeof matchedCodeSchema>;
+
+/** 解析后的编码项 */
+export const resolvedCodeItemSchema = z.object({
+  secondClassCode: z.string(),
+  secondClassName: z.string(),
+  dataCategoryCode: z.string(),
+  dataCategoryName: z.string(),
+  dataCode: z.string(),
+  dataName: z.string(),
+  matchedCodes: z.array(matchedCodeSchema),
+});
+
+export type ResolvedCodeItem = z.infer<typeof resolvedCodeItemSchema>;
+
+/** 解析编码请求 */
+export const resolveCodesRequestSchema = z.object({
+  codes: z.array(z.object({
+    code: z.string(),
+    name: z.string().optional(),
+  })).min(1).max(10000),
+});
+
+export type ResolveCodesRequest = z.infer<typeof resolveCodesRequestSchema>;
+
+/** 保存编码映射请求 */
+export const saveCodeMappingRequestSchema = z.object({
+  oldCode: z.string(),
+  newCode: z.string(),
+  oldName: z.string().optional(),
+  newName: z.string().optional(),
+});
+
+export type SaveCodeMappingRequest = z.infer<typeof saveCodeMappingRequestSchema>;

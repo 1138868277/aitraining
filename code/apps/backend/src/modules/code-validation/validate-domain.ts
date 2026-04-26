@@ -1,5 +1,9 @@
 import { stringSimilarity } from '@cec/shared';
 import { parseCode, isValidCodeFormat } from '../code-generation/code-domain.js';
+import { query as dbQuery } from '../../db/index.js';
+import { config } from '../../config/index.js';
+
+const schema = config.db.schema;
 
 /** 校验单条编码 */
 export function validateSingleCode(code: string, dictItems: Record<string, Set<string>>): {
@@ -62,4 +66,313 @@ function getDictKeyForSegment(segmentIndex: number): string {
     'thirdExt', 'dataType', 'dataCode',
   ];
   return keys[segmentIndex] || 'unknown';
+}
+
+/** ---- 以下为编码校验页面3个模块新增的函数 ---- */
+
+export interface DictTreeNode {
+  code: string;
+  name: string;
+  type: 'secondClass' | 'dataCategory' | 'dataCode';
+  isManual?: string;
+  children?: DictTreeNode[];
+  childCount?: number;
+}
+
+export interface ManualStatItem {
+  secondClassCode: string;
+  secondClassName: string;
+  dataCategoryCode: string;
+  dataCategoryName: string;
+  dataCode: string;
+  dataName: string;
+  createTm: string;
+}
+
+export interface ResolvedCodeItem {
+  secondClassCode: string;
+  secondClassName: string;
+  dataCategoryCode: string;
+  dataCategoryName: string;
+  dataCode: string;
+  dataName: string;
+  matchedCodes: Array<{ code: string; name: string }>;
+}
+
+/** 获取字典树数据（四层：类型域→二级类码→数据类码→数据码） */
+export async function getDictTree(): Promise<DictTreeNode[]> {
+  // 一次性查询所有数据，在内存中组装树结构
+  const allRows = await dbQuery<{
+    second_class_code: string;
+    second_class_name: string;
+    data_category_code: string;
+    data_category_name: string;
+    data_code: string;
+    data_name: string;
+    is_manual: string;
+    type_domain_code: string;
+  }>(
+    `SELECT second_class_code, second_class_name,
+            data_category_code, data_category_name,
+            data_code, data_name, is_manual, type_domain_code
+     FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0'
+       AND NOT (data_code IS NOT NULL AND data_code = data_name)
+     ORDER BY type_domain_code, second_class_code, data_category_code, data_code`,
+  );
+
+  const typeLabel: Record<string, string> = {
+    F: '风电',
+    G: '光伏',
+  };
+
+  // 使用 Map 去重和组装
+  const typeDomainMap = new Map<string, DictTreeNode>();
+  const secondClassMap = new Map<string, DictTreeNode>();
+  const dcMap = new Map<string, DictTreeNode>();
+  const seenDataCodes = new Set<string>();
+
+  for (const row of allRows) {
+    const tdCode = row.type_domain_code || 'OTHER';
+
+    // 类型域（最外层 F/G）
+    if (!typeDomainMap.has(tdCode)) {
+      typeDomainMap.set(tdCode, {
+        code: tdCode,
+        name: typeLabel[tdCode] || tdCode,
+        type: 'typeDomain',
+        children: [],
+      });
+    }
+
+    // 二级类码
+    const scKey = `${tdCode}|${row.second_class_code}`;
+    if (!secondClassMap.has(scKey)) {
+      const scNode: DictTreeNode = {
+        code: row.second_class_code,
+        name: row.second_class_name,
+        type: 'secondClass',
+        children: [],
+      };
+      secondClassMap.set(scKey, scNode);
+      typeDomainMap.get(tdCode)!.children!.push(scNode);
+    }
+
+    // 数据类码
+    const dcKey = `${scKey}|${row.data_category_code}`;
+    if (!dcMap.has(dcKey)) {
+      const dcNode: DictTreeNode = {
+        code: row.data_category_code,
+        name: row.data_category_name,
+        type: 'dataCategory',
+        isManual: row.is_manual,
+        children: [],
+      };
+      dcMap.set(dcKey, dcNode);
+      secondClassMap.get(scKey)!.children!.push(dcNode);
+    }
+
+    // 数据码（按二级类码+数据类码+数据码去重）
+    const dataCodeKey = `${dcKey}|${row.data_code}`;
+    if (row.data_code && !seenDataCodes.has(dataCodeKey)) {
+      seenDataCodes.add(dataCodeKey);
+      const dcNode = dcMap.get(dcKey)!;
+      dcNode.children!.push({
+        code: row.data_code,
+        name: row.data_name,
+        type: 'dataCode',
+        isManual: row.is_manual,
+      });
+    }
+  }
+
+  // 计算子节点数量，同时根据子节点修正数据类码的 isManual
+  for (const td of typeDomainMap.values()) {
+    for (const sc of td.children!) {
+      for (const dc of sc.children!) {
+        dc.childCount = dc.children?.length || 0;
+        if (dc.children?.some((child) => child.isManual === '1')) {
+          dc.isManual = '1';
+        }
+      }
+      sc.childCount = sc.children?.length || 0;
+    }
+    td.childCount = td.children?.length || 0;
+  }
+
+  return Array.from(typeDomainMap.values());
+}
+
+/** 分页查询手动添加的编码记录 */
+export async function getManualStatistics(
+  pageNum: number,
+  pageSize: number,
+  secondClassCode?: string,
+): Promise<{ items: ManualStatItem[]; total: number; secondClassOptions: string[] }> {
+  const offset = (pageNum - 1) * pageSize;
+  const filterSql = secondClassCode ? ` AND second_class_code = $1` : '';
+  const filterParams = secondClassCode ? [secondClassCode] : [];
+
+  const countResult = await dbQuery<{ cnt: string }>(
+    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0' AND is_manual = '1'${filterSql}`,
+    filterParams,
+  );
+  const total = Number(countResult[0].cnt);
+
+  // 获取所有二级类码选项（带名称）
+  const optionRows = await dbQuery<{ code: string; name: string }>(
+    `SELECT DISTINCT second_class_code AS code, second_class_name AS name FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0' AND is_manual = '1' ORDER BY code`,
+  );
+
+  const params: any[] = [...filterParams, pageSize, offset];
+  const items = await dbQuery<ManualStatItem>(
+    `SELECT second_class_code AS "secondClassCode",
+            second_class_name AS "secondClassName",
+            data_category_code AS "dataCategoryCode",
+            data_category_name AS "dataCategoryName",
+            data_code AS "dataCode",
+            data_name AS "dataName",
+            create_tm AS "createTm"
+     FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0' AND is_manual = '1'${filterSql}
+     ORDER BY create_tm DESC
+     LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}`,
+    params,
+  );
+
+  return { items, total, secondClassOptions: optionRows.map((r) => ({ code: r.code, name: r.name })) };
+}
+
+/** 获取所有手动添加记录（不分页，用于导出） */
+export async function getAllManualStatistics(secondClassCode?: string): Promise<ManualStatItem[]> {
+  const filterSql = secondClassCode ? ` AND second_class_code = $1` : '';
+  const params = secondClassCode ? [secondClassCode] : [];
+  return dbQuery<ManualStatItem>(
+    `SELECT second_class_code AS "secondClassCode",
+            second_class_name AS "secondClassName",
+            data_category_code AS "dataCategoryCode",
+            data_category_name AS "dataCategoryName",
+            data_code AS "dataCode",
+            data_name AS "dataName",
+            create_tm AS "createTm"
+     FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0' AND is_manual = '1'${filterSql}
+     ORDER BY create_tm DESC`,
+    params,
+  );
+}
+
+/**
+ * 批量解析编码列表
+ * 从31位编码中截取: 二级类码(13-15位)、数据类码(27-28位)、数据码(29-31位)
+ */
+export async function resolveCodesFromDB(
+  codeList: Array<{ code: string; name?: string }>,
+): Promise<ResolvedCodeItem[]> {
+  const extractedMap = new Map<string, {
+    secondClassCode: string;
+    dataCategoryCode: string;
+    dataCode: string;
+    matchedCodes: Array<{ code: string; name: string }>;
+  }>();
+
+  for (const item of codeList) {
+    const code = item.code;
+    if (code.length < 31) continue;
+
+    const secondClassCode = code.substring(12, 15);
+    const dataCategoryCode = code.substring(26, 28);
+    const dataCode = code.substring(28, 31);
+
+    const key = `${secondClassCode}|${dataCategoryCode}|${dataCode}`;
+
+    if (!extractedMap.has(key)) {
+      extractedMap.set(key, {
+        secondClassCode,
+        dataCategoryCode,
+        dataCode,
+        matchedCodes: [],
+      });
+    }
+    extractedMap.get(key)!.matchedCodes.push({
+      code: item.code,
+      name: item.name || '',
+    });
+  }
+
+  const keys = Array.from(extractedMap.keys());
+  const result: ResolvedCodeItem[] = [];
+
+  for (const key of keys) {
+    const entry = extractedMap.get(key)!;
+
+    const rows = await dbQuery<{
+      second_class_name: string;
+      data_category_name: string;
+      data_name: string;
+    }>(
+      `SELECT second_class_name, data_category_name, data_name
+       FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0'
+         AND second_class_code = $1
+         AND data_category_code = $2
+         AND data_code = $3
+       LIMIT 1`,
+      [entry.secondClassCode, entry.dataCategoryCode, entry.dataCode],
+    );
+
+    if (rows.length > 0) {
+      result.push({
+        secondClassCode: entry.secondClassCode,
+        secondClassName: rows[0].second_class_name,
+        dataCategoryCode: entry.dataCategoryCode,
+        dataCategoryName: rows[0].data_category_name,
+        dataCode: entry.dataCode,
+        dataName: rows[0].data_name,
+        matchedCodes: entry.matchedCodes,
+      });
+    } else {
+      result.push({
+        secondClassCode: entry.secondClassCode,
+        secondClassName: entry.secondClassCode,
+        dataCategoryCode: entry.dataCategoryCode,
+        dataCategoryName: entry.dataCategoryCode,
+        dataCode: entry.dataCode,
+        dataName: entry.dataCode,
+        matchedCodes: entry.matchedCodes,
+      });
+    }
+  }
+
+  return result;
+}
+
+/** 保存编码修改映射 */
+export async function saveCodeMapping(input: {
+  oldCode: string;
+  newCode: string;
+  oldName: string;
+  newName: string;
+  creator: string;
+}): Promise<void> {
+  await dbQuery(
+    `CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_code_mapping (
+      id BIGSERIAL PRIMARY KEY,
+      old_code VARCHAR(31) NOT NULL,
+      new_code VARCHAR(31) NOT NULL,
+      old_name VARCHAR(500),
+      new_name VARCHAR(500),
+      creator VARCHAR(50),
+      create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+  );
+
+  await dbQuery(
+    `INSERT INTO ${schema}.cec_new_energy_code_mapping
+     (old_code, new_code, old_name, new_name, creator, create_tm)
+     VALUES ($1, $2, $3, $4, $5, NOW())`,
+    [input.oldCode, input.newCode, input.oldName, input.newName, input.creator],
+  );
 }
