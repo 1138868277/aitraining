@@ -19,7 +19,7 @@ export function createApp() {
   );
 
   // 请求体解析
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: '200mb' }));
   app.use(express.urlencoded({ extended: true }));
 
   // 通用中间件

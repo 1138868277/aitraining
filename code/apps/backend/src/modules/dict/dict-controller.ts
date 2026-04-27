@@ -6,6 +6,22 @@ import { ErrorCode } from '@cec/contracts';
 
 const router = Router();
 
+/** 编码解析：解析31位编码的各段信息 */
+router.post('/api/dict/parse-code', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+    if (!code || typeof code !== 'string' || code.length !== 31) {
+      error(res, ErrorCode.PARAM_FORMAT_ERROR, '编码必须为31位', 400);
+      return;
+    }
+    const result = await dictService.parseCode(code);
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to parse code:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '编码解析失败，请重试', 500);
+  }
+});
+
 /** 快捷搜索：根据数据码名称模糊匹配（必须在 :dictType 通配路由之前注册） */
 router.get('/api/dict/quick-search', async (req: Request, res: Response) => {
   try {

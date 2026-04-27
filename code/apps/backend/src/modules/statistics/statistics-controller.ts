@@ -1,14 +1,97 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
-import * as statisticsService from './statistics-service.js';
-import { success, error, paginated } from '../../common/response.js';
 import { ErrorCode } from '@cec/contracts';
+import * as statisticsService from './statistics-service.js';
+import { success, error } from '../../common/response.js';
+import { config } from '../../config/index.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: config.file.maxMeasurementFileSizeMB * 1024 * 1024 },
+});
+
 const router = Router();
 
-/** 上传稽核数据 */
-router.post('/api/statistics/upload', upload.single('file'), (req: Request, res: Response) => {
+// ========== 1. 编码生成统计 ==========
+
+/** 编码生成概览 */
+router.get('/api/statistics/code-gen/overview', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getCodeGenOverview();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get code gen overview:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取编码生成概览失败', 500);
+  }
+});
+
+/** 编码生成维度统计 */
+router.get('/api/statistics/code-gen/by-dimension', async (req: Request, res: Response) => {
+  try {
+    const dimension = (req.query.dimension as string) || 'typeCode';
+    const startTime = req.query.startTime as string;
+    const endTime = req.query.endTime as string;
+    const data = await statisticsService.getCodeGenByDimension(dimension, startTime, endTime);
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get code gen dimension:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取编码生成维度统计失败', 500);
+  }
+});
+
+/** 编码生成趋势 */
+router.get('/api/statistics/code-gen/trend', async (req: Request, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30;
+    const data = await statisticsService.getCodeGenTrend(days);
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get code gen trend:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取编码生成趋势失败', 500);
+  }
+});
+
+// ========== 2. 编码字典统计 ==========
+
+/** 字典概览 */
+router.get('/api/statistics/dict/overview', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getDictOverview();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get dict overview:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取字典概览失败', 500);
+  }
+});
+
+/** 字典新增情况 */
+router.get('/api/statistics/dict/new-addition', async (req: Request, res: Response) => {
+  try {
+    const startTime = req.query.startTime as string;
+    const endTime = req.query.endTime as string;
+    const data = await statisticsService.getDictNewAddition(startTime, endTime);
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get dict new addition:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取字典新增情况失败', 500);
+  }
+});
+
+/** 类型域分布 */
+router.get('/api/statistics/dict/type-domain-dist', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getDictTypeDomainDist();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get type domain dist:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取类型域分布失败', 500);
+  }
+});
+
+// ========== 3. 全量测点统计 ==========
+
+/** 导入测点Excel */
+router.post('/api/statistics/measurement/import', upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return error(res, ErrorCode.FILE_FORMAT_ERROR, '请上传文件');
@@ -17,71 +100,75 @@ router.post('/api/statistics/upload', upload.single('file'), (req: Request, res:
     if (ext !== 'xlsx' && ext !== 'xls') {
       return error(res, ErrorCode.IMPORT_FILE_FORMAT_ERROR, '文件格式不合法，请上传.xlsx或.xls文件');
     }
-    success(res, {
-      fileId: `file_${Date.now()}`,
-      fileName: req.file.originalname,
-      importCount: 0,
-      status: 'PROCESSING',
-    });
-  } catch (err) {
-    error(res, ErrorCode.SYSTEM_ERROR, '上传失败', 500);
-  }
-});
-
-/** 获取统计概览 */
-router.get('/api/statistics/overview', async (req: Request, res: Response) => {
-  try {
-    const overview = await statisticsService.getOverview();
-    success(res, overview);
-  } catch (err) {
-    console.error('Failed to get overview:', err);
-    error(res, ErrorCode.SYSTEM_ERROR, '获取统计概览失败', 500);
-  }
-});
-
-/** 按维度统计 */
-router.get('/api/statistics/by-dimension', async (req: Request, res: Response) => {
-  try {
-    const dimension = (req.query.dimension as string) || 'managementDomain';
-    const result = await statisticsService.getByDimension(dimension);
+    const result = await statisticsService.importMeasurementFile(req.file.buffer, req.file.originalname);
     success(res, result);
-  } catch (err) {
-    console.error('Failed to get dimension stats:', err);
-    error(res, ErrorCode.SYSTEM_ERROR, '获取维度统计失败', 500);
+  } catch (err: any) {
+    if (err.message === 'IMPORT_BUSY') {
+      return error(res, ErrorCode.IMPORT_BUSY, '导入任务正在进行中，请等待');
+    }
+    if (err.message === 'IMPORT_DATA_EMPTY') {
+      return error(res, ErrorCode.IMPORT_DATA_EMPTY, '文件中未检测到有效数据');
+    }
+    console.error('Failed to import measurement file:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '导入失败', 500);
   }
 });
 
-/** 获取图表数据 */
-router.get('/api/statistics/chart-data', async (req: Request, res: Response) => {
+/** 获取导入状态 */
+router.get('/api/statistics/measurement/import-status', async (_req: Request, res: Response) => {
   try {
-    const chartType = (req.query.chartType as string) || 'bar';
-    const dimension = (req.query.dimension as string) || 'managementDomain';
-    const result = await statisticsService.getChartData(chartType, dimension);
-    success(res, result);
+    const data = statisticsService.getImportStatus();
+    success(res, data);
   } catch (err) {
-    console.error('Failed to get chart data:', err);
-    error(res, ErrorCode.CHART_RENDER_ERROR, '图表加载失败，请刷新重试', 500);
+    console.error('Failed to get import status:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取导入状态失败', 500);
   }
 });
 
-/** 获取统计明细 */
-router.get('/api/statistics/details', async (req: Request, res: Response) => {
+/** 全量测点概览 */
+router.get('/api/statistics/measurement/overview', async (_req: Request, res: Response) => {
   try {
-    const pageNum = parseInt(req.query.pageNum as string) || 1;
-    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 20, 100);
-    const result = await statisticsService.getDetails(pageNum, pageSize);
-    paginated(res, result.list, result.total, pageNum, pageSize);
+    const data = await statisticsService.getMeasureOverview();
+    success(res, data);
   } catch (err) {
-    console.error('Failed to get details:', err);
-    error(res, ErrorCode.SYSTEM_ERROR, '获取统计明细失败', 500);
+    console.error('Failed to get measure overview:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取测点概览失败', 500);
   }
 });
 
-/** 导出统计报表 */
-router.get('/api/statistics/export', (req: Request, res: Response) => {
-  success(res, {
-    downloadUrl: `/api/files/export/statistics_${Date.now()}.xlsx`,
-  });
+/** 全量测点维度统计 */
+router.get('/api/statistics/measurement/by-dimension', async (req: Request, res: Response) => {
+  try {
+    const dimension = (req.query.dimension as string) || 'typeCode';
+    const data = await statisticsService.getMeasureByDimension(dimension);
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get measure dimension:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取测点维度统计失败', 500);
+  }
+});
+
+/** 全量测点类型下钻 */
+router.get('/api/statistics/measurement/drill-down', async (req: Request, res: Response) => {
+  try {
+    const typeCode = (req.query.typeCode as string) || 'F';
+    const data = await statisticsService.getMeasureDrillDown(typeCode);
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get measure drill down:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取测点下钻数据失败', 500);
+  }
+});
+
+/** 清理测点数据 */
+router.delete('/api/statistics/measurement/clear', async (_req: Request, res: Response) => {
+  try {
+    await statisticsService.clearMeasurementData();
+    success(res, { message: '清理成功' });
+  } catch (err) {
+    console.error('Failed to clear measurement data:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '清理失败', 500);
+  }
 });
 
 export default router;

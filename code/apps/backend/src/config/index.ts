@@ -24,7 +24,8 @@ export const config = {
     moduleCode: process.env.MODULE_CODE || 'liuhaojun',
   },
   file: {
-    maxSizeMB: parseInt(process.env.FILE_UPLOAD_MAX_SIZE || '10', 10),
+    maxSizeMB: parseInt(process.env.FILE_UPLOAD_MAX_SIZE || '200', 10),
+    maxMeasurementFileSizeMB: parseInt(process.env.MEASUREMENT_FILE_MAX_SIZE || '200', 10),
     uploadDir: './uploads',
   },
   auth: {

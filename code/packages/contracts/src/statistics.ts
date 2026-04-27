@@ -1,95 +1,148 @@
 import { z } from 'zod';
 
-/** 统计概览响应 */
-export const statisticsOverviewSchema = z.object({
-  totalCount: z.number(),
-  compliantCount: z.number(),
-  abnormalCount: z.number(),
-  complianceRate: z.number(),
+// ========== 通用 ==========
+
+export const timeRangeSchema = z.object({
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
 });
 
-export type StatisticsOverview = z.infer<typeof statisticsOverviewSchema>;
+export type TimeRange = z.infer<typeof timeRangeSchema>;
 
-/** 维度统计项 */
-export const dimensionStatItemSchema = z.object({
-  name: z.string(),
-  totalCount: z.number(),
-  compliantCount: z.number(),
-  abnormalCount: z.number(),
-  complianceRate: z.number(),
+// ========== 1. 编码生成统计 ==========
+
+/** 编码生成统计 - 概览 */
+export const codeGenOverviewSchema = z.object({
+  totalCodes: z.number(),
+  todayCodes: z.number(),
+  thisWeekCodes: z.number(),
+  thisMonthCodes: z.number(),
 });
 
-export type DimensionStatItem = z.infer<typeof dimensionStatItemSchema>;
+export type CodeGenOverview = z.infer<typeof codeGenOverviewSchema>;
 
-/** 维度统计响应 */
-export const dimensionStatisticsSchema = z.object({
-  dimension: z.string(),
-  items: z.array(dimensionStatItemSchema),
-});
-
-export type DimensionStatistics = z.infer<typeof dimensionStatisticsSchema>;
-
-/** 柱状图数据 */
-export const barChartDataSchema = z.object({
-  chartType: z.literal('bar'),
-  dimension: z.string(),
-  categories: z.array(z.string()),
-  compliantData: z.array(z.number()),
-  abnormalData: z.array(z.number()),
-});
-
-export type BarChartData = z.infer<typeof barChartDataSchema>;
-
-/** 饼图系列数据 */
-export const pieSeriesItemSchema = z.object({
+/** 编码生成统计 - 维度聚合项 */
+export const codeGenDimensionItemSchema = z.object({
   name: z.string(),
   value: z.number(),
   percentage: z.number(),
 });
 
-export type PieSeriesItem = z.infer<typeof pieSeriesItemSchema>;
+export type CodeGenDimensionItem = z.infer<typeof codeGenDimensionItemSchema>;
 
-/** 饼图数据 */
-export const pieChartDataSchema = z.object({
-  chartType: z.literal('pie'),
+/** 编码生成统计 - 维度聚合响应 */
+export const codeGenDimensionResponseSchema = z.object({
   dimension: z.string(),
-  series: z.array(pieSeriesItemSchema),
+  items: z.array(codeGenDimensionItemSchema),
 });
 
-export type PieChartData = z.infer<typeof pieChartDataSchema>;
+export type CodeGenDimensionResponse = z.infer<typeof codeGenDimensionResponseSchema>;
 
-/** 图表数据（联合类型） */
-export type ChartData = BarChartData | PieChartData;
-
-/** 统计明细项 */
-export const statisticsDetailItemSchema = z.object({
-  index: z.number(),
-  managementDomain: z.string(),
-  station: z.string(),
-  totalCount: z.number(),
-  compliantCount: z.number(),
-  abnormalCount: z.number(),
-  complianceRate: z.number(),
+/** 编码生成统计 - 每日趋势 */
+export const codeGenTrendItemSchema = z.object({
+  date: z.string(),
+  count: z.number(),
 });
 
-export type StatisticsDetailItem = z.infer<typeof statisticsDetailItemSchema>;
+export type CodeGenTrendItem = z.infer<typeof codeGenTrendItemSchema>;
 
-/** 统计明细分页响应 */
-export const statisticsDetailPageSchema = z.object({
-  list: z.array(statisticsDetailItemSchema),
+export const codeGenTrendResponseSchema = z.object({
+  items: z.array(codeGenTrendItemSchema),
+});
+
+export type CodeGenTrendResponse = z.infer<typeof codeGenTrendResponseSchema>;
+
+// ========== 2. 编码字典统计 ==========
+
+/** 编码字典统计 - 当前概览 */
+export const dictOverviewSchema = z.object({
+  stationCount: z.number(),
+  secondClassCount: z.number(),
+  thirdClassCount: z.number(),
+  dataCategoryCount: z.number(),
+  dataCodeCount: z.number(),
+  typeDomainCount: z.number(),
+});
+
+export type DictOverview = z.infer<typeof dictOverviewSchema>;
+
+/** 编码字典统计 - 新增情况 */
+export const dictNewAdditionSchema = z.object({
+  totalNewCodes: z.number(),
+  manualCodes: z.number(),
+  autoCodes: z.number(),
+  newCodesBySecondClass: z.array(
+    z.object({
+      secondClassCode: z.string(),
+      secondClassName: z.string(),
+      count: z.number(),
+    }),
+  ),
+  newCodesByDate: z.array(
+    z.object({
+      date: z.string(),
+      count: z.number(),
+    }),
+  ),
+});
+
+export type DictNewAddition = z.infer<typeof dictNewAdditionSchema>;
+
+/** 编码字典统计 - 类型域分布 */
+export const dictTypeDomainDistSchema = z.object({
+  items: z.array(
+    z.object({
+      typeDomainCode: z.string(),
+      typeDomainName: z.string(),
+      secondClassCount: z.number(),
+      dataCategoryCount: z.number(),
+      dataCodeCount: z.number(),
+    }),
+  ),
+});
+
+export type DictTypeDomainDist = z.infer<typeof dictTypeDomainDistSchema>;
+
+// ========== 3. 全量测点统计 ==========
+
+/** 全量测点统计 - 导入状态 */
+export const importStatusSchema = z.object({
+  importing: z.boolean(),
+  batchId: z.string().nullable(),
+  totalRows: z.number(),
+  importedRows: z.number(),
+  validRows: z.number(),
+  status: z.enum(['IDLE', 'PROCESSING', 'COMPLETED', 'FAILED']),
+  message: z.string().optional(),
+});
+
+export type ImportStatus = z.infer<typeof importStatusSchema>;
+
+/** 全量测点统计 - 概览 */
+export const measureOverviewSchema = z.object({
+  totalPoints: z.number(),
+  windCount: z.number(),
+  solarCount: z.number(),
+  otherCount: z.number(),
+});
+
+export type MeasureOverview = z.infer<typeof measureOverviewSchema>;
+
+/** 全量测点统计 - 维度聚合项 */
+export const measureDimensionItemSchema = z.object({
+  name: z.string(),
+  count: z.number(),
+  percentage: z.number(),
+});
+
+export type MeasureDimensionItem = z.infer<typeof measureDimensionItemSchema>;
+
+/** 全量测点统计 - 类型维度下钻 */
+export const measureDrillDownSchema = z.object({
+  typeCode: z.string(),
+  typeName: z.string(),
   total: z.number(),
-  pageNum: z.number(),
-  pageSize: z.number(),
+  secondClassItems: z.array(measureDimensionItemSchema),
 });
 
-export type StatisticsDetailPage = z.infer<typeof statisticsDetailPageSchema>;
-
-/** 文件上传响应 */
-export const uploadResponseSchema = z.object({
-  fileId: z.string(),
-  fileName: z.string(),
-  importCount: z.number(),
-  status: z.enum(['PROCESSING', 'COMPLETED', 'FAILED']),
-});
-
-export type UploadResponse = z.infer<typeof uploadResponseSchema>;
+export type MeasureDrillDown = z.infer<typeof measureDrillDownSchema>;

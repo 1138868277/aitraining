@@ -115,6 +115,18 @@ export async function checkExistingDataCategories(
   return dictDomain.checkExistingDataCategories(secondClassCode, typeCode, categoryCodes);
 }
 
+export interface CodeParseResult {
+  rawCode: string;
+  segments: Array<{ label: string; code: string; name: string }>;
+  isValid: boolean;
+  errorMessage?: string;
+}
+
+/** 编码解析：根据31位编码查询各段信息 */
+export async function parseCode(code: string): Promise<CodeParseResult> {
+  return dictDomain.parseCode(code);
+}
+
 /** 检查数据码是否已存在 */
 export async function checkExistingDataCodes(
   secondClassCode: string,

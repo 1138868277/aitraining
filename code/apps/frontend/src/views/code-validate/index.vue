@@ -60,9 +60,93 @@
           </div>
         </el-tab-pane>
 
-        
+        <!-- Tab 2: 编码解析 -->
+        <el-tab-pane label="编码解析" name="parse">
+          <div class="parse-container">
+            <div class="parse-input-section">
+              <el-input
+                v-model="parseCodeInput"
+                type="textarea"
+                :rows="3"
+                placeholder="请输入31位编码"
+                clearable
+                class="parse-code-input"
+                maxlength="31"
+                @input="onParseInput"
+              />
+              <div class="parse-code-length">
+                已输入 {{ parseCodeInput.length }} / 31 位
+                <span v-if="parseCodeInput.length > 0 && parseCodeInput.length !== 31" class="parse-length-warning">编码必须为31位</span>
+              </div>
+              <el-button
+                type="primary"
+                :disabled="parseCodeInput.length !== 31 || parsingCode"
+                @click="handleParseCode"
+                class="parse-btn"
+              >{{ parsingCode ? '解析中...' : '解析' }}</el-button>
+            </div>
 
-<!-- Tab 2: 编码校验 -->
+            <div v-if="parseResult" class="parse-result-section">
+              <el-card shadow="never" class="parse-result-card">
+                <template #header>
+                  <div class="parse-result-header">
+                    <span class="parse-result-title">解析结果</span>
+                    <el-tag v-if="parseResult.isValid" type="success" effect="dark">全部识别</el-tag>
+                    <el-tag v-else type="danger" effect="dark">部分未识别</el-tag>
+                  </div>
+                </template>
+
+                <!-- 编码分段展示 -->
+                <div class="code-segments-display">
+                  <div
+                    v-for="(seg, index) in parseResult.segments"
+                    :key="index"
+                    class="segment-block"
+                    :class="{ 'segment-unrecognized': seg.name === '未识别' }"
+                  >
+                    <div class="segment-label">{{ seg.label }}</div>
+                    <div class="segment-code">{{ seg.code }}</div>
+                    <div class="segment-name" :class="{ 'name-error': seg.name === '未识别' }">{{ seg.name }}</div>
+                  </div>
+                </div>
+
+                <!-- 编码可视化（分段标注） -->
+                <div class="code-visualization">
+                  <div class="viz-title">编码结构</div>
+                  <div class="viz-code">
+                    <span
+                      v-for="(seg, index) in parseResult.segments"
+                      :key="index"
+                      class="viz-segment"
+                      :class="'viz-color-' + (index % 5)"
+                      :title="seg.label + ': ' + seg.code"
+                    >{{ seg.code }}</span>
+                  </div>
+                  <div class="viz-labels">
+                    <span
+                      v-for="(seg, index) in parseResult.segments"
+                      :key="index"
+                      class="viz-label"
+                      :class="'viz-color-' + (index % 5)"
+                    >{{ seg.label }}</span>
+                  </div>
+                </div>
+
+                <!-- 错误信息 -->
+                <el-alert
+                  v-if="!parseResult.isValid && parseResult.errorMessage"
+                  :title="parseResult.errorMessage"
+                  type="warning"
+                  show-icon
+                  :closable="false"
+                  class="parse-error-alert"
+                />
+              </el-card>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <!-- Tab 3: 编码校验 -->
         <el-tab-pane label="编码校验" name="validate">
           <!-- 输入区域 -->
           <el-card shadow="never" class="input-section">
@@ -191,8 +275,8 @@
             </el-table>
           </div>
         </el-tab-pane>
-        <!-- Tab 3: 新增字典记录 -->
-        <el-tab-pane label="新增字典记录" name="statistics">
+        <!-- Tab 4: 新增字典记录 -->
+        <el-tab-pane label="字典新增" name="statistics">
           <div class="statistics-header">
             <span class="statistics-title">手动添加编码记录</span>
             <el-button
@@ -322,6 +406,33 @@ import * as validateService from '@/services/validate';
 import * as dictService from '@/services/dict';
 import type { DictTreeNode, ManualStatItem, ResolvedCodeItem } from '@cec/contracts';
 
+// ========== Tab 2: 编码解析 ==========
+const parseCodeInput = ref('');
+const parsingCode = ref(false);
+const parseResult = ref<{
+  rawCode: string;
+  segments: Array<{ label: string; code: string; name: string }>;
+  isValid: boolean;
+  errorMessage?: string;
+} | null>(null);
+
+function onParseInput() {
+  // 只允许数字和字母
+  parseCodeInput.value = parseCodeInput.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 31);
+}
+
+async function handleParseCode() {
+  if (parseCodeInput.value.length !== 31) return;
+  parsingCode.value = true;
+  try {
+    parseResult.value = await dictService.parseCode(parseCodeInput.value);
+  } catch (err: any) {
+    ElMessage.error(err.message || '编码解析失败');
+  } finally {
+    parsingCode.value = false;
+  }
+}
+
 // ========== Tab Switching ==========
 const route = useRoute();
 const router = useRouter();
@@ -426,7 +537,7 @@ function onCollapseAll() {
   }
 }
 
-// ========== Tab 3: 新增字典记录 ==========
+// ========== Tab 4: 新增字典记录 ==========
 const manualStats = ref<ManualStatItem[]>([]);
 const loadingStats = ref(false);
 const statsTotal = ref(0);
@@ -490,7 +601,7 @@ async function handleExportStats() {
   }
 }
 
-// ========== Tab 2: 编码校验 ==========
+// ========== Tab 3: 编码校验 ==========
 const inputMode = ref('paste');
 const batchInput = ref('');
 const uploadFileList = ref<Array<{ name: string; size: number }>>([]);
@@ -694,7 +805,7 @@ onMounted(() => {
   margin-top: -16px;
 }
 
-/* Tab 1: Tree */
+/* Tab 1: 字典查询 */
 .tree-container {
   padding: 8px 0;
 }
@@ -769,7 +880,7 @@ onMounted(() => {
   color: #909399;
 }
 
-/* Tab 3: 新增字典记录 */
+/* Tab 4: 新增字典记录 */
 .statistics-header {
   display: flex;
   justify-content: space-between;
@@ -815,7 +926,7 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-/* Tab 2: 编码校验 */
+/* Tab 3: 编码校验 */
 .input-section {
   margin-bottom: 16px;
   border: none;
@@ -902,6 +1013,162 @@ onMounted(() => {
   color: #f56c6c;
   font-weight: 700;
   margin-left: 6px;
+}
+
+/* Tab 2: 编码解析 */
+.parse-container {
+  padding: 8px 0;
+}
+
+.parse-input-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 500px;
+}
+
+.parse-code-input {
+  width: 100%;
+}
+
+.parse-code-length {
+  font-size: 12px;
+  color: #909399;
+}
+
+.parse-length-warning {
+  color: #e6a23c;
+  margin-left: 8px;
+}
+
+.parse-btn {
+  margin-top: 4px;
+}
+
+.parse-result-section {
+  margin-top: 20px;
+}
+
+.parse-result-card {
+  max-width: 900px;
+}
+
+.parse-result-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.parse-result-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.code-segments-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.segment-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  min-width: 80px;
+}
+
+.segment-block.segment-unrecognized {
+  background: #fef0f0;
+  border-color: #f56c6c;
+}
+
+.segment-label {
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+.segment-code {
+  font-size: 16px;
+  font-weight: 700;
+  color: #303133;
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+.segment-name {
+  font-size: 13px;
+  color: #606266;
+  text-align: center;
+}
+
+.segment-name.name-error {
+  color: #f56c6c;
+  font-weight: 700;
+}
+
+.code-visualization {
+  margin-bottom: 16px;
+}
+
+.viz-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.viz-code {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.viz-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 4px;
+  cursor: default;
+}
+
+.viz-labels {
+  display: flex;
+  gap: 2px;
+}
+
+.viz-label {
+  font-size: 10px;
+  text-align: center;
+  padding: 2px 4px;
+  color: #fff;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viz-color-0 { background: #409eff; }
+.viz-color-1 { background: #67c23a; }
+.viz-color-2 { background: #e6a23c; }
+.viz-color-3 { background: #9b59b6; }
+.viz-color-4 { background: #f56c6c; }
+
+.parse-error-alert {
+  margin-top: 12px;
 }
 
 </style>

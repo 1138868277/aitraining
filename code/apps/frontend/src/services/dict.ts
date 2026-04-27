@@ -84,6 +84,17 @@ export async function getMaxDataCategoryCode(secondClassCode: string, typeCode: 
   return res.data.maxDataCategoryCode;
 }
 
+/** 编码解析：解析31位编码的各段信息 */
+export async function parseCode(code: string): Promise<{
+  rawCode: string;
+  segments: Array<{ label: string; code: string; name: string }>;
+  isValid: boolean;
+  errorMessage?: string;
+}> {
+  const res = await api.post('/dict/parse-code', { code });
+  return res.data;
+}
+
 /** 批量新增编码字典项 */
 export async function batchCreateManualCode(data: {
   mode: 'existing' | 'new';

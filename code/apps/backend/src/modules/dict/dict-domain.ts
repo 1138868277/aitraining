@@ -439,6 +439,99 @@ export async function batchCreateManualCode(input: {
   return { insertedCount: input.entries.length };
 }
 
+/** 编码解析：根据31位编码查询各段信息 */
+export async function parseCode(code: string): Promise<{
+  rawCode: string;
+  segments: Array<{ label: string; code: string; name: string }>;
+  isValid: boolean;
+  errorMessage?: string;
+}> {
+  if (!code || code.length !== 31) {
+    return { rawCode: code, segments: [], isValid: false, errorMessage: '编码必须为31位' };
+  }
+
+  const stationCode = code.slice(0, 4);
+  const typeCode = code.slice(4, 6);
+  const projectLineCode = code.slice(6, 9);
+  const prefixNo = code.slice(9, 10);
+  const firstClassCode = code.slice(10, 12);
+  const secondClassCode = code.slice(12, 15);
+  const secondExtCode = code.slice(15, 19);
+  const thirdClassCode = code.slice(19, 22);
+  const thirdExtCode = code.slice(22, 26);
+  const dataCategoryCode = code.slice(26, 28);
+  const dataCode = code.slice(28, 31);
+
+  // 并行查询所有段
+  const [
+    stations, types, prefixes, firstClasses,
+    secondClasses, thirdClasses, codeDictItems,
+  ] = await Promise.all([
+    query<{ name: string }>(
+      `SELECT station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0' AND station_code = $1`,
+      [stationCode],
+    ),
+    query<{ name: string }>(
+      `SELECT type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0' AND type_code = $1`,
+      [typeCode],
+    ),
+    query<{ name: string }>(
+      `SELECT prefix_name AS name FROM ${schema}.cec_new_energy_prefix_dict WHERE if_delete = '0' AND prefix_no = $1`,
+      [prefixNo],
+    ),
+    query<{ name: string }>(
+      `SELECT first_class_name AS name FROM ${schema}.cec_new_energy_first_class_dict WHERE if_delete = '0' AND first_class_code = $1`,
+      [firstClassCode],
+    ),
+    query<{ name: string }>(
+      `SELECT second_class_name AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code = $1 AND type_code = $2`,
+      [secondClassCode, typeCode],
+    ),
+    query<{ name: string }>(
+      `SELECT third_class_name AS name FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code = $1`,
+      [thirdClassCode],
+    ),
+    query<{ data_category_name: string; data_name: string }>(
+      `SELECT data_category_name, data_name FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND data_category_code = $1 AND data_code = $2
+       LIMIT 1`,
+      [dataCategoryCode, dataCode],
+    ),
+  ]);
+
+  const segments = [
+    { label: '场站', code: stationCode, name: stations[0]?.name || '未识别' },
+    { label: '类型', code: typeCode, name: types[0]?.name || '未识别' },
+    { label: '项目期号&并网线路', code: projectLineCode, name: '项目期号编码' },
+    { label: '前缀号', code: prefixNo, name: prefixes[0]?.name || '未识别' },
+    { label: '一级类码', code: firstClassCode, name: firstClasses[0]?.name || '未识别' },
+    { label: '二级类码', code: secondClassCode, name: secondClasses[0]?.name || '未识别' },
+    { label: '二级类扩展码', code: secondExtCode, name: secondExtCode === '0000' ? '无扩展' : '扩展编码' },
+    { label: '三级类码', code: thirdClassCode, name: thirdClasses[0]?.name || '未识别' },
+    { label: '三级类扩展码', code: thirdExtCode, name: thirdExtCode === '0000' ? '无扩展' : '扩展编码' },
+    { label: '数据类码', code: dataCategoryCode, name: codeDictItems[0]?.data_category_name || '未识别' },
+    { label: '数据码', code: dataCode, name: codeDictItems[0]?.data_name || '未识别' },
+  ];
+
+  const unrecognizedCount = segments.filter(s => s.name === '未识别').length;
+  const isValid = unrecognizedCount === 0;
+
+  const result: {
+    rawCode: string;
+    segments: Array<{ label: string; code: string; name: string }>;
+    isValid: boolean;
+    errorMessage?: string;
+  } = {
+    rawCode: code,
+    segments,
+    isValid,
+  };
+  if (!isValid) {
+    result.errorMessage = `有 ${unrecognizedCount} 个段未识别`;
+  }
+  return result;
+}
+
 /** 根据类型代码和二级类码获取数据类码 */
 export async function getDataTypeBySecondClass(typeCode: string, secondClassCode: string): Promise<DictItem[]> {
   const typeDomainCode = getTypeDomainCode(typeCode);

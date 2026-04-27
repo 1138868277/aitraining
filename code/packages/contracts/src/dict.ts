@@ -92,3 +92,31 @@ export const batchCreateManualDictCodeResponseSchema = z.object({
 });
 
 export type BatchCreateManualDictCodeResponse = z.infer<typeof batchCreateManualDictCodeResponseSchema>;
+
+// ========== 编码解析 ==========
+
+/** 编码解析 - 单段编码信息 */
+export const codeParseSegmentSchema = z.object({
+  label: z.string(),
+  code: z.string(),
+  name: z.string(),
+});
+
+export type CodeParseSegment = z.infer<typeof codeParseSegmentSchema>;
+
+/** 编码解析请求 */
+export const codeParseRequestSchema = z.object({
+  code: z.string().length(31, '编码必须为31位'),
+});
+
+export type CodeParseRequest = z.infer<typeof codeParseRequestSchema>;
+
+/** 编码解析响应 */
+export const codeParseResponseSchema = z.object({
+  rawCode: z.string(),
+  segments: z.array(codeParseSegmentSchema),
+  isValid: z.boolean(),
+  errorMessage: z.string().optional(),
+});
+
+export type CodeParseResponse = z.infer<typeof codeParseResponseSchema>;

@@ -37,9 +37,12 @@ export const ErrorCode = {
   IMPORT_FIELD_MISMATCH: 'IMPORT_FIELD_MISMATCH',
   IMPORT_LIMIT_EXCEEDED: 'IMPORT_LIMIT_EXCEEDED',
   IMPORT_TIMEOUT: 'IMPORT_TIMEOUT',
+  IMPORT_BUSY: 'IMPORT_BUSY',
   STATISTICS_EMPTY: 'STATISTICS_EMPTY',
   CHART_RENDER_ERROR: 'CHART_RENDER_ERROR',
   REPORT_EXPORT_FAILED: 'REPORT_EXPORT_FAILED',
+  MEASUREMENT_FILE_TOO_LARGE: 'MEASUREMENT_FILE_TOO_LARGE',
+  MEASUREMENT_NO_VALID_CODES: 'MEASUREMENT_NO_VALID_CODES',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -79,7 +82,10 @@ export const ErrorMessage: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_FIELD_MISMATCH]: '文件字段不匹配，请使用标准模板',
   [ErrorCode.IMPORT_LIMIT_EXCEEDED]: '单次导入数量超出限制（上限10000条），请分批导入',
   [ErrorCode.IMPORT_TIMEOUT]: '数据导入超时，请稍后重试或分批导入',
+  [ErrorCode.IMPORT_BUSY]: '导入任务正在进行中，请等待完成后再次导入',
   [ErrorCode.STATISTICS_EMPTY]: '暂无统计数据，请先上传稽核数据',
   [ErrorCode.CHART_RENDER_ERROR]: '图表加载失败，请刷新重试',
   [ErrorCode.REPORT_EXPORT_FAILED]: '导出失败，请重试',
+  [ErrorCode.MEASUREMENT_FILE_TOO_LARGE]: '文件过大，请上传不超过200MB的Excel文件',
+  [ErrorCode.MEASUREMENT_NO_VALID_CODES]: '文件中未找到有效的31位测点编码',
 };
