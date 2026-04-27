@@ -21,8 +21,8 @@ export async function getCodeGenByType(): Promise<{ windCount: number; solarCoun
   return res.data;
 }
 
-export async function getCodeGenBySecondClass(): Promise<{ items: Array<{ name: string; value: number; percentage: number }> }> {
-  const res = await api.get('/statistics/code-gen/by-second-class');
+export async function getCodeGenBySecondClass(type?: string): Promise<{ items: Array<{ name: string; value: number; percentage: number }> }> {
+  const res = await api.get('/statistics/code-gen/by-second-class', { params: { type } });
   return res.data;
 }
 

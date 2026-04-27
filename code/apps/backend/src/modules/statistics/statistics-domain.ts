@@ -93,19 +93,31 @@ export async function getCodeGenByDimension(
 }
 
 /** 编码生成按二级类码统计（编码 + 名称） */
-export async function getCodeGenBySecondClass(): Promise<{
+export async function getCodeGenBySecondClass(
+  typeFilter?: 'wind' | 'solar',
+): Promise<{
   items: Array<{ name: string; value: number; percentage: number }>
 }> {
+  let typeCondition = '';
+  let dictTypeCondition = '';
+  if (typeFilter === 'wind') {
+    typeCondition = "AND (SUBSTRING(code, 5, 2) LIKE 'F%' OR SUBSTRING(code, 5, 2) = '01')";
+    dictTypeCondition = "AND (type_code LIKE 'F%' OR type_code = '01')";
+  } else if (typeFilter === 'solar') {
+    typeCondition = "AND (SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02')";
+    dictTypeCondition = "AND (type_code LIKE 'G%' OR type_code = '02')";
+  }
   const sql = `
-    SELECT SUBSTRING(c.code, 13, 3) AS code_val,
-      MAX(d.second_class_name) AS name_val,
-      COUNT(*) AS cnt
-    FROM ${schema}.cec_new_energy_createcode c
-    LEFT JOIN ${schema}.cec_new_energy_second_class_type_dict d
-      ON SUBSTRING(c.code, 13, 3) = d.second_class_code AND d.if_delete = '0'
-    WHERE c.if_delete = '0'
-    GROUP BY SUBSTRING(c.code, 13, 3)
-    ORDER BY cnt DESC`;
+    SELECT t.code_val, d.second_class_name AS name_val, t.cnt
+    FROM (
+      SELECT SUBSTRING(code, 13, 3) AS code_val, COUNT(*) AS cnt
+      FROM ${schema}.cec_new_energy_createcode
+      WHERE if_delete = '0' ${typeCondition}
+      GROUP BY SUBSTRING(code, 13, 3)
+    ) t
+    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' ${dictTypeCondition} GROUP BY second_class_code) d
+      ON t.code_val = d.second_class_code
+    ORDER BY t.cnt DESC`;
   const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
   const total = rows.reduce((s, r) => s + Number(r.cnt), 0);
   const items = rows.map(r => ({
@@ -121,15 +133,16 @@ export async function getCodeGenByStation(): Promise<{
   items: Array<{ name: string; value: number; percentage: number }>
 }> {
   const sql = `
-    SELECT SUBSTRING(c.code, 1, 4) AS code_val,
-      MAX(d.station_name) AS name_val,
-      COUNT(*) AS cnt
-    FROM ${schema}.cec_new_energy_createcode c
-    LEFT JOIN ${schema}.cec_new_energy_station_dict d
-      ON SUBSTRING(c.code, 1, 4) = d.station_code AND d.if_delete = '0'
-    WHERE c.if_delete = '0'
-    GROUP BY SUBSTRING(c.code, 1, 4)
-    ORDER BY cnt DESC`;
+    SELECT t.code_val, d.station_name AS name_val, t.cnt
+    FROM (
+      SELECT SUBSTRING(code, 1, 4) AS code_val, COUNT(*) AS cnt
+      FROM ${schema}.cec_new_energy_createcode
+      WHERE if_delete = '0'
+      GROUP BY SUBSTRING(code, 1, 4)
+    ) t
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') d
+      ON t.code_val = d.station_code
+    ORDER BY t.cnt DESC`;
   const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
   const total = rows.reduce((s, r) => s + Number(r.cnt), 0);
   const items = rows.map(r => ({

@@ -51,9 +51,11 @@ router.get('/api/statistics/code-gen/by-type', async (_req: Request, res: Respon
 });
 
 /** 编码生成按二级类码统计 */
-router.get('/api/statistics/code-gen/by-second-class', async (_req: Request, res: Response) => {
+router.get('/api/statistics/code-gen/by-second-class', async (req: Request, res: Response) => {
   try {
-    const data = await statisticsService.getCodeGenBySecondClass();
+    const type = req.query.type as string;
+    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
+    const data = await statisticsService.getCodeGenBySecondClass(typeFilter);
     success(res, data);
   } catch (err) {
     console.error('Failed to get code gen by second class:', err);

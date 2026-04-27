@@ -22,7 +22,15 @@
     <el-row :gutter="16" class="mb-16">
       <el-col :span="12">
         <el-card class="chart-card">
-          <template #header><span class="section-title">二级类码维度</span></template>
+          <template #header>
+            <div class="card-header">
+              <span class="section-title">二级类码维度</span>
+              <el-radio-group v-model="secondClassType" size="small" @change="loadSecondClass">
+                <el-radio-button value="wind">风电</el-radio-button>
+                <el-radio-button value="solar">光伏</el-radio-button>
+              </el-radio-group>
+            </div>
+          </template>
           <div class="chart-container-h"><v-chart v-if="secondClassData" :option="secondClassData" autoresize /></div>
         </el-card>
       </el-col>
@@ -44,6 +52,7 @@ import 'echarts';
 
 const overview = ref({ totalCodes: 0, todayCodes: 0, thisWeekCodes: 0, thisMonthCodes: 0 });
 const typeStats = ref({ windCount: 0, solarCount: 0, otherCount: 0 });
+const secondClassType = ref('wind');
 const secondClassItems = ref<Array<{ name: string; value: number; percentage: number }>>([]);
 const stationItems = ref<Array<{ name: string; value: number; percentage: number }>>([]);
 
@@ -51,10 +60,37 @@ const secondClassData = computed(() => {
   if (!secondClassItems.value.length) return null;
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '8%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: secondClassItems.value.map(i => i.name).reverse(), axisLabel: { fontSize: 11, fontWeight: 'bold' } },
-    series: [{ type: 'bar', data: secondClassItems.value.map(i => i.value).reverse(), itemStyle: { color: '#409EFF' }, barMaxWidth: 24 }],
+    grid: { left: '3%', right: '8%', bottom: '3%', top: '3%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.06)' } },
+      axisLabel: { fontSize: 10, color: '#909399' },
+    },
+    yAxis: {
+      type: 'category',
+      data: secondClassItems.value.map(i => i.name).reverse(),
+      axisLabel: { fontSize: 11, fontWeight: 'bold', color: '#303133' },
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
+    series: [{
+      type: 'bar',
+      data: secondClassItems.value.map(i => i.value).reverse(),
+      barMaxWidth: 24,
+      itemStyle: {
+        borderRadius: [0, 4, 4, 0],
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
+          colorStops: [
+            { offset: 0, color: '#4db8ff' },
+            { offset: 1, color: '#1a7bca' },
+          ],
+        },
+        shadowBlur: 6,
+        shadowColor: 'rgba(26, 123, 202, 0.3)',
+        shadowOffsetX: 2,
+      },
+    }],
   };
 });
 
@@ -62,10 +98,37 @@ const stationData = computed(() => {
   if (!stationItems.value.length) return null;
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '8%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: stationItems.value.map(i => i.name).reverse(), axisLabel: { fontSize: 11, fontWeight: 'bold' } },
-    series: [{ type: 'bar', data: stationItems.value.map(i => i.value).reverse(), itemStyle: { color: '#67C23A' }, barMaxWidth: 24 }],
+    grid: { left: '3%', right: '8%', bottom: '3%', top: '3%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.06)' } },
+      axisLabel: { fontSize: 10, color: '#909399' },
+    },
+    yAxis: {
+      type: 'category',
+      data: stationItems.value.map(i => i.name).reverse(),
+      axisLabel: { fontSize: 11, fontWeight: 'bold', color: '#303133' },
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
+    series: [{
+      type: 'bar',
+      data: stationItems.value.map(i => i.value).reverse(),
+      barMaxWidth: 24,
+      itemStyle: {
+        borderRadius: [0, 4, 4, 0],
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
+          colorStops: [
+            { offset: 0, color: '#67C23A' },
+            { offset: 1, color: '#40944f' },
+          ],
+        },
+        shadowBlur: 6,
+        shadowColor: 'rgba(64, 148, 79, 0.3)',
+        shadowOffsetX: 2,
+      },
+    }],
   };
 });
 
@@ -76,7 +139,7 @@ async function loadTypeStats() {
   try { typeStats.value = await statsService.getCodeGenByType(); } catch {}
 }
 async function loadSecondClass() {
-  try { secondClassItems.value = (await statsService.getCodeGenBySecondClass()).items; } catch {}
+  try { secondClassItems.value = (await statsService.getCodeGenBySecondClass(secondClassType.value)).items; } catch {}
 }
 async function loadStation() {
   try { stationItems.value = (await statsService.getCodeGenByStation()).items; } catch {}
@@ -103,4 +166,5 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .type-icon.wind .dot { background: #409EFF; }
 .type-icon.solar .dot { background: #67C23A; }
 .type-icon.other .dot { background: #E6A23C; }
+.card-header { display: flex; justify-content: space-between; align-items: center; }
 </style>
