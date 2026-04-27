@@ -482,6 +482,7 @@
             stripe
             style="width: 100%"
             @selection-change="onSavedSelectionChange"
+            @row-click="onSavedRowClick"
           >
             <el-table-column type="selection" width="50" />
             <el-table-column type="index" label="序号" width="60" />
@@ -494,13 +495,14 @@
           <!-- 分页 -->
           <div v-if="savedTotal > 0" class="saved-pagination">
             <el-pagination
-              v-model:current-page="savedPageNum"
-              v-model:page-size="savedPageSize"
+              :current-page="savedPageNum"
+              :page-size="savedPageSize"
               :total="savedTotal"
-              :page-sizes="[10, 20, 50, 100]"
+              :page-sizes="[10, 20, 50, 100, 200, 500]"
               layout="total, sizes, prev, pager, next"
-              @current-change="loadSavedCodes"
-              @size-change="loadSavedCodes"
+              background
+              @current-change="onSavedPageChange"
+              @size-change="onSavedSizeChange"
             />
           </div>
         </el-tab-pane>
@@ -597,7 +599,7 @@ function toggleLock(key: string) {
 const savedCodes = ref<Array<{ id?: number; code: string; name: string; generateTime: string; creator: string }>>([]);
 const savedTotal = ref(0);
 const savedPageNum = ref(1);
-const savedPageSize = ref(20);
+const savedPageSize = ref(50);
 
 /** 最近保存时间筛选 */
 const savedStartDate = ref<string>('');
@@ -607,6 +609,7 @@ const savedRangeStart = ref(1);
 const savedRangeEnd = ref(1);
 const selectedSavedIds = ref<number[]>([]);
 const savedLoading = ref(false);
+const lastSavedClickedIndex = ref(-1);
 const activeTab = ref('preview');
 const recentConditions = ref<Array<{ id: number; conditionData: Record<string, any>; conditionSummary: string; generateTime: string }>>([]);
 const recentPopoverRef = ref<any>(null);
@@ -1434,6 +1437,16 @@ async function loadSavedCodes() {
   }
 }
 
+function onSavedPageChange(page: number) {
+  savedPageNum.value = page;
+  loadSavedCodes();
+}
+function onSavedSizeChange(size: number) {
+  savedPageSize.value = size;
+  savedPageNum.value = 1;
+  loadSavedCodes();
+}
+
 /** 时间筛选查询 */
 function onSavedTimeFilter() {
   savedPageNum.value = 1;
@@ -1451,6 +1464,21 @@ function onSavedTimeReset() {
 /** 最近保存选中变化 */
 function onSavedSelectionChange(rows: any[]) {
   selectedSavedIds.value = rows.map((r) => r.id);
+}
+
+/** Shift 多选 */
+function onSavedRowClick(row: any, _column: any, event: Event) {
+  const idx = savedCodes.value.findIndex((r: any) => r.id === row.id);
+  if (idx < 0) return;
+  if ((event as MouseEvent).shiftKey && lastSavedClickedIndex.value >= 0) {
+    const [start, end] = idx > lastSavedClickedIndex.value
+      ? [lastSavedClickedIndex.value, idx]
+      : [idx, lastSavedClickedIndex.value];
+    for (let i = start; i <= end; i++) {
+      savedTableRef.value?.toggleRowSelection(savedCodes.value[i], true);
+    }
+  }
+  lastSavedClickedIndex.value = idx;
 }
 
 /** 选中行范围 */

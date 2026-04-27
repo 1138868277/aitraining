@@ -34,8 +34,8 @@ export async function getCodeGenByStation(): Promise<{ items: Array<{ name: stri
 // ========== 2. 编码字典统计 ==========
 
 export async function getDictOverview(): Promise<{
-  stationCount: number; secondClassCount: number; thirdClassCount: number;
-  dataCategoryCount: number; dataCodeCount: number; typeDomainCount: number;
+  wind: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
+  solar: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
 }> {
   const res = await api.get('/statistics/dict/overview');
   return res.data;

@@ -74,7 +74,7 @@ router.get('/api/codes/draft', (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
     const pageNum = parseInt(req.query.pageNum as string) || 1;
-    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 20, 100);
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
     const result = codeService.getDraftList(sessionId, pageNum, pageSize);
     paginated(res, result.list, result.total, pageNum, pageSize);
   } catch (err) {
@@ -134,7 +134,7 @@ router.post('/api/codes', async (req: Request, res: Response) => {
 router.get('/api/codes', async (req: Request, res: Response) => {
   try {
     const pageNum = parseInt(req.query.pageNum as string) || 1;
-    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 20, 100);
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
     const startTime = req.query.startTime as string;
     const endTime = req.query.endTime as string;
     const result = await codeService.queryCodeHistory(pageNum, pageSize, startTime, endTime);

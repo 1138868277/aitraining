@@ -167,27 +167,57 @@ export async function getCodeGenTrend(
 
 // ========== 2. 编码字典统计 ==========
 
-/** 字典整体概览 */
+/** 字典整体概览（按风电/光伏拆分） */
 export async function getDictOverview(): Promise<{
-  stationCount: number; secondClassCount: number; thirdClassCount: number;
-  dataCategoryCount: number; dataCodeCount: number; typeDomainCount: number;
-}> {
-  const [stations, secondClasses, thirdClasses, categories, codes, domains] = await Promise.all([
-    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0'`),
-    query<{ c: string }>(`SELECT COUNT(DISTINCT second_class_code) AS c FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0'`),
-    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0'`),
-    query<{ c: string }>(`SELECT COUNT(DISTINCT data_category_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0'`),
-    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL`),
-    query<{ c: string }>(`SELECT COUNT(DISTINCT type_domain_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0'`),
-  ]);
-  return {
-    stationCount: Number(stations[0]?.c || 0),
-    secondClassCount: Number(secondClasses[0]?.c || 0),
-    thirdClassCount: Number(thirdClasses[0]?.c || 0),
-    dataCategoryCount: Number(categories[0]?.c || 0),
-    dataCodeCount: Number(codes[0]?.c || 0),
-    typeDomainCount: Number(domains[0]?.c || 0),
+  wind: {
+    firstClassCount: number; secondClassCount: number; thirdClassCount: number;
+    dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
   };
+  solar: {
+    firstClassCount: number; secondClassCount: number; thirdClassCount: number;
+    dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
+  };
+}> {
+  async function getTypeDetail(typeCode: 'F' | 'G'): Promise<{
+    firstClassCount: number; secondClassCount: number; thirdClassCount: number;
+    dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
+  }> {
+    const t = typeCode;
+    const [first, second, third, cat, codeGroup, codeManual] = await Promise.all([
+      query<{ c: string }>(
+        `SELECT COUNT(DISTINCT first_class_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1`,
+        [t]),
+      query<{ c: string }>(
+        `SELECT COUNT(DISTINCT second_class_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code IS NOT NULL`,
+        [t]),
+      query<{ c: string }>(
+        `SELECT COUNT(DISTINCT t.third_class_code) AS c FROM ${schema}.cec_new_energy_third_class_dict t
+         WHERE t.if_delete = '0' AND t.second_class_code IN (
+           SELECT DISTINCT second_class_code FROM ${schema}.cec_new_energy_code_dict
+           WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code IS NOT NULL
+         )`, [t]),
+      query<{ c: string }>(
+        `SELECT COUNT(DISTINCT data_category_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND data_category_code IS NOT NULL`,
+        [t]),
+      query<{ c: string }>(
+        `SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND data_code IS NOT NULL AND (is_manual IS NULL OR is_manual = '0')`,
+        [t]),
+      query<{ c: string }>(
+        `SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND data_code IS NOT NULL AND is_manual = '1'`,
+        [t]),
+    ]);
+    return {
+      firstClassCount: Number(first[0]?.c || 0),
+      secondClassCount: Number(second[0]?.c || 0),
+      thirdClassCount: Number(third[0]?.c || 0),
+      dataCategoryCount: Number(cat[0]?.c || 0),
+      dataCodeGroup: Number(codeGroup[0]?.c || 0),
+      dataCodeManual: Number(codeManual[0]?.c || 0),
+    };
+  }
+
+  const [wind, solar] = await Promise.all([getTypeDetail('F'), getTypeDetail('G')]);
+  return { wind, solar };
 }
 
 /** 字典新增情况 */

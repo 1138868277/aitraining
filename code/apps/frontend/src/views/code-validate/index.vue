@@ -4,6 +4,7 @@
       <el-tabs v-model="activeTab" class="main-tabs">
         <!-- Tab 1: 字典查询 -->
         <el-tab-pane label="字典查询" name="dictTree">
+          <DictOverviewCard />
           <div class="tree-container">
             <div class="tree-toolbar">
               <el-input
@@ -267,6 +268,9 @@
                   <template v-else-if="row.typeName !== '未识别' && row.secondClassName !== '未识别' && row.dataCategoryName !== '未识别' && row.dataName !== '未识别'">
                     <span class="processed-tag">已识别</span>
                   </template>
+                  <template v-else-if="row.dataCategoryName === '未识别'">
+                    <span class="processed-tag">无法新增</span>
+                  </template>
                   <template v-else>
                     <el-button link type="primary" size="small" @click="handleAddItem(row)">新增</el-button>
                   </template>
@@ -279,12 +283,15 @@
         <el-tab-pane label="字典新增" name="statistics">
           <div class="statistics-header">
             <span class="statistics-title">手动添加编码记录</span>
-            <el-button
-              v-if="manualStats.length > 0"
-              size="small"
-              type="primary"
-              @click="handleExportStats"
-            >导出Excel</el-button>
+            <div class="header-actions">
+              <el-button size="small" @click="loadManualStats">刷新</el-button>
+              <el-button
+                v-if="manualStats.length > 0"
+                size="small"
+                type="primary"
+                @click="handleExportStats"
+              >导出Excel</el-button>
+            </div>
           </div>
           <div class="statistics-toolbar">
             <el-select
@@ -327,8 +334,8 @@
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column label="类型">
               <template #default="{ row }">
-                <span v-if="row.typeCode" class="code-type">{{ row.typeCode }}</span>
-                <span v-if="row.typeName" class="name-muted">{{ row.typeName }}</span>
+                <span v-if="row.typeCode" class="code-type">{{ row.typeCode.charAt(0) }}</span>
+                <span v-if="row.typeCode" class="name-muted">{{ row.typeCode.charAt(0) === 'F' ? '风电' : row.typeCode.charAt(0) === 'G' ? '光伏' : '其他' }}</span>
                 <span v-else class="name-error">未识别</span>
               </template>
             </el-table-column>
@@ -376,16 +383,16 @@
           <el-input :model-value="addTarget?.secondClassCode + ' ' + addTarget?.secondClassName" disabled />
         </el-form-item>
         <el-form-item label="数据类码">
-          <el-input v-model="addForm.dataCategoryCode" placeholder="2位数字" maxlength="2" style="width: 80px" />
+          <el-input v-model="addForm.dataCategoryCode" placeholder="2位数字" maxlength="2" style="width: 80px" disabled />
         </el-form-item>
-        <el-form-item label="数据类名称">
-          <el-input v-model="addForm.dataCategoryName" placeholder="输入数据类名称" />
+        <el-form-item label="数据类码名称">
+          <el-input v-model="addForm.dataCategoryName" placeholder="输入数据类码名称" disabled />
         </el-form-item>
         <el-form-item label="数据码">
           <el-input v-model="addForm.dataCode" placeholder="3位数字" maxlength="3" style="width: 80px" />
         </el-form-item>
-        <el-form-item label="数据名称">
-          <el-input v-model="addForm.dataName" placeholder="输入数据名称" />
+        <el-form-item label="数据码名称">
+          <el-input v-model="addForm.dataName" placeholder="输入数据码名称" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -404,6 +411,7 @@ import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx';
 import * as validateService from '@/services/validate';
 import * as dictService from '@/services/dict';
+import DictOverviewCard from './dict-overview-card.vue';
 import type { DictTreeNode, ManualStatItem, ResolvedCodeItem } from '@cec/contracts';
 
 // ========== Tab 2: 编码解析 ==========
@@ -583,9 +591,10 @@ async function handleExportStats() {
     const scFilter = statsSecondClassFilter.value || undefined;
     const tFilter = statsTypeFilter.value || undefined;
     const items = await validateService.exportManualStatistics(scFilter, tFilter);
+    const fmtType = (tc: string) => tc ? `${tc.charAt(0)} ${tc.charAt(0) === 'F' ? '风电' : tc.charAt(0) === 'G' ? '光伏' : '其他'}` : '未识别';
     const data = items.map((item, index) => ({
       '序号': index + 1,
-      '类型': item.typeCode && item.typeName ? `${item.typeCode} ${item.typeName}` : '未识别',
+      '类型': item.typeCode ? fmtType(item.typeCode) : '未识别',
       '二级类码': `${item.secondClassCode} ${item.secondClassName}`,
       '数据类码': `${item.dataCategoryCode} ${item.dataCategoryName}`,
       '数据码': `${item.dataCode} ${item.dataName}`,
@@ -887,6 +896,7 @@ onMounted(() => {
   align-items: center;
 }
 
+.header-actions { display: flex; align-items: center; gap: 8px; }
 .statistics-title {
   font-size: 16px;
   font-weight: 600;

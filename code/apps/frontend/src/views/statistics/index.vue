@@ -5,9 +5,6 @@
         <el-tab-pane label="编码生成统计" name="codeGen">
           <CodeGenTab />
         </el-tab-pane>
-        <el-tab-pane label="编码字典统计" name="dict">
-          <DictTab />
-        </el-tab-pane>
         <el-tab-pane label="全量测点统计" name="measure">
           <MeasureTab />
         </el-tab-pane>
@@ -19,7 +16,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import CodeGenTab from './code-gen-tab.vue';
-import DictTab from './dict-tab.vue';
 import MeasureTab from './measure-tab.vue';
 
 const activeTab = ref('codeGen');

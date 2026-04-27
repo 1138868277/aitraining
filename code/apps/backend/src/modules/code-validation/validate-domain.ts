@@ -254,18 +254,13 @@ export async function getManualStatistics(
     const domainCode = typeCodeToDomain(typeCode);
     const tcIdx = paramIdx++;
     params.push(typeCode);
+    // 域级筛选（如 'F' 匹配 F1/F2/F3/F4）
     if (domainCode) {
       const domIdx = paramIdx++;
       params.push(domainCode);
-      // 优先使用 d.type_code 精确匹配，兼容旧数据（type_code IS NULL）
       conditions.push(`(
-        d.type_code = $${tcIdx}
-        OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx}
-          AND d.second_class_code IN (
-            SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
-            WHERE type_code = $${tcIdx} AND if_delete = '0'
-          )
-        )
+        d.type_code LIKE $${tcIdx} || '%'
+        OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx})
       )`);
     } else {
       conditions.push(`(
@@ -295,11 +290,16 @@ export async function getManualStatistics(
     params,
   );
 
-  // 所有类型选项（从 type_dict 获取）
+  // 所有类型选项（按域级聚合: F/G）
   const typeRows = await dbQuery<{ code: string; name: string }>(
-    `SELECT type_code AS code, type_name AS name
+    `SELECT SUBSTRING(type_code, 1, 1) AS code,
+            CASE WHEN SUBSTRING(type_code, 1, 1) = 'F' THEN '风电'
+                 WHEN SUBSTRING(type_code, 1, 1) = 'G' THEN '光伏'
+                 ELSE '其他' END AS name
      FROM ${schema}.cec_new_energy_type_dict
-     WHERE if_delete = '0' ORDER BY type_code`,
+     WHERE if_delete = '0'
+     GROUP BY SUBSTRING(type_code, 1, 1)
+     ORDER BY code`,
   );
 
   // 分页数据
@@ -364,13 +364,8 @@ export async function getAllManualStatistics(secondClassCode?: string, typeCode?
       const domIdx = paramIdx++;
       params.push(domainCode);
       conditions.push(`(
-        d.type_code = $${tcIdx}
-        OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx}
-          AND d.second_class_code IN (
-            SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
-            WHERE type_code = $${tcIdx} AND if_delete = '0'
-          )
-        )
+        d.type_code LIKE $${tcIdx} || '%'
+        OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx})
       )`);
     } else {
       conditions.push(`(
