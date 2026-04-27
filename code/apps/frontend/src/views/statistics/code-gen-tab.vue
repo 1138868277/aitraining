@@ -1,5 +1,6 @@
 <template>
   <div class="tab-content">
+    <!-- 概览卡片 -->
     <el-row :gutter="16" class="mb-16">
       <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">累计生成</div><div class="stat-value">{{ overview.totalCodes }}</div></div></el-card></el-col>
       <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">今日生成</div><div class="stat-value primary">{{ overview.todayCodes }}</div></div></el-card></el-col>
@@ -7,26 +8,28 @@
       <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">本月生成</div><div class="stat-value warning">{{ overview.thisMonthCodes }}</div></div></el-card></el-col>
     </el-row>
 
+    <!-- 类型维度 -->
+    <el-card class="mb-16">
+      <template #header><span class="section-title">类型维度</span></template>
+      <el-row :gutter="16">
+        <el-col :span="8"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon wind"><span class="dot" />风电</div><div class="stat-value primary">{{ typeStats.windCount }}</div></div></el-card></el-col>
+        <el-col :span="8"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon solar"><span class="dot" />光伏</div><div class="stat-value success">{{ typeStats.solarCount }}</div></div></el-card></el-col>
+        <el-col :span="8"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon other"><span class="dot" />不区分类型</div><div class="stat-value warning">{{ typeStats.otherCount }}</div></div></el-card></el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 二级类码维度 + 场站维度（左右并排） -->
     <el-row :gutter="16" class="mb-16">
       <el-col :span="12">
-        <el-card>
-          <template #header>
-            <div class="card-header"><span>维度分布</span>
-              <el-select v-model="dimension" size="small" style="width:140px" @change="loadDimension">
-                <el-option label="类型" value="typeCode" />
-                <el-option label="场站" value="stationCode" />
-                <el-option label="二级类码" value="secondClassCode" />
-                <el-option label="数据类码" value="dataCategoryCode" />
-              </el-select>
-            </div>
-          </template>
-          <div class="chart-container"><v-chart v-if="barData" :option="barData" autoresize /></div>
+        <el-card class="chart-card">
+          <template #header><span class="section-title">二级类码维度</span></template>
+          <div class="chart-container-h"><v-chart v-if="secondClassData" :option="secondClassData" autoresize /></div>
         </el-card>
       </el-col>
       <el-col :span="12">
-        <el-card>
-          <template #header><span>每日趋势（近30天）</span></template>
-          <div class="chart-container"><v-chart v-if="trendData" :option="trendData" autoresize /></div>
+        <el-card class="chart-card">
+          <template #header><span class="section-title">场站维度</span></template>
+          <div class="chart-container-h"><v-chart v-if="stationData" :option="stationData" autoresize /></div>
         </el-card>
       </el-col>
     </el-row>
@@ -40,49 +43,51 @@ import VChart from 'vue-echarts';
 import 'echarts';
 
 const overview = ref({ totalCodes: 0, todayCodes: 0, thisWeekCodes: 0, thisMonthCodes: 0 });
-const dimension = ref('typeCode');
-const dimItems = ref<Array<{ name: string; value: number; percentage: number }>>([]);
-const trendItems = ref<Array<{ date: string; count: number }>>([]);
+const typeStats = ref({ windCount: 0, solarCount: 0, otherCount: 0 });
+const secondClassItems = ref<Array<{ name: string; value: number; percentage: number }>>([]);
+const stationItems = ref<Array<{ name: string; value: number; percentage: number }>>([]);
 
-const barData = computed(() => {
-  if (!dimItems.value.length) return null;
+const secondClassData = computed(() => {
+  if (!secondClassItems.value.length) return null;
   return {
-    tooltip: { trigger: 'axis' },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: dimItems.value.map(i => i.name), axisLabel: { rotate: 45, fontSize: 11 } },
-    yAxis: { type: 'value' },
-    series: [{ type: 'bar', data: dimItems.value.map(i => i.value), itemStyle: { color: '#409EFF' }, barMaxWidth: 40 }],
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '3%', right: '8%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: secondClassItems.value.map(i => i.name).reverse(), axisLabel: { fontSize: 11, fontWeight: 'bold' } },
+    series: [{ type: 'bar', data: secondClassItems.value.map(i => i.value).reverse(), itemStyle: { color: '#409EFF' }, barMaxWidth: 24 }],
   };
 });
 
-const trendData = computed(() => {
-  if (!trendItems.value.length) return null;
+const stationData = computed(() => {
+  if (!stationItems.value.length) return null;
   return {
-    tooltip: { trigger: 'axis' },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: trendItems.value.map(i => i.date), axisLabel: { fontSize: 10, interval: 2 } },
-    yAxis: { type: 'value' },
-    series: [{ type: 'line', data: trendItems.value.map(i => i.count), smooth: true, lineStyle: { color: '#67C23A' }, areaStyle: { color: 'rgba(103,194,58,0.15)' }, itemStyle: { color: '#67C23A' } }],
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '3%', right: '8%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: stationItems.value.map(i => i.name).reverse(), axisLabel: { fontSize: 11, fontWeight: 'bold' } },
+    series: [{ type: 'bar', data: stationItems.value.map(i => i.value).reverse(), itemStyle: { color: '#67C23A' }, barMaxWidth: 24 }],
   };
 });
 
 async function loadOverview() {
   try { overview.value = await statsService.getCodeGenOverview(); } catch {}
 }
-async function loadDimension() {
-  try { dimItems.value = (await statsService.getCodeGenByDimension(dimension.value)).items; } catch {}
+async function loadTypeStats() {
+  try { typeStats.value = await statsService.getCodeGenByType(); } catch {}
 }
-async function loadTrend() {
-  try { trendItems.value = (await statsService.getCodeGenTrend(30)).items; } catch {}
+async function loadSecondClass() {
+  try { secondClassItems.value = (await statsService.getCodeGenBySecondClass()).items; } catch {}
+}
+async function loadStation() {
+  try { stationItems.value = (await statsService.getCodeGenByStation()).items; } catch {}
 }
 
-onMounted(() => { loadOverview(); loadDimension(); loadTrend(); });
+onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStation(); });
 </script>
 
 <style scoped>
 .tab-content { min-height: 400px; }
 .mb-16 { margin-bottom: 16px; }
-.mt-16 { margin-top: 16px; }
 .stat-card { text-align: center; padding: 8px 0; }
 .stat-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
 .stat-value { font-size: 28px; font-weight: 700; color: #303133; }
@@ -90,10 +95,12 @@ onMounted(() => { loadOverview(); loadDimension(); loadTrend(); });
 .stat-value.success { color: #67C23A; }
 .stat-value.warning { color: #E6A23C; }
 .chart-container { height: 320px; width: 100%; }
-.chart-container-sm { height: 280px; width: 100%; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.import-status { margin-top: 12px; padding: 8px 12px; border-radius: 4px; font-size: 13px; }
-.import-status.completed { background: #f0f9eb; color: #67c23a; }
-.import-status.failed { background: #fef0f0; color: #f56c6c; }
-.import-status.processing { background: #ecf5ff; color: #409eff; }
+.chart-container-h { height: 360px; width: 100%; }
+.chart-card { height: 100%; }
+.section-title { font-weight: 600; font-size: 15px; }
+.type-icon { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.type-icon.wind .dot { background: #409EFF; }
+.type-icon.solar .dot { background: #67C23A; }
+.type-icon.other .dot { background: #E6A23C; }
 </style>

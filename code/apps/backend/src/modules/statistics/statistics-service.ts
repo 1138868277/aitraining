@@ -5,6 +5,9 @@ import type { ImportTask } from './statistics-domain.js';
 
 export const getCodeGenOverview = domain.getCodeGenOverview;
 export const getCodeGenByDimension = domain.getCodeGenByDimension;
+export const getCodeGenByType = domain.getCodeGenByType;
+export const getCodeGenBySecondClass = domain.getCodeGenBySecondClass;
+export const getCodeGenByStation = domain.getCodeGenByStation;
 export const getCodeGenTrend = domain.getCodeGenTrend;
 
 // ========== 2. 编码字典统计 ==========

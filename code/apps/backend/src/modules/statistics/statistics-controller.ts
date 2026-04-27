@@ -39,6 +39,39 @@ router.get('/api/statistics/code-gen/by-dimension', async (req: Request, res: Re
   }
 });
 
+/** 编码生成按类型统计 */
+router.get('/api/statistics/code-gen/by-type', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getCodeGenByType();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get code gen by type:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取编码生成类型统计失败', 500);
+  }
+});
+
+/** 编码生成按二级类码统计 */
+router.get('/api/statistics/code-gen/by-second-class', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getCodeGenBySecondClass();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get code gen by second class:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取编码生成二级类码统计失败', 500);
+  }
+});
+
+/** 编码生成按场站统计 */
+router.get('/api/statistics/code-gen/by-station', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getCodeGenByStation();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get code gen by station:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取编码生成场站统计失败', 500);
+  }
+});
+
 /** 编码生成趋势 */
 router.get('/api/statistics/code-gen/trend', async (req: Request, res: Response) => {
   try {

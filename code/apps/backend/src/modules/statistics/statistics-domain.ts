@@ -32,6 +32,26 @@ export async function getCodeGenOverview(): Promise<{
   };
 }
 
+/** 编码生成按类型统计（风电/光伏/其他） */
+export async function getCodeGenByType(): Promise<{
+  windCount: number; solarCount: number; otherCount: number;
+}> {
+  const sql = `
+    SELECT
+      COUNT(CASE WHEN SUBSTRING(code, 5, 2) LIKE 'F%' OR SUBSTRING(code, 5, 2) = '01' THEN 1 END) AS wind,
+      COUNT(CASE WHEN SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02' THEN 1 END) AS solar,
+      COUNT(CASE WHEN NOT (SUBSTRING(code, 5, 2) LIKE 'F%' OR SUBSTRING(code, 5, 2) = '01'
+                        OR SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02') THEN 1 END) AS other
+    FROM ${schema}.cec_new_energy_createcode
+    WHERE if_delete = '0'`;
+  const r = await query<{ wind: string; solar: string; other: string }>(sql);
+  return {
+    windCount: Number(r[0]?.wind || 0),
+    solarCount: Number(r[0]?.solar || 0),
+    otherCount: Number(r[0]?.other || 0),
+  };
+}
+
 /** 按维度统计编码生成 */
 export async function getCodeGenByDimension(
   dimension: string,
@@ -70,6 +90,54 @@ export async function getCodeGenByDimension(
     percentage: total > 0 ? Math.round((Number(r.cnt) / total) * 1000) / 10 : 0,
   }));
   return { dimension, items };
+}
+
+/** 编码生成按二级类码统计（编码 + 名称） */
+export async function getCodeGenBySecondClass(): Promise<{
+  items: Array<{ name: string; value: number; percentage: number }>
+}> {
+  const sql = `
+    SELECT SUBSTRING(c.code, 13, 3) AS code_val,
+      MAX(d.second_class_name) AS name_val,
+      COUNT(*) AS cnt
+    FROM ${schema}.cec_new_energy_createcode c
+    LEFT JOIN ${schema}.cec_new_energy_second_class_type_dict d
+      ON SUBSTRING(c.code, 13, 3) = d.second_class_code AND d.if_delete = '0'
+    WHERE c.if_delete = '0'
+    GROUP BY SUBSTRING(c.code, 13, 3)
+    ORDER BY cnt DESC`;
+  const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
+  const total = rows.reduce((s, r) => s + Number(r.cnt), 0);
+  const items = rows.map(r => ({
+    name: r.name_val ? `${r.code_val} ${r.name_val}` : r.code_val,
+    value: Number(r.cnt),
+    percentage: total > 0 ? Math.round((Number(r.cnt) / total) * 1000) / 10 : 0,
+  }));
+  return { items };
+}
+
+/** 编码生成按场站统计（编码 + 名称） */
+export async function getCodeGenByStation(): Promise<{
+  items: Array<{ name: string; value: number; percentage: number }>
+}> {
+  const sql = `
+    SELECT SUBSTRING(c.code, 1, 4) AS code_val,
+      MAX(d.station_name) AS name_val,
+      COUNT(*) AS cnt
+    FROM ${schema}.cec_new_energy_createcode c
+    LEFT JOIN ${schema}.cec_new_energy_station_dict d
+      ON SUBSTRING(c.code, 1, 4) = d.station_code AND d.if_delete = '0'
+    WHERE c.if_delete = '0'
+    GROUP BY SUBSTRING(c.code, 1, 4)
+    ORDER BY cnt DESC`;
+  const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
+  const total = rows.reduce((s, r) => s + Number(r.cnt), 0);
+  const items = rows.map(r => ({
+    name: r.name_val ? `${r.code_val} ${r.name_val}` : r.code_val,
+    value: Number(r.cnt),
+    percentage: total > 0 ? Math.round((Number(r.cnt) / total) * 1000) / 10 : 0,
+  }));
+  return { items };
 }
 
 /** 编码生成每日趋势 */

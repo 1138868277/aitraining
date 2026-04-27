@@ -16,8 +16,18 @@ export async function getCodeGenByDimension(
   return res.data;
 }
 
-export async function getCodeGenTrend(days: number = 30): Promise<{ items: Array<{ date: string; count: number }> }> {
-  const res = await api.get('/statistics/code-gen/trend', { params: { days } });
+export async function getCodeGenByType(): Promise<{ windCount: number; solarCount: number; otherCount: number }> {
+  const res = await api.get('/statistics/code-gen/by-type');
+  return res.data;
+}
+
+export async function getCodeGenBySecondClass(): Promise<{ items: Array<{ name: string; value: number; percentage: number }> }> {
+  const res = await api.get('/statistics/code-gen/by-second-class');
+  return res.data;
+}
+
+export async function getCodeGenByStation(): Promise<{ items: Array<{ name: string; value: number; percentage: number }> }> {
+  const res = await api.get('/statistics/code-gen/by-station');
   return res.data;
 }
 
