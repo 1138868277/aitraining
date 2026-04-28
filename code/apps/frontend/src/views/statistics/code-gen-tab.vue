@@ -42,10 +42,80 @@
       </el-col>
     </el-row>
   </div>
+
+  <!-- 编码生成列表 -->
+  <div class="list-section">
+    <div class="list-section-header">编码生成列表</div>
+
+    <div class="list-filter-bar">
+      <el-select v-model="listFilters.typeCode" placeholder="类型" clearable style="width:150px" @change="onListFilter">
+        <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
+      </el-select>
+      <el-select v-model="listFilters.stationCode" placeholder="场站" clearable style="width:150px" @change="onListFilter">
+        <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+      </el-select>
+      <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" clearable style="width:150px" @change="onListFilter">
+        <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+      </el-select>
+      <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" clearable style="width:150px" @change="onListFilter">
+        <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
+      </el-select>
+      <el-button type="primary" @click="onListFilter">查询</el-button>
+      <el-button @click="onResetListFilter">重置</el-button>
+    </div>
+
+    <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand">
+      <el-table-column type="index" label="序号" width="60" fixed />
+      <el-table-column label="类型" width="90" prop="type_code" />
+      <el-table-column label="场站" min-width="150">
+        <template #default="{ row }">{{ row.station_name ? `${row.station_code} ${row.station_name}` : row.station_code }}</template>
+      </el-table-column>
+      <el-table-column label="二级类码" min-width="150">
+        <template #default="{ row }">{{ row.second_class_name ? `${row.second_class_code} ${row.second_class_name}` : row.second_class_code }}</template>
+      </el-table-column>
+      <el-table-column label="三级类码" min-width="150">
+        <template #default="{ row }">{{ row.third_class_name ? `${row.third_class_code} ${row.third_class_name}` : row.third_class_code }}</template>
+      </el-table-column>
+      <el-table-column label="数据类码" min-width="90">
+        <template #default="{ row }">{{ row.data_type_name ? `${row.data_type_code} ${row.data_type_name}` : row.data_type_code }}</template>
+      </el-table-column>
+      <el-table-column label="数据码" min-width="120">
+        <template #default="{ row }">{{ row.data_name ? `${row.data_code} ${row.data_name}` : row.data_code }}</template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="140">
+        <template #default="{ row }">
+          <span class="code-count">{{ row.code_count }}</span>
+          <el-button size="small" @click="toggleRowExpand(row)">{{ isRowExpanded(row) ? '收起' : '明细' }}</el-button>
+        </template>
+      </el-table-column>
+      <el-table-column type="expand">
+        <template #default="{ row }">
+          <div v-if="row._detailLoading" style="text-align:center;padding:12px">加载中...</div>
+          <el-table v-else :data="row._detailList" border stripe size="small">
+            <el-table-column type="index" label="序号" width="60" />
+            <el-table-column label="测点编码" width="300" prop="code" />
+            <el-table-column label="测点名称" min-width="200" prop="name" />
+          </el-table>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <div class="list-pagination">
+      <el-pagination
+        v-model:current-page="listPageNum"
+        v-model:page-size="listPageSize"
+        :total="listTotal"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next"
+        @current-change="loadCodeList"
+        @size-change="loadCodeList"
+      />
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import * as statsService from '@/services/statistics';
 import VChart from 'vue-echarts';
 import 'echarts';
@@ -145,7 +215,119 @@ async function loadStation() {
   try { stationItems.value = (await statsService.getCodeGenByStation()).items; } catch {}
 }
 
-onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStation(); });
+// 编码生成列表（分组统计）
+const mainTableRef = ref<any>(null);
+const codeList = ref<any[]>([]);
+const listTotal = ref(0);
+const listPageNum = ref(1);
+const listPageSize = ref(20);
+const listLoading = ref(false);
+const expandedRowKeys = ref<string[]>([]);
+
+function getRowKey(row: any): string {
+  return `${row.type_code}|${row.station_code}|${row.second_class_code}|${row.third_class_code}|${row.data_type_code}|${row.data_code}`;
+}
+
+function isRowExpanded(row: any): boolean {
+  return expandedRowKeys.value.includes(getRowKey(row));
+}
+
+async function toggleRowExpand(row: any) {
+  const key = getRowKey(row);
+  const idx = expandedRowKeys.value.indexOf(key);
+  if (idx >= 0) {
+    expandedRowKeys.value.splice(idx, 1);
+  } else {
+    if (row._detailList.length === 0) {
+      row._detailLoading = true;
+      try {
+        row._detailList = await statsService.getCodeGenGroupDetail({
+          typeCode: row.type_code,
+          stationCode: row.station_code,
+          secondClassCode: row.second_class_code,
+          thirdClassCode: row.third_class_code,
+          dataTypeCode: row.data_type_code,
+          dataCode: row.data_code,
+        });
+      } catch {
+        row._detailList = [];
+      } finally {
+        row._detailLoading = false;
+      }
+    }
+    expandedRowKeys.value.push(key);
+  }
+}
+
+// 给列表数据自动补充 rowKey
+function enrichListData(list: any[]) {
+  return list.map(item => ({ ...item, rowKey: getRowKey(item), _detailList: [], _detailLoading: false }));
+}
+const filterOptionMap = ref<{
+  typeCodes: Array<{ code: string; name: string }>;
+  stationCodes: Array<{ code: string; name: string }>;
+  secondClassCodes: Array<{ code: string; name: string }>;
+  dataTypeCodes: Array<{ code: string; name: string }>;
+}>({ typeCodes: [], stationCodes: [], secondClassCodes: [], dataTypeCodes: [] });
+const listFilters = reactive({
+  typeCode: undefined as string | undefined,
+  stationCode: undefined as string | undefined,
+  secondClassCode: undefined as string | undefined,
+  dataTypeCode: undefined as string | undefined,
+});
+
+async function loadCodeList() {
+  listLoading.value = true;
+  try {
+    const result = await statsService.getCodeGenList(listPageNum.value, listPageSize.value, listFilters);
+    codeList.value = enrichListData(result.list || []);
+    listTotal.value = result.total || 0;
+    if (filterOptionMap.value.typeCodes.length === 0) {
+      filterOptionMap.value = result.filterOptions;
+    }
+  } catch {
+    codeList.value = [];
+    listTotal.value = 0;
+  } finally {
+    listLoading.value = false;
+  }
+}
+
+async function onGroupExpand(row: any, expandedRows: any[]) {
+  if (!expandedRows.includes(row)) return;
+  if (row._detailList.length > 0) return;
+  row._detailLoading = true;
+  try {
+    row._detailList = await statsService.getCodeGenGroupDetail({
+      typeCode: row.type_code,
+      stationCode: row.station_code,
+      secondClassCode: row.second_class_code,
+      thirdClassCode: row.third_class_code,
+      dataTypeCode: row.data_type_code,
+      dataCode: row.data_code,
+    });
+  } catch {
+    row._detailList = [];
+  } finally {
+    row._detailLoading = false;
+  }
+}
+
+function onListFilter() {
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
+function onResetListFilter() {
+  listFilters.typeCode = undefined;
+  listFilters.stationCode = undefined;
+  listFilters.secondClassCode = undefined;
+  listFilters.dataTypeCode = undefined;
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
+onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStation(); loadCodeList(); });
 </script>
 
 <style scoped>
@@ -167,4 +349,10 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .type-icon.solar .dot { background: #67C23A; }
 .type-icon.other .dot { background: #E6A23C; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
+.list-section { margin-top: 32px; border-top: 1px solid #e4e7ed; padding-top: 24px; }
+.list-section-header { font-weight: 600; font-size: 16px; margin-bottom: 16px; }
+.list-filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.list-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
+:deep(.el-table__expand-column) { display: none; }
+.code-count { display: inline-block; min-width: 28px; font-weight: 700; color: #409EFF; margin-right: 4px; }
 </style>

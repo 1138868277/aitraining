@@ -159,13 +159,27 @@ export function batchDeleteDraft(sessionId: string, ids: number[]): number {
 /** 持久化保存编码生成记录到数据库 */
 export async function saveCodeRecords(
   codes: Array<{ code: string; name: string }>,
+  context?: {
+    typeCode?: string;
+    secondClassCode?: string;
+    dataTypeCode?: string;
+    stationCode?: string;
+    thirdClassCode?: string;
+  },
 ): Promise<number> {
   let saved = 0;
   for (const c of codes) {
     const sql = `INSERT INTO ${schema}.cec_new_energy_createcode
-      (code, name, creator, create_tm, modify_tm, if_delete)
-      VALUES ($1, $2, 'system', NOW(), NOW(), 0)`;
-    await query(sql, [c.code, c.name]);
+      (code, name, type_code, second_class_code, data_type_code, station_code, third_class_code, creator, create_tm, modify_tm, if_delete)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'system', NOW(), NOW(), 0)`;
+    await query(sql, [
+      c.code, c.name,
+      context?.typeCode || null,
+      context?.secondClassCode || null,
+      context?.dataTypeCode || null,
+      context?.stationCode || null,
+      context?.thirdClassCode || null,
+    ]);
     saved++;
   }
   return saved;
@@ -218,7 +232,7 @@ export async function queryCodeHistory(
   let paramIdx = 1;
 
   if (startTime) {
-    conditions.push(`create_tm >= $${paramIdx++}`);
+    conditions.push(`create_tm >= $${paramIdx++}::timestamp`);
     params.push(startTime);
   }
   if (endTime) {
@@ -230,11 +244,12 @@ export async function queryCodeHistory(
   const whereClause = conditions.join(' AND ');
 
   const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_createcode WHERE ${whereClause}`;
-  const countResult = await queryOne<{ total: number }>(countSql);
+  const countResult = await queryOne<{ total: number }>(countSql, params);
   const total = countResult?.total || 0;
 
   const offset = (pageNum - 1) * pageSize;
   const listSql = `SELECT id, code, name,
+    type_code, second_class_code, data_type_code, station_code, third_class_code,
     TO_CHAR(create_tm, 'YYYY-MM-DD HH24:MI:SS') AS generate_time, creator
     FROM ${schema}.cec_new_energy_createcode
     WHERE ${whereClause}

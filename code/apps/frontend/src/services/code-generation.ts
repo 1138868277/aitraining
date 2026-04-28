@@ -5,8 +5,20 @@ import type {
   SaveDraftRequest,
   SaveDraftResponse,
   DraftCodeItem,
-  CodeRecord,
 } from '@cec/contracts';
+
+export interface SavedCodeRecord {
+  id: number;
+  code: string;
+  name: string;
+  type_code?: string;
+  second_class_code?: string;
+  data_type_code?: string;
+  station_code?: string;
+  third_class_code?: string;
+  generate_time: string;
+  creator: string;
+}
 
 export async function generateCode(params: GenerateCodeRequest): Promise<GenerateCodeResponse | GenerateCodeResponse[]> {
   const res = await api.post('/codes/generate', params);
@@ -35,8 +47,19 @@ export async function batchDeleteDraft(ids: number[]): Promise<{ deletedCount: n
   return res.data;
 }
 
-export async function saveCodeRecords(codes: Array<{ code: string; name: string }>) {
-  const res = await api.post('/codes', { codes });
+export interface SaveContext {
+  typeCode?: string;
+  secondClassCode?: string;
+  dataTypeCode?: string;
+  stationCode?: string;
+  thirdClassCode?: string;
+}
+
+export async function saveCodeRecords(
+  codes: Array<{ code: string; name: string }>,
+  context?: SaveContext,
+): Promise<{ savedCount: number }> {
+  const res = await api.post('/codes', { codes, context });
   return res.data;
 }
 
@@ -45,7 +68,7 @@ export async function getCodeHistory(
   pageSize = 20,
   startTime?: string,
   endTime?: string,
-): Promise<{ list: CodeRecord[]; total: number }> {
+): Promise<{ list: SavedCodeRecord[]; total: number }> {
   const params: Record<string, any> = { pageNum, pageSize };
   if (startTime) params.startTime = startTime;
   if (endTime) params.endTime = endTime;
@@ -53,17 +76,13 @@ export async function getCodeHistory(
   return res.data;
 }
 
-export async function deleteCodeRecord(id: number): Promise<void> {
-  await api.delete(`/codes/${id}`);
+export async function saveRecentCondition(conditions: Record<string, any>): Promise<void> {
+  await api.post('/codes/recent-conditions', { conditions });
 }
 
 export async function batchDeleteCodeRecords(ids: number[]): Promise<{ deletedCount: number }> {
   const res = await api.delete('/codes/batch', { data: { ids } });
   return res.data;
-}
-
-export async function saveRecentCondition(conditions: Record<string, any>): Promise<void> {
-  await api.post('/codes/recent-conditions', { conditions });
 }
 
 export async function getRecentConditions(): Promise<any[]> {

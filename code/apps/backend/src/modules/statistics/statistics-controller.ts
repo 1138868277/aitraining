@@ -74,6 +74,44 @@ router.get('/api/statistics/code-gen/by-station', async (_req: Request, res: Res
   }
 });
 
+/** 编码生成列表（含筛选分页） */
+router.get('/api/statistics/code-gen/list', async (req: Request, res: Response) => {
+  try {
+    const pageNum = parseInt(req.query.pageNum as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
+    const filters = {
+      typeCode: req.query.typeCode as string,
+      stationCode: req.query.stationCode as string,
+      secondClassCode: req.query.secondClassCode as string,
+      dataTypeCode: req.query.dataTypeCode as string,
+    };
+    const result = await statisticsService.getCodeGenList(pageNum, pageSize, filters);
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to get code gen list:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '查询编码生成列表失败', 500);
+  }
+});
+
+/** 编码生成分组详情（展开查看具体编码） */
+router.get('/api/statistics/code-gen/group-detail', async (req: Request, res: Response) => {
+  try {
+    const group = {
+      typeCode: req.query.typeCode as string,
+      stationCode: req.query.stationCode as string,
+      secondClassCode: req.query.secondClassCode as string,
+      thirdClassCode: req.query.thirdClassCode as string,
+      dataTypeCode: req.query.dataTypeCode as string,
+      dataCode: req.query.dataCode as string,
+    };
+    const result = await statisticsService.getCodeGenGroupDetail(group);
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to get code gen group detail:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '查询分组详情失败', 500);
+  }
+});
+
 /** 编码生成趋势 */
 router.get('/api/statistics/code-gen/trend', async (req: Request, res: Response) => {
   try {

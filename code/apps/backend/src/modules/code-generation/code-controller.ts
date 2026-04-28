@@ -118,11 +118,11 @@ router.delete('/api/codes/draft/batch', (req: Request, res: Response) => {
 /** 保存生成记录到数据库 */
 router.post('/api/codes', async (req: Request, res: Response) => {
   try {
-    const { codes } = req.body;
+    const { codes, context } = req.body;
     if (!Array.isArray(codes) || codes.length === 0) {
       return error(res, ErrorCode.MISSING_PARAMETER, '请提供要保存的编码列表');
     }
-    const saved = await codeService.saveCodeRecords(codes);
+    const saved = await codeService.saveCodeRecords(codes, context);
     success(res, { savedCount: saved });
   } catch (err) {
     console.error('Failed to save code records:', err);

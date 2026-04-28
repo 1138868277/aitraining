@@ -31,6 +31,63 @@ export async function getCodeGenByStation(): Promise<{ items: Array<{ name: stri
   return res.data;
 }
 
+export async function getCodeGenList(
+  pageNum = 1,
+  pageSize = 20,
+  filters?: {
+    typeCode?: string;
+    stationCode?: string;
+    secondClassCode?: string;
+    dataTypeCode?: string;
+  },
+): Promise<{
+  list: Array<{
+    type_code: string;
+    station_code: string;
+    second_class_code: string;
+    third_class_code: string;
+    data_type_code: string;
+    data_code: string;
+    type_name: string;
+    station_name: string;
+    second_class_name: string;
+    third_class_name: string;
+    data_type_name: string;
+    data_name: string;
+    code_count: number;
+  }>;
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  pages: number;
+  filterOptions: {
+    typeCodes: Array<{ code: string; name: string }>;
+    stationCodes: Array<{ code: string; name: string }>;
+    secondClassCodes: Array<{ code: string; name: string }>;
+    dataTypeCodes: Array<{ code: string; name: string }>;
+  };
+}> {
+  const params: Record<string, any> = { pageNum, pageSize };
+  if (filters?.typeCode) params.typeCode = filters.typeCode;
+  if (filters?.stationCode) params.stationCode = filters.stationCode;
+  if (filters?.secondClassCode) params.secondClassCode = filters.secondClassCode;
+  if (filters?.dataTypeCode) params.dataTypeCode = filters.dataTypeCode;
+  const res = await api.get('/statistics/code-gen/list', { params });
+  return res.data;
+}
+
+export async function getCodeGenGroupDetail(group: {
+  typeCode: string;
+  stationCode: string;
+  secondClassCode: string;
+  thirdClassCode: string;
+  dataTypeCode: string;
+  dataCode: string;
+}): Promise<Array<{ code: string; name: string }>> {
+  const res = await api.get('/statistics/code-gen/group-detail', { params: group });
+  return res.data;
+}
+
 // ========== 2. 编码字典统计 ==========
 
 export async function getDictOverview(): Promise<{

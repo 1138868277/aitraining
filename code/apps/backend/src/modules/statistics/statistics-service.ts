@@ -9,6 +9,8 @@ export const getCodeGenByType = domain.getCodeGenByType;
 export const getCodeGenBySecondClass = domain.getCodeGenBySecondClass;
 export const getCodeGenByStation = domain.getCodeGenByStation;
 export const getCodeGenTrend = domain.getCodeGenTrend;
+export const getCodeGenList = domain.getCodeGenList;
+export const getCodeGenGroupDetail = domain.getCodeGenGroupDetail;
 
 // ========== 2. 编码字典统计 ==========
 

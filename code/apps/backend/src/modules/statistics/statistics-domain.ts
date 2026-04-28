@@ -1,4 +1,4 @@
-import { query } from '../../db/index.js';
+import { query, queryOne } from '../../db/index.js';
 import { config } from '../../config/index.js';
 
 const schema = config.db.schema;
@@ -163,6 +163,166 @@ export async function getCodeGenTrend(
     GROUP BY dt ORDER BY dt`;
   const rows = await query<{ dt: string; cnt: string }>(sql, [String(days)]);
   return { items: rows.map(r => ({ date: r.dt, count: Number(r.cnt) })) };
+}
+
+/** 查询编码生成分组列表（按维度分组统计数量） */
+export async function getCodeGenList(
+  pageNum: number,
+  pageSize: number,
+  filters: {
+    typeCode?: string;
+    stationCode?: string;
+    secondClassCode?: string;
+    dataTypeCode?: string;
+  },
+): Promise<{
+  list: Array<{
+    type_code: string;
+    station_code: string;
+    second_class_code: string;
+    third_class_code: string;
+    data_type_code: string;
+    data_code: string;
+    type_name: string;
+    station_name: string;
+    second_class_name: string;
+    third_class_name: string;
+    data_type_name: string;
+    data_name: string;
+    code_count: number;
+  }>;
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  pages: number;
+  filterOptions: {
+    typeCodes: Array<{ code: string; name: string }>;
+    stationCodes: Array<{ code: string; name: string }>;
+    secondClassCodes: Array<{ code: string; name: string }>;
+    dataTypeCodes: Array<{ code: string; name: string }>;
+  };
+}> {
+  const conditions: string[] = [`c.if_delete = '0'`];
+  const params: string[] = [];
+  let paramIdx = 1;
+
+  if (filters.typeCode) {
+    conditions.push(`SUBSTRING(c.code, 5, 2) = $${paramIdx++}`);
+    params.push(filters.typeCode);
+  }
+  if (filters.stationCode) {
+    conditions.push(`SUBSTRING(c.code, 1, 4) = $${paramIdx++}`);
+    params.push(filters.stationCode);
+  }
+  if (filters.secondClassCode) {
+    conditions.push(`SUBSTRING(c.code, 13, 3) = $${paramIdx++}`);
+    params.push(filters.secondClassCode);
+  }
+  if (filters.dataTypeCode) {
+    conditions.push(`SUBSTRING(c.code, 27, 2) = $${paramIdx++}`);
+    params.push(filters.dataTypeCode);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  // 分组统计各维度组合下的编码数量
+  const dims = `
+    SUBSTRING(c.code, 5, 2) AS type_code,
+    SUBSTRING(c.code, 1, 4) AS station_code,
+    SUBSTRING(c.code, 13, 3) AS second_class_code,
+    SUBSTRING(c.code, 20, 3) AS third_class_code,
+    SUBSTRING(c.code, 27, 2) AS data_type_code,
+    SUBSTRING(c.code, 29, 3) AS data_code`;
+
+  const dimsGroup = `
+    SUBSTRING(c.code, 5, 2),
+    SUBSTRING(c.code, 1, 4),
+    SUBSTRING(c.code, 13, 3),
+    SUBSTRING(c.code, 20, 3),
+    SUBSTRING(c.code, 27, 2),
+    SUBSTRING(c.code, 29, 3)`;
+
+  const countSql = `SELECT COUNT(*) AS total FROM (SELECT 1 FROM ${schema}.cec_new_energy_createcode c WHERE ${whereClause} GROUP BY ${dimsGroup}) t`;
+  const countResult = await queryOne<{ total: string }>(countSql, params);
+  const total = Number(countResult?.total || 0);
+
+  const offset = (pageNum - 1) * pageSize;
+  const listSql = `
+    SELECT
+      ${dims},
+      COALESCE(t.type_name, '') AS type_name,
+      COALESCE(s.station_name, '') AS station_name,
+      COALESCE(sc.second_class_name, '') AS second_class_name,
+      COALESCE(tc.third_class_name, '') AS third_class_name,
+      COALESCE(dtd_type.data_type_name, '') AS data_type_name,
+      COALESCE(dtd_code.data_name, '') AS data_name,
+      COUNT(*) AS code_count
+    FROM ${schema}.cec_new_energy_createcode c
+    LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON SUBSTRING(c.code, 5, 2) = t.type_code
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON SUBSTRING(c.code, 1, 4) = s.station_code
+    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code) sc ON SUBSTRING(c.code, 13, 3) = sc.second_class_code
+    LEFT JOIN (SELECT third_class_code, MIN(third_class_name) AS third_class_name FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL GROUP BY third_class_code) tc ON SUBSTRING(c.code, 20, 3) = tc.third_class_code
+    LEFT JOIN (SELECT data_category_code, MIN(data_category_name) AS data_type_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code) dtd_type ON SUBSTRING(c.code, 27, 2) = dtd_type.data_category_code
+    LEFT JOIN (SELECT data_category_code, data_code, MIN(data_name) AS data_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL GROUP BY data_category_code, data_code) dtd_code ON SUBSTRING(c.code, 27, 2) = dtd_code.data_category_code AND SUBSTRING(c.code, 29, 3) = dtd_code.data_code
+    WHERE ${whereClause}
+    GROUP BY ${dimsGroup}, t.type_name, s.station_name, sc.second_class_name, tc.third_class_name, dtd_type.data_type_name, dtd_code.data_name
+    ORDER BY code_count DESC
+    LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+  const list = await query(listSql, [...params, pageSize, offset]);
+
+  // 筛选条件选项
+  const [typeOptions, stationOptions, secondClassOptions, dataTypeOptions] = await Promise.all([
+    query<{ code: string; name: string }>(
+      `SELECT type_code AS code, type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
+    query<{ code: string; name: string }>(
+      `SELECT station_code AS code, station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
+    query<{ code: string; name: string }>(
+      `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code ORDER BY code`),
+    query<{ code: string; name: string }>(
+      `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code ORDER BY code`),
+  ]);
+
+  return {
+    list,
+    total,
+    pageNum,
+    pageSize,
+    pages: Math.ceil(total / pageSize),
+    filterOptions: {
+      typeCodes: typeOptions,
+      stationCodes: stationOptions,
+      secondClassCodes: secondClassOptions,
+      dataTypeCodes: dataTypeOptions,
+    },
+  };
+}
+
+/** 查询编码生成分组详情（展开某组查看具体编码） */
+export async function getCodeGenGroupDetail(
+  group: {
+    typeCode: string;
+    stationCode: string;
+    secondClassCode: string;
+    thirdClassCode: string;
+    dataTypeCode: string;
+    dataCode: string;
+  },
+): Promise<Array<{ code: string; name: string }>> {
+  const sql = `
+    SELECT code, name
+    FROM ${schema}.cec_new_energy_createcode
+    WHERE if_delete = '0'
+      AND SUBSTRING(code, 5, 2) = $1
+      AND SUBSTRING(code, 1, 4) = $2
+      AND SUBSTRING(code, 13, 3) = $3
+      AND SUBSTRING(code, 20, 3) = $4
+      AND SUBSTRING(code, 27, 2) = $5
+      AND SUBSTRING(code, 29, 3) = $6
+    ORDER BY code`;
+  return query<{ code: string; name: string }>(sql, [
+    group.typeCode, group.stationCode, group.secondClassCode,
+    group.thirdClassCode, group.dataTypeCode, group.dataCode,
+  ]);
 }
 
 // ========== 2. 编码字典统计 ==========

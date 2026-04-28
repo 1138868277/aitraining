@@ -392,14 +392,14 @@
           <div v-if="generatedCodes.length > 0" class="preview-actions">
             <span class="preview-count">共 {{ generatedCodes.length }} 条</span>
             <el-button size="small" @click="copyAllPreview">一键复制全部</el-button>
-            <el-button size="small" type="primary" @click="savePreviewToDb">保存</el-button>
+            <el-button size="small" type="primary" :loading="savedSaving" @click="handleSaveCodes">保存</el-button>
           </div>
-          <el-table :data="generatedCodes" border stripe style="width: 100%">
-            <el-table-column type="index" label="序号" width="60" />
+          <el-table :data="paginatedPreviewCodes" border stripe style="width: 100%">
+            <el-table-column type="index" label="序号" width="60" :index="previewPageIndex" />
             <el-table-column prop="code" label="编码" width="320" />
             <el-table-column label="编码名称" min-width="260">
-              <template #default="{ row, $index }">
-                <div v-if="editingIndex === $index" class="name-editor">
+              <template #default="{ row }">
+                <div v-if="editingIndex === findPreviewIndex(row)" class="name-editor">
                   <el-input
                     v-model="editingName"
                     size="small"
@@ -408,7 +408,7 @@
                     @blur="confirmEditName"
                   />
                 </div>
-                <span v-else class="name-display" @click="startEditName($index)">{{ row.name }}</span>
+                <span v-else class="name-display" @click="startEditName(row)">{{ row.name }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="generateTime" label="生成时间" width="180" />
@@ -418,27 +418,32 @@
               </template>
             </el-table-column>
           </el-table>
+          <div v-if="generatedCodes.length > 0" class="preview-pagination">
+            <el-pagination
+              v-model:current-page="previewPageNum"
+              v-model:page-size="previewPageSize"
+              :total="generatedCodes.length"
+              :page-sizes="[10, 20, 50, 100, 200, 500]"
+              layout="total, sizes, prev, pager, next"
+              background
+              @current-change="onPreviewPageChange"
+              @size-change="onPreviewSizeChange"
+            />
+          </div>
           <el-empty v-if="generatedCodes.length === 0" description="暂无生成记录" />
         </el-tab-pane>
 
-        <!-- 最近保存标签页 -->
-        <el-tab-pane label="最近保存" name="saved">
-          <!-- 时间筛选 -->
+        <!-- 已保存标签页 -->
+        <el-tab-pane label="已生成编码" name="saved">
           <div class="saved-filter-bar">
             <el-date-picker
-              v-model="savedStartDate"
-              type="date"
-              placeholder="开始"
-              value-format="YYYY-MM-DD"
-              style="width: 225px"
-            />
-            <span class="range-separator">~</span>
-            <el-date-picker
-              v-model="savedEndDate"
-              type="date"
-              placeholder="结束"
-              value-format="YYYY-MM-DD"
-              style="width: 225px"
+              v-model="savedDateRange"
+              type="datetimerange"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              style="width: 380px"
             />
             <el-button size="small" type="primary" @click="onSavedTimeFilter">查询</el-button>
             <el-button size="small" @click="onSavedTimeReset">重置</el-button>
@@ -446,66 +451,41 @@
 
           <!-- 选中操作栏 -->
           <div v-if="savedCodes.length > 0" class="saved-selection-bar">
-            <span class="saved-total">共 {{ savedTotal }} 条</span>
-            <span class="range-selector">
-              <el-input-number
-                v-model="savedRangeStart"
-                :min="1"
-                :max="savedCodes.length"
-                size="small"
-                controls-position="right"
-                placeholder="起始行"
-                style="width: 100px"
-              />
-              <span class="range-separator">~</span>
-              <el-input-number
-                v-model="savedRangeEnd"
-                :min="1"
-                :max="savedCodes.length"
-                size="small"
-                controls-position="right"
-                placeholder="结束行"
-                style="width: 100px"
-              />
-              <el-button size="small" @click="selectSavedRange">选中范围</el-button>
-              <el-button size="small" @click="clearSavedSelection">取消选中</el-button>
-            </span>
+            <el-input-number
+              v-model="savedRangeStart"
+              :min="1"
+              :max="Math.max(1, savedCodes.length)"
+              size="small"
+              controls-position="right"
+              style="width: 100px"
+            />
+            <span class="range-separator">~</span>
+            <el-input-number
+              v-model="savedRangeEnd"
+              :min="1"
+              :max="Math.max(1, savedCodes.length)"
+              size="small"
+              controls-position="right"
+              style="width: 100px"
+            />
+            <el-button size="small" @click="selectSavedRange">选中</el-button>
+            <el-button size="small" @click="clearSavedSelection">取消选中</el-button>
             <el-button size="small" @click="copySelectedSaved">复制选中</el-button>
-            <el-button size="small" @click="exportSelectedSaved">导出选中</el-button>
             <el-button size="small" @click="deleteSelectedSaved">删除选中</el-button>
+            <el-button size="small" @click="exportSelectedSaved">导出选中</el-button>
           </div>
 
-          <el-table
-            ref="savedTableRef"
-            :data="savedCodes"
-            border
-            stripe
-            style="width: 100%"
-            @selection-change="onSavedSelectionChange"
-            @row-click="onSavedRowClick"
-          >
+          <el-table ref="savedTableRef" :data="savedCodes" border stripe style="width: 100%" v-loading="savedLoading" @selection-change="onSavedSelectionChange">
             <el-table-column type="selection" width="50" />
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column prop="code" label="编码" width="320" />
             <el-table-column prop="name" label="编码名称" min-width="200" />
-            <el-table-column prop="generateTime" label="生成时间" width="180" />
+            <el-table-column prop="generate_time" label="生成时间" width="180" />
           </el-table>
           <el-empty v-if="savedCodes.length === 0 && !savedLoading" description="暂无保存记录" />
 
-          <!-- 分页 -->
-          <div v-if="savedTotal > 0" class="saved-pagination">
-            <el-pagination
-              :current-page="savedPageNum"
-              :page-size="savedPageSize"
-              :total="savedTotal"
-              :page-sizes="[10, 20, 50, 100, 200, 500]"
-              layout="total, sizes, prev, pager, next"
-              background
-              @current-change="onSavedPageChange"
-              @size-change="onSavedSizeChange"
-            />
-          </div>
         </el-tab-pane>
+
       </el-tabs>
     </el-card>
   </div>
@@ -546,6 +526,32 @@ const conditionFields: ConditionField[] = [
 const conditions = reactive<Record<string, any>>({});
 const dictOptions = reactive<Record<string, Array<{ code: string; name: string }>>>({});
 const generatedCodes = ref<Array<{ code: string; name: string; generateTime: string }>>([]);
+
+/** 预览分页数据 */
+const previewPageNum = ref(1);
+const previewPageSize = ref(50);
+
+const paginatedPreviewCodes = computed(() => {
+  const start = (previewPageNum.value - 1) * previewPageSize.value;
+  return generatedCodes.value.slice(start, start + previewPageSize.value);
+});
+
+function previewPageIndex(index: number) {
+  return (previewPageNum.value - 1) * previewPageSize.value + index + 1;
+}
+
+function findPreviewIndex(row: { code: string; generateTime: string }) {
+  return generatedCodes.value.findIndex(r => r.code === row.code && r.generateTime === row.generateTime);
+}
+
+function onPreviewPageChange(page: number) {
+  previewPageNum.value = page;
+}
+
+function onPreviewSizeChange(size: number) {
+  previewPageSize.value = size;
+  previewPageNum.value = 1;
+}
 
 /** 锁定筛选条件（本地存储持久化） */
 const LOCKED_FIELDS_KEY = 'locked_filter_fields';
@@ -595,27 +601,115 @@ function toggleLock(key: string) {
   saveLockedState();
 }
 
-/** 最近保存分页数据 */
-const savedCodes = ref<Array<{ id?: number; code: string; name: string; generateTime: string; creator: string }>>([]);
-const savedTotal = ref(0);
-const savedPageNum = ref(1);
-const savedPageSize = ref(50);
-
-/** 最近保存时间筛选 */
-const savedStartDate = ref<string>('');
-const savedEndDate = ref<string>('');
-const savedTableRef = ref<any>(null);
-const savedRangeStart = ref(1);
-const savedRangeEnd = ref(1);
-const selectedSavedIds = ref<number[]>([]);
-const savedLoading = ref(false);
-const lastSavedClickedIndex = ref(-1);
 const activeTab = ref('preview');
 const recentConditions = ref<Array<{ id: number; conditionData: Record<string, any>; conditionSummary: string; generateTime: string }>>([]);
 const recentPopoverRef = ref<any>(null);
 const editingIndex = ref<number | null>(null);
 const editingName = ref('');
 const nameInputRef = ref<any>(null);
+
+/** 已保存编码 */
+const savedCodes = ref<Array<{
+  id: number;
+  code: string;
+  name: string;
+  type_code?: string;
+  second_class_code?: string;
+  data_type_code?: string;
+  station_code?: string;
+  third_class_code?: string;
+  generate_time: string;
+}>>([]);
+const savedTotal = ref(0);
+const savedPageNum = ref(1);
+const savedPageSize = ref(50);
+const savedDateRange = ref<[string, string] | null>(null);
+const savedLoading = ref(false);
+const savedSaving = ref(false);
+const savedTableRef = ref<any>(null);
+const selectedSavedIds = ref<number[]>([]);
+const savedRangeStart = ref(1);
+const savedRangeEnd = ref(1);
+
+function onSavedSelectionChange(rows: any[]) {
+  selectedSavedIds.value = rows.map((r: any) => r.id);
+}
+
+/** 选中行范围 */
+function selectSavedRange() {
+  const len = savedCodes.value.length;
+  const start = Math.max(1, Math.min(savedRangeStart.value, savedRangeEnd.value));
+  const end = Math.min(len, Math.max(savedRangeStart.value, savedRangeEnd.value));
+  savedTableRef.value?.clearSelection();
+  for (let i = start - 1; i < end; i++) {
+    savedTableRef.value?.toggleRowSelection(savedCodes.value[i], true);
+  }
+}
+
+/** 取消选中 */
+function clearSavedSelection() {
+  savedTableRef.value?.clearSelection();
+}
+
+/** 复制选中编码 */
+function copySelectedSaved() {
+  const rows = savedTableRef.value?.getSelectionRows();
+  if (!rows || rows.length === 0) {
+    ElMessage.warning('请先选择要复制的编码');
+    return;
+  }
+  const text = rows.map((r: any) => `${r.code} ${r.name}`).join('\n');
+  navigator.clipboard.writeText(text).then(
+    () => ElMessage.success('已复制'),
+    () => ElMessage.warning('复制失败，请手动选择复制'),
+  );
+}
+
+/** 导出选中为 Excel */
+function exportSelectedSaved() {
+  const rows = savedTableRef.value?.getSelectionRows();
+  if (!rows || rows.length === 0) {
+    ElMessage.warning('请先选择要导出的编码');
+    return;
+  }
+  const data = rows.map((r: any, i: number) => ({
+    '序号': i + 1,
+    '编码': r.code,
+    '编码名称': r.name,
+    '生成时间': r.generate_time,
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '编码记录');
+  XLSX.writeFile(wb, `编码记录_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  ElMessage.success(`已导出 ${data.length} 条记录`);
+}
+
+/** 删除选中记录 */
+async function deleteSelectedSaved() {
+  const rows = savedTableRef.value?.getSelectionRows();
+  if (!rows || rows.length === 0) {
+    ElMessage.warning('请先选择要删除的编码');
+    return;
+  }
+  const ids = rows.map((r: any) => r.id);
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${ids.length} 条编码吗？删除后数据将置为失效状态。`,
+      '确认删除',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
+    );
+    const result = await codeService.batchDeleteCodeRecords(ids);
+    ElMessage.success(`已删除 ${result.deletedCount} 条`);
+    savedCodes.value = savedCodes.value.filter((c: any) => !ids.includes(c.id));
+    savedTotal.value -= result.deletedCount;
+    selectedSavedIds.value = [];
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '删除失败');
+    }
+  }
+}
 
 /** 快捷筛选 */
 const quickSearchText = ref('');
@@ -1124,9 +1218,6 @@ onMounted(async () => {
 
     // 加载最近条件记录
     loadRecentConditions();
-
-    // 加载最近保存记录
-    loadSavedCodes();
   } catch (err: any) {
     ElMessage.error('筛选条件加载失败，请刷新重试');
   }
@@ -1315,6 +1406,7 @@ async function handleGenerate() {
     }
 
     generatedCodes.value = allResults;
+    previewPageNum.value = 1;
 
     // 显示生成数量提示
     if (allResults.length > 1) {
@@ -1368,18 +1460,6 @@ function handleClear() {
   generatedCodes.value = [];
 }
 
-/** 保存编码至数据库 */
-async function handleSaveToDb() {
-  try {
-    const result = await codeService.saveCodeRecords(generatedCodes.value);
-    ElMessage.success(`已保存 ${result.savedCount} 条至数据库`);
-    savedPageNum.value = 1;
-    loadSavedCodes();
-  } catch (err: any) {
-    ElMessage.error(err.message || '保存失败');
-  }
-}
-
 /** 编码预览：一键复制全部（编码 + 名称） */
 function copyAllPreview() {
   const text = generatedCodes.value.map(c => `${c.code} ${c.name}`).join('\n');
@@ -1389,181 +1469,73 @@ function copyAllPreview() {
   );
 }
 
-/** 编码预览：保存至数据库并切换到最近保存 */
-async function savePreviewToDb() {
-  const scrollY = window.scrollY;
-  await handleSaveToDb();
-  activeTab.value = 'saved';
-  nextTick(() => {
-    window.scrollTo(0, scrollY);
-  });
+/** 格式化上下文值：编码 + 名称（如 "F1 风电"） */
+function formatContextValue(key: string, code: string): string {
+  const name = findDictName(key, code);
+  return name ? `${code} ${name}` : code;
 }
 
-/** 格式化时间为 YYYY-MM-DD HH:mm:ss */
-function formatLocalTime(date: any): string {
-  if (!date) return '';
-  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
-  if (!(d instanceof Date) || isNaN(d.getTime())) return String(date);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
-  return `${y}-${m}-${day} ${h}:${min}:${s}`;
+/** 保存当前生成的编码到数据库 */
+async function handleSaveCodes() {
+  if (generatedCodes.value.length === 0) {
+    ElMessage.warning('请先生成编码');
+    return;
+  }
+  savedSaving.value = true;
+  try {
+    const context = {
+      typeCode: conditions.typeCode ? formatContextValue('typeCode', conditions.typeCode) : undefined,
+      secondClassCode: conditions.secondClassCode ? formatContextValue('secondClassCode', conditions.secondClassCode) : undefined,
+      dataTypeCode: conditions.dataTypeCode ? formatContextValue('dataTypeCode', conditions.dataTypeCode) : undefined,
+      stationCode: conditions.stationCode ? formatContextValue('stationCode', conditions.stationCode) : undefined,
+      thirdClassCode: conditions.thirdClassCode ? formatContextValue('thirdClassCode', conditions.thirdClassCode) : undefined,
+    };
+    const result = await codeService.saveCodeRecords(generatedCodes.value, context);
+    ElMessage.success(`已保存 ${result.savedCount} 条`);
+    savedPageNum.value = 1;
+    loadSavedCodes();
+    activeTab.value = 'saved';
+  } catch (err: any) {
+    ElMessage.error(err.message || '保存失败');
+  } finally {
+    savedSaving.value = false;
+  }
 }
 
-/** 加载最近保存记录（支持时间筛选） */
+/** 加载已保存编码列表 */
 async function loadSavedCodes() {
   savedLoading.value = true;
   try {
-    const result = await codeService.getCodeHistory(
-      savedPageNum.value, savedPageSize.value,
-      savedStartDate.value || undefined,
-      savedEndDate.value || undefined,
-    );
-    savedCodes.value = (result.list || []).map((item: any) => ({
-      id: item.id,
-      code: item.code,
-      name: item.name,
-      generateTime: item.generate_time || '',
-      creator: item.creator || '-',
-    }));
+    const startTime = savedDateRange.value?.[0] || undefined;
+    const endTime = savedDateRange.value?.[1] || undefined;
+    const result = await codeService.getCodeHistory(1, 99999, startTime, endTime);
+    savedCodes.value = result.list || [];
     savedTotal.value = result.total || 0;
   } catch {
-    // 静默失败
+    savedCodes.value = [];
+    savedTotal.value = 0;
   } finally {
     savedLoading.value = false;
   }
 }
 
-function onSavedPageChange(page: number) {
-  savedPageNum.value = page;
-  loadSavedCodes();
-}
-function onSavedSizeChange(size: number) {
-  savedPageSize.value = size;
-  savedPageNum.value = 1;
-  loadSavedCodes();
-}
-
-/** 时间筛选查询 */
 function onSavedTimeFilter() {
   savedPageNum.value = 1;
   loadSavedCodes();
 }
 
-/** 重置时间筛选 */
 function onSavedTimeReset() {
-  savedStartDate.value = '';
-  savedEndDate.value = '';
+  savedDateRange.value = null;
   savedPageNum.value = 1;
   loadSavedCodes();
 }
 
-/** 最近保存选中变化 */
-function onSavedSelectionChange(rows: any[]) {
-  selectedSavedIds.value = rows.map((r) => r.id);
-}
-
-/** Shift 多选 */
-function onSavedRowClick(row: any, _column: any, event: Event) {
-  const idx = savedCodes.value.findIndex((r: any) => r.id === row.id);
-  if (idx < 0) return;
-  if ((event as MouseEvent).shiftKey && lastSavedClickedIndex.value >= 0) {
-    const [start, end] = idx > lastSavedClickedIndex.value
-      ? [lastSavedClickedIndex.value, idx]
-      : [idx, lastSavedClickedIndex.value];
-    for (let i = start; i <= end; i++) {
-      savedTableRef.value?.toggleRowSelection(savedCodes.value[i], true);
-    }
-  }
-  lastSavedClickedIndex.value = idx;
-}
-
-/** 选中行范围 */
-function selectSavedRange() {
-  const len = savedCodes.value.length;
-  const start = Math.max(1, Math.min(savedRangeStart.value, savedRangeEnd.value));
-  const end = Math.min(len, Math.max(savedRangeStart.value, savedRangeEnd.value));
-  for (let i = start - 1; i < end; i++) {
-    savedTableRef.value?.toggleRowSelection(savedCodes.value[i], true);
-  }
-}
-
-/** 取消行范围选中 */
-function clearSavedSelection() {
-  const len = savedCodes.value.length;
-  const start = Math.max(1, Math.min(savedRangeStart.value, savedRangeEnd.value));
-  const end = Math.min(len, Math.max(savedRangeStart.value, savedRangeEnd.value));
-  for (let i = start - 1; i < end; i++) {
-    savedTableRef.value?.toggleRowSelection(savedCodes.value[i], false);
-  }
-}
-
-/** 复制选中编码（编码 + 名称） */
-function copySelectedSaved() {
-  const codes = savedCodes.value
-    .filter((d: any) => selectedSavedIds.value.includes(d.id))
-    .map((d: any) => `${d.code} ${d.name}`)
-    .join('\n');
-  if (!codes) {
-    ElMessage.warning('请先选择要复制的编码');
-    return;
-  }
-  navigator.clipboard.writeText(codes).then(
-    () => ElMessage.success('已复制'),
-    () => ElMessage.warning('复制失败，请手动选择复制'),
-  );
-}
-
-/** 导出选中记录为 Excel */
-function exportSelectedSaved() {
-  const rows = savedTableRef.value?.getSelectionRows();
-  if (!rows || rows.length === 0) {
-    ElMessage.warning('请先选择要导出的编码');
-    return;
-  }
-
-  const data = rows.map((r: any, i: number) => ({
-    '序号': i + 1,
-    '编码': r.code,
-    '编码名称': r.name,
-    '生成时间': r.generateTime,
-  }));
-
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '编码记录');
-  XLSX.writeFile(wb, `编码记录_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  ElMessage.success(`已导出 ${data.length} 条记录`);
-}
-
-/** 删除选中记录（逻辑删除） */
-async function deleteSelectedSaved() {
-  if (selectedSavedIds.value.length === 0) {
-    ElMessage.warning('请先选择要删除的编码');
-    return;
-  }
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除选中的 ${selectedSavedIds.value.length} 条编码吗？删除后数据将置为失效状态。`,
-      '确认删除',
-      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
-    );
-    const result = await codeService.batchDeleteCodeRecords(selectedSavedIds.value);
-    ElMessage.success(`已删除 ${result.deletedCount} 条`);
-    loadSavedCodes();
-  } catch (err: any) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '删除失败');
-    }
-  }
-}
-
-/** 切换标签页时保持滚动位置 */
-function onTabClick() {
+/** 切换标签页时保持滚动位置，并在切换到已保存标签页时加载数据 */
+function onTabClick(tab: any) {
   const scrollY = window.scrollY;
+  if (tab.props?.name === 'saved' && savedCodes.value.length === 0) {
+    loadSavedCodes();
+  }
   nextTick(() => {
     window.scrollTo(0, scrollY);
   });
@@ -1577,9 +1549,11 @@ function copyCode(code: string) {
 }
 
 /** 开始编辑编码名称 */
-function startEditName(index: number) {
-  editingIndex.value = index;
-  editingName.value = generatedCodes.value[index].name;
+function startEditName(row: any) {
+  const idx = generatedCodes.value.findIndex(r => r.code === row.code && r.generateTime === row.generateTime);
+  if (idx < 0) return;
+  editingIndex.value = idx;
+  editingName.value = generatedCodes.value[idx].name;
   nextTick(() => {
     const input = document.querySelector('.name-editor-input') as HTMLInputElement;
     input?.focus();
@@ -1865,7 +1839,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 }
 
 .condition-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .condition-header {
@@ -1970,7 +1944,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   color: #606266;
 }
 
-.saved-pagination {
+.preview-pagination {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
@@ -1980,10 +1954,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   margin-bottom: 12px;
   display: flex;
   align-items: center;
-}
-
-.saved-filter-bar > * + * {
-  margin-left: 10px;
+  gap: 12px;
 }
 
 .saved-selection-bar {
@@ -1991,24 +1962,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-}
-
-.saved-selection-bar > * + * {
-  margin-left: 10px;
-}
-
-.saved-total {
-  font-size: 14px;
-  color: #606266;
-}
-
-.saved-selection-bar .range-selector {
-  display: flex;
-  align-items: center;
-}
-
-.saved-selection-bar .range-selector > * + * {
-  margin-left: 10px;
+  gap: 12px;
 }
 
 .range-separator {
