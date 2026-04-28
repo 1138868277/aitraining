@@ -198,6 +198,17 @@ router.get('/api/statistics/measurement/import-status', async (_req: Request, re
   }
 });
 
+/** 终止导入 */
+router.post('/api/statistics/measurement/cancel-import', async (_req: Request, res: Response) => {
+  try {
+    statisticsService.cancelImport();
+    success(res, { message: '已请求终止' });
+  } catch (err) {
+    console.error('Failed to cancel import:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '终止导入失败', 500);
+  }
+});
+
 /** 全量测点概览 */
 router.get('/api/statistics/measurement/overview', async (_req: Request, res: Response) => {
   try {
@@ -230,6 +241,60 @@ router.get('/api/statistics/measurement/drill-down', async (req: Request, res: R
   } catch (err) {
     console.error('Failed to get measure drill down:', err);
     error(res, ErrorCode.SYSTEM_ERROR, '获取测点下钻数据失败', 500);
+  }
+});
+
+/** 全量测点按二级类码统计 */
+router.get('/api/statistics/measurement/by-second-class', async (req: Request, res: Response) => {
+  try {
+    const type = req.query.type as string;
+    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
+    const data = await statisticsService.getMeasureBySecondClass(typeFilter);
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get measure by second class:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取测点二级类码统计失败', 500);
+  }
+});
+
+/** 全量测点按场站统计 */
+router.get('/api/statistics/measurement/by-station', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getMeasureByStation();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get measure by station:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取测点场站统计失败', 500);
+  }
+});
+
+/** 全量测点列表（含筛选分页） */
+router.get('/api/statistics/measurement/list', async (req: Request, res: Response) => {
+  try {
+    const pageNum = parseInt(req.query.pageNum as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
+    const filters = {
+      typeCode: req.query.typeCode as string,
+      stationCode: req.query.stationCode as string,
+      secondClassCode: req.query.secondClassCode as string,
+      dataTypeCode: req.query.dataTypeCode as string,
+    };
+    const result = await statisticsService.getMeasureList(pageNum, pageSize, filters);
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to get measure list:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '查询测点列表失败', 500);
+  }
+});
+
+/** 全量测点筛选条件选项 */
+router.get('/api/statistics/measurement/filter-options', async (_req: Request, res: Response) => {
+  try {
+    const data = await statisticsService.getMeasureFilterOptions();
+    success(res, data);
+  } catch (err) {
+    console.error('Failed to get measure filter options:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '获取测点筛选条件失败', 500);
   }
 });
 

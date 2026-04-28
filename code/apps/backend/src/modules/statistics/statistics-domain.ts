@@ -451,8 +451,10 @@ export interface ImportTask {
   totalRows: number;
   importedRows: number;
   validRows: number;
-  status: 'IDLE' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: 'IDLE' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   message?: string;
+  startTime?: number;
+  cancelRequested?: boolean;
 }
 
 const importStore: ImportTask = {
@@ -462,7 +464,11 @@ const importStore: ImportTask = {
 };
 
 export function getImportStatus(): ImportTask {
-  return { ...importStore };
+  return { ...importStore, cancelRequested: false };
+}
+
+export function cancelImport(): void {
+  importStore.cancelRequested = true;
 }
 
 /** 解析31位编码各段 */
@@ -522,42 +528,71 @@ export async function importMeasurementFile(
   importStore.totalRows = 0;
   importStore.importedRows = 0;
   importStore.validRows = 0;
+  importStore.startTime = Date.now();
+  importStore.cancelRequested = false;
   importStore.message = '正在解析文件...';
 
   const batchId = importStore.batchId;
 
+  // 先清空所有旧数据
+  await query(`DELETE FROM ${schema}.cec_new_energy_measurement_points`);
+
   try {
     const wb = XLSX.read(fileBuffer, { type: 'buffer' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const ref = ws['!ref'];
-    if (!ref) throw new Error('IMPORT_DATA_EMPTY');
+    const sheetNames = wb.SheetNames;
+    if (!sheetNames.length) throw new Error('IMPORT_DATA_EMPTY');
 
-    const rows: Array<Record<string, string>> = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    importStore.totalRows = rows.length;
-    importStore.message = `共读取 ${rows.length} 行，正在解析...`;
+    // 先统计所有sheet的总行数
+    let totalRows = 0;
+    for (const name of sheetNames) {
+      const ws = wb.Sheets[name];
+      if (!ws['!ref']) continue;
+      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
+      totalRows += rows.length;
+    }
+    importStore.totalRows = totalRows;
+    importStore.message = `共读取 ${totalRows} 行（${sheetNames.length} 个Sheet），正在解析...`;
 
-    // 识别测点编码列
-    const headers = Object.keys(rows[0] || {});
-    const codeCol = headers.find(h =>
-      h.includes('测点编码') || h.includes('编码') || h.includes('code') || h.includes('Code')
-    ) || headers[0];
+    // 识别测点编码列（从第一个非空sheet获取列名）
+    let codeCol = '';
+    for (const name of sheetNames) {
+      const ws = wb.Sheets[name];
+      if (!ws['!ref']) continue;
+      const firstRows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
+      if (firstRows.length) {
+        const headers = Object.keys(firstRows[0]);
+        codeCol = headers.find(h =>
+          h.includes('测点编码') || h.includes('编码') || h.includes('code') || h.includes('Code')
+        ) || headers[0];
+        break;
+      }
+    }
+    if (!codeCol) throw new Error('IMPORT_DATA_EMPTY');
 
     const batch: Array<{ code: string; seg: Record<string, string> }> = [];
     let validCount = 0;
 
-    for (let i = 0; i < rows.length; i++) {
-      const raw = String(rows[i][codeCol] || '').trim();
-      const seg = parseCodeSegments(raw);
-      if (seg) {
-        batch.push({ code: raw, seg });
-        validCount++;
-      }
+    for (const name of sheetNames) {
+      if (importStore.cancelRequested) break;
+      const ws = wb.Sheets[name];
+      if (!ws['!ref']) continue;
+      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
 
-      if (batch.length >= 500) {
-        await batchInsertPoints(batchId, batch);
-        importStore.importedRows += batch.length;
-        batch.length = 0;
-        importStore.message = `已导入 ${importStore.importedRows}/${importStore.totalRows} 行...`;
+      for (let i = 0; i < rows.length; i++) {
+        if (importStore.cancelRequested) break;
+        const raw = String(rows[i][codeCol] || '').trim();
+        const seg = parseCodeSegments(raw);
+        if (seg) {
+          batch.push({ code: raw, seg });
+          validCount++;
+        }
+
+        if (batch.length >= 500) {
+          await batchInsertPoints(batchId, batch);
+          importStore.importedRows += batch.length;
+          batch.length = 0;
+          importStore.message = `已导入 ${importStore.importedRows}/${importStore.totalRows} 行...`;
+        }
       }
     }
 
@@ -566,10 +601,18 @@ export async function importMeasurementFile(
       importStore.importedRows += batch.length;
     }
 
+    if (importStore.cancelRequested) {
+      importStore.validRows = validCount;
+      importStore.importing = false;
+      importStore.status = 'CANCELLED';
+      importStore.message = `已终止，已导入 ${importStore.importedRows} 行（有效编码 ${validCount} 条）`;
+      return { batchId };
+    }
+
     importStore.validRows = validCount;
     importStore.importing = false;
     importStore.status = 'COMPLETED';
-    importStore.message = `导入完成，有效编码 ${validCount} 条`;
+    importStore.message = `导入完成，有效编码 ${validCount} 条（${sheetNames.length} 个Sheet）`;
 
     return { batchId };
   } catch (err: any) {
@@ -582,22 +625,24 @@ export async function importMeasurementFile(
 
 /** 全量测点概览 */
 export async function getMeasureOverview(): Promise<{
-  totalPoints: number; windCount: number; solarCount: number; otherCount: number;
+  totalPoints: number; windCount: number; solarCount: number; otherCount: number; lastImportTime: string | null;
 }> {
   const sql = `SELECT
       COUNT(*) AS total,
       COUNT(CASE WHEN type_code LIKE 'F%' OR type_code = '01' THEN 1 END) AS wind,
       COUNT(CASE WHEN type_code LIKE 'G%' OR type_code = '02' THEN 1 END) AS solar,
       COUNT(CASE WHEN type_code NOT LIKE 'F%' AND type_code NOT LIKE 'G%'
-             AND type_code != '01' AND type_code != '02' THEN 1 END) AS other
+             AND type_code != '01' AND type_code != '02' THEN 1 END) AS other,
+      MAX(create_tm) AS last_import_time
     FROM ${schema}.cec_new_energy_measurement_points
     WHERE if_delete = '0'`;
-  const r = await query<{ total: string; wind: string; solar: string; other: string }>(sql);
+  const r = await query<{ total: string; wind: string; solar: string; other: string; last_import_time: string }>(sql);
   return {
     totalPoints: Number(r[0]?.total || 0),
     windCount: Number(r[0]?.wind || 0),
     solarCount: Number(r[0]?.solar || 0),
     otherCount: Number(r[0]?.other || 0),
+    lastImportTime: r[0]?.last_import_time || null,
   };
 }
 
@@ -678,7 +723,204 @@ export async function getMeasureDrillDown(
   };
 }
 
-/** 清理旧导入数据 */
+/** 全量测点按二级类码统计 */
+export async function getMeasureBySecondClass(
+  typeFilter?: 'wind' | 'solar',
+): Promise<{
+  items: Array<{ name: string; value: number; percentage: number }>
+}> {
+  let typeCondition = '';
+  let dictTypeCondition = '';
+  if (typeFilter === 'wind') {
+    typeCondition = "AND (type_code LIKE 'F%' OR type_code = '01')";
+    dictTypeCondition = "AND (type_code LIKE 'F%' OR type_code = '01')";
+  } else if (typeFilter === 'solar') {
+    typeCondition = "AND (type_code LIKE 'G%' OR type_code = '02')";
+    dictTypeCondition = "AND (type_code LIKE 'G%' OR type_code = '02')";
+  }
+  const sql = `
+    SELECT t.code_val, d.second_class_name AS name_val, t.cnt
+    FROM (
+      SELECT second_class_code AS code_val, COUNT(*) AS cnt
+      FROM ${schema}.cec_new_energy_measurement_points
+      WHERE if_delete = '0' ${typeCondition}
+      GROUP BY second_class_code
+    ) t
+    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' ${dictTypeCondition} GROUP BY second_class_code) d
+      ON t.code_val = d.second_class_code
+    ORDER BY t.cnt DESC`;
+  const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
+  const total = rows.reduce((s, r) => s + Number(r.cnt), 0);
+  const items = rows.map(r => {
+    const cleanName = r.name_val?.replace(/[（(][^）)]*[）)]/g, '').trim() || '';
+    return {
+      name: cleanName ? `${r.code_val} ${cleanName}` : r.code_val,
+      value: Number(r.cnt),
+      percentage: total > 0 ? Math.round((Number(r.cnt) / total) * 1000) / 10 : 0,
+    };
+  });
+  return { items };
+}
+
+/** 全量测点按场站统计 */
+export async function getMeasureByStation(): Promise<{
+  items: Array<{ name: string; value: number; percentage: number }>
+}> {
+  const sql = `
+    SELECT t.code_val, d.station_name AS name_val, t.cnt
+    FROM (
+      SELECT station_code AS code_val, COUNT(*) AS cnt
+      FROM ${schema}.cec_new_energy_measurement_points
+      WHERE if_delete = '0'
+      GROUP BY station_code
+    ) t
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') d
+      ON t.code_val = d.station_code
+    ORDER BY t.cnt DESC`;
+  const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
+  const total = rows.reduce((s, r) => s + Number(r.cnt), 0);
+  const items = rows.map(r => ({
+    name: r.name_val || r.code_val,
+    value: Number(r.cnt),
+    percentage: total > 0 ? Math.round((Number(r.cnt) / total) * 1000) / 10 : 0,
+  }));
+  return { items };
+}
+
+/** 全量测点列表（含筛选分页） */
+export async function getMeasureList(
+  pageNum: number,
+  pageSize: number,
+  filters: {
+    typeCode?: string;
+    stationCode?: string;
+    secondClassCode?: string;
+    dataTypeCode?: string;
+  },
+): Promise<{
+  list: Array<{
+    code: string;
+    station_code: string;
+    type_code: string;
+    second_class_code: string;
+    third_class_code: string;
+    data_category_code: string;
+    data_code: string;
+    type_name: string;
+    station_name: string;
+    second_class_name: string;
+    third_class_name: string;
+    data_type_name: string;
+    data_name: string;
+  }>;
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  pages: number;
+}> {
+  const conditions: string[] = [`mp.if_delete = '0'`];
+  const params: string[] = [];
+  let paramIdx = 1;
+
+  if (filters.typeCode) {
+    conditions.push(`mp.type_code = $${paramIdx++}`);
+    params.push(filters.typeCode);
+  }
+  if (filters.stationCode) {
+    conditions.push(`mp.station_code = $${paramIdx++}`);
+    params.push(filters.stationCode);
+  }
+  if (filters.secondClassCode) {
+    conditions.push(`mp.second_class_code = $${paramIdx++}`);
+    params.push(filters.secondClassCode);
+  }
+  if (filters.dataTypeCode) {
+    conditions.push(`mp.data_category_code = $${paramIdx++}`);
+    params.push(filters.dataTypeCode);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  console.log('[DEBUG] getMeasureList: before count query, whereClause:', whereClause, 'params:', params);
+  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_measurement_points mp WHERE ${whereClause}`;
+  const countResult = await queryOne<{ total: string }>(countSql, params);
+  const total = Number(countResult?.total || 0);
+  console.log('[DEBUG] getMeasureList: count result:', total);
+
+  const offset = (pageNum - 1) * pageSize;
+
+  // 先查出分页的 code 列表
+  const pageSql = `SELECT mp.code FROM ${schema}.cec_new_energy_measurement_points mp WHERE ${whereClause} ORDER BY mp.create_tm DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+  console.log('[DEBUG] getMeasureList: pageSql:', pageSql, 'values:', [...params, pageSize, offset]);
+  const pageRows = await query<{ code: string }>(pageSql, [...params, pageSize, offset]);
+  const codes = pageRows.map(r => r.code);
+  console.log('[DEBUG] getMeasureList: codes count:', codes.length);
+  if (codes.length === 0) {
+    return { list: [], total, pageNum, pageSize, pages: Math.ceil(total / pageSize) };
+  }
+
+  // 根据 code 列表查明细（只查需要的行）
+  const placeholders = codes.map((_, i) => `$${i + 1}`).join(',');
+  const listSql = `
+    SELECT
+      mp.code,
+      mp.type_code,
+      mp.station_code,
+      mp.second_class_code,
+      mp.third_class_code,
+      mp.data_category_code,
+      mp.data_code,
+      COALESCE(t.type_name, '') AS type_name,
+      COALESCE(s.station_name, '') AS station_name,
+      COALESCE(sc.second_class_name, '') AS second_class_name,
+      COALESCE(tc.third_class_name, '') AS third_class_name,
+      COALESCE(dt.data_category_name, '') AS data_type_name,
+      COALESCE(dc.data_name, '') AS data_name
+    FROM ${schema}.cec_new_energy_measurement_points mp
+    LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON mp.type_code = t.type_code
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON mp.station_code = s.station_code
+    LEFT JOIN (SELECT second_class_code, second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL) sc ON mp.second_class_code = sc.second_class_code
+    LEFT JOIN (SELECT third_class_code, third_class_name FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL) tc ON mp.third_class_code = tc.third_class_code
+    LEFT JOIN (SELECT data_category_code, data_category_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL) dt ON mp.data_category_code = dt.data_category_code
+    LEFT JOIN (SELECT data_category_code, data_code, data_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL) dc ON mp.data_category_code = dc.data_category_code AND mp.data_code = dc.data_code
+    WHERE mp.code IN (${placeholders})
+    ORDER BY mp.create_tm DESC`;
+  const list = await query(listSql, [...codes]);
+
+  return {
+    list,
+    total,
+    pageNum,
+    pageSize,
+    pages: Math.ceil(total / pageSize),
+  };
+}
+
+/** 全量测点筛选条件选项 */
+export async function getMeasureFilterOptions(): Promise<{
+  typeCodes: Array<{ code: string; name: string }>;
+  stationCodes: Array<{ code: string; name: string }>;
+  secondClassCodes: Array<{ code: string; name: string }>;
+  dataTypeCodes: Array<{ code: string; name: string }>;
+}> {
+  const [typeOptions, stationOptions, secondClassOptions, dataTypeOptions] = await Promise.all([
+    query<{ code: string; name: string }>(
+      `SELECT type_code AS code, type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
+    query<{ code: string; name: string }>(
+      `SELECT station_code AS code, station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
+    query<{ code: string; name: string }>(
+      `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code ORDER BY code`),
+    query<{ code: string; name: string }>(
+      `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code ORDER BY code`),
+  ]);
+  return {
+    typeCodes: typeOptions,
+    stationCodes: stationOptions,
+    secondClassCodes: secondClassOptions,
+    dataTypeCodes: dataTypeOptions,
+  };
+}
+
 export async function clearMeasurementData(): Promise<void> {
   await query(`DELETE FROM ${schema}.cec_new_energy_measurement_points`);
   importStore.importing = false;

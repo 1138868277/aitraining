@@ -135,7 +135,7 @@ export async function getImportStatus(): Promise<{
 }
 
 export async function getMeasureOverview(): Promise<{
-  totalPoints: number; windCount: number; solarCount: number; otherCount: number;
+  totalPoints: number; windCount: number; solarCount: number; otherCount: number; lastImportTime: string | null;
 }> {
   const res = await api.get('/statistics/measurement/overview');
   return res.data;
@@ -156,6 +156,69 @@ export async function getMeasureDrillDown(typeCode: string): Promise<{
   return res.data;
 }
 
+export async function getMeasureBySecondClass(type?: string): Promise<{ items: Array<{ name: string; value: number; percentage: number }> }> {
+  const res = await api.get('/statistics/measurement/by-second-class', { params: { type } });
+  return res.data;
+}
+
+export async function getMeasureByStation(): Promise<{ items: Array<{ name: string; value: number; percentage: number }> }> {
+  const res = await api.get('/statistics/measurement/by-station');
+  return res.data;
+}
+
+export async function getMeasureList(
+  pageNum = 1,
+  pageSize = 20,
+  filters?: {
+    typeCode?: string;
+    stationCode?: string;
+    secondClassCode?: string;
+    dataTypeCode?: string;
+  },
+): Promise<{
+  list: Array<{
+    code: string;
+    type_code: string;
+    station_code: string;
+    second_class_code: string;
+    third_class_code: string;
+    data_category_code: string;
+    data_code: string;
+    type_name: string;
+    station_name: string;
+    second_class_name: string;
+    third_class_name: string;
+    data_type_name: string;
+    data_name: string;
+  }>;
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  pages: number;
+}> {
+  const params: Record<string, any> = { pageNum, pageSize };
+  if (filters?.typeCode) params.typeCode = filters.typeCode;
+  if (filters?.stationCode) params.stationCode = filters.stationCode;
+  if (filters?.secondClassCode) params.secondClassCode = filters.secondClassCode;
+  if (filters?.dataTypeCode) params.dataTypeCode = filters.dataTypeCode;
+  const res = await api.get('/statistics/measurement/list', { params });
+  return res.data;
+}
+
+export async function getMeasureFilterOptions(): Promise<{
+  typeCodes: Array<{ code: string; name: string }>;
+  stationCodes: Array<{ code: string; name: string }>;
+  secondClassCodes: Array<{ code: string; name: string }>;
+  dataTypeCodes: Array<{ code: string; name: string }>;
+}> {
+  const res = await api.get('/statistics/measurement/filter-options');
+  return res.data;
+}
+
 export async function clearMeasurementData(): Promise<void> {
   await api.delete('/statistics/measurement/clear');
+}
+
+export async function cancelImport(): Promise<void> {
+  await api.post('/statistics/measurement/cancel-import');
 }

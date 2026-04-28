@@ -33,3 +33,5 @@ CREATE INDEX IF NOT EXISTS idx_mp_data_code ON ${schema}.cec_new_energy_measurem
 CREATE INDEX IF NOT EXISTS idx_mp_import_batch ON ${schema}.cec_new_energy_measurement_points (import_batch_id);
 CREATE INDEX IF NOT EXISTS idx_mp_code ON ${schema}.cec_new_energy_measurement_points (code);
 CREATE INDEX IF NOT EXISTS idx_mp_if_delete ON ${schema}.cec_new_energy_measurement_points (if_delete);
+CREATE INDEX IF NOT EXISTS idx_mp_create_tm ON ${schema}.cec_new_energy_measurement_points (create_tm DESC);
+CREATE INDEX IF NOT EXISTS idx_mp_ifdel_crtm ON ${schema}.cec_new_energy_measurement_points (if_delete, create_tm DESC);
