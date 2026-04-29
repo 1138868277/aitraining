@@ -899,7 +899,9 @@ async function fillNewCategoryCodeAndEntries() {
   try {
     const mappedType = TYPE_CODE_MAP[addForm.typeCode] || addForm.typeCode;
     const maxCategoryCode = await dictService.getMaxDataCategoryCode(addForm.secondClassCode, mappedType);
-    addForm.dataCategoryCode = maxCategoryCode ? getNextCategoryCode(maxCategoryCode) : '01';
+    const nextCode = maxCategoryCode ? getNextCategoryCode(maxCategoryCode) : '01';
+    // 如果溢出（超过2位），则留空让用户手动输入
+    addForm.dataCategoryCode = nextCode.length <= 2 ? nextCode : '';
     fillEntries('001');
   } catch {
     addForm.dataCategoryCode = '01';

@@ -416,7 +416,7 @@ export async function batchCreateManualCode(input: {
     const dataName = entry.dataName || entry.dataCode;
 
     valuePlaceholders.push(
-      `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}, $${idx + 10}, '1', $${idx + 11}, NOW(), $${idx + 11}, NOW())`,
+      `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}, '1', $${idx + 10}, NOW(), $${idx + 10}, NOW())`,
     );
     params.push(
       typeDomainCode, input.typeCode, firstClassCode, firstClassName,
@@ -425,7 +425,7 @@ export async function batchCreateManualCode(input: {
       entry.dataCode, dataName,
       input.creator,
     );
-    idx += 12;
+    idx += 11;
   }
 
   const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
