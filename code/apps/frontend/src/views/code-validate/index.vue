@@ -7,23 +7,17 @@
           <DictOverviewCard />
           <div class="tree-container">
             <div class="tree-toolbar">
-              <el-input
-                v-model="treeFilterText"
-                placeholder="搜索节点..."
-                clearable
-                class="tree-filter-input"
-              />
               <el-button size="default" @click="onCollapseAll">收起所有</el-button>
             </div>
             <el-tree
               ref="treeRef"
               :data="dictTreeData"
+              lazy
+              :load="loadTreeNode"
               :props="treeProps"
-              :filter-node-method="filterTreeNode"
               v-loading="loadingTree"
               element-loading-text="字典数据加载中..."
               highlight-current
-              @node-click="onTreeNodeClick"
             >
               <template #default="{ node, data }">
                 <span class="custom-tree-node">
@@ -335,7 +329,7 @@
             <el-table-column label="类型">
               <template #default="{ row }">
                 <span v-if="row.typeCode" class="code-type">{{ row.typeCode.charAt(0) }}</span>
-                <span v-if="row.typeCode" class="name-muted">{{ row.typeCode.charAt(0) === 'F' ? '风电' : row.typeCode.charAt(0) === 'G' ? '光伏' : '其他' }}</span>
+                <span v-if="row.typeCode" class="name-muted">{{ row.typeCode.charAt(0) === 'F' ? '风电' : row.typeCode.charAt(0) === 'G' ? '光伏' : row.typeCode.charAt(0) === 'S' ? '水电' : '其他' }}</span>
                 <span v-else class="name-error">未识别</span>
               </template>
             </el-table-column>
@@ -452,13 +446,14 @@ watch(activeTab, (tab) => {
 
 // ========== Tab 1: 字典查询 ==========
 const dictTreeData = ref<DictTreeNode[]>([]);
+const treeDataCache = ref<DictTreeNode[]>([]); // lazy load 查找缓存
 const loadingTree = ref(false);
-const treeFilterText = ref('');
 const treeRef = ref<any>(null);
 
 const treeProps = {
   children: 'children',
   label: 'name',
+  isLeaf: (data: any) => data.type === 'dataCode',
 };
 
 const typeLabelMap: Record<string, string> = {
@@ -491,11 +486,6 @@ function typeCodeClass(type: string): string {
   return '';
 }
 
-function filterTreeNode(value: string, data: any): boolean {
-  if (!value) return true;
-  return data.name.includes(value) || data.code.includes(value);
-}
-
 function formatTime(tm: string): string {
   // ISO 字符串裁剪到秒: "2024-01-01T12:00:00.000Z" → "2024-01-01 12:00:00"
   const d = new Date(tm);
@@ -503,20 +493,11 @@ function formatTime(tm: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-watch(treeFilterText, (val) => {
-  treeRef.value?.filter(val);
-});
-
 async function loadDictTree() {
   loadingTree.value = true;
   try {
-    dictTreeData.value = await validateService.getDictTree();
-    await nextTick();
-    // 展开第一层（类型域节点）
-    const rootNodes = treeRef.value?.store?.root?.childNodes || [];
-    for (const node of rootNodes) {
-      node.expand();
-    }
+    treeDataCache.value = await validateService.getDictTree();
+    dictTreeData.value = treeDataCache.value; // 保留引用供其他逻辑使用
   } catch (err: any) {
     ElMessage.error('字典树加载失败');
   } finally {
@@ -524,24 +505,42 @@ async function loadDictTree() {
   }
 }
 
-function onTreeNodeClick(data: any) {
-  // 点击节点不做特殊处理
+/** lazy 模式加载子节点：前三级从缓存取，数据类码展开时从 API 懒加载 */
+async function loadTreeNode(node: any, resolve: Function) {
+  const data = node.data;
+  if (data.type === 'typeDomain') {
+    // 返回该类型域下的二级类码
+    const td = treeDataCache.value.find((t: any) => t.code === data.code);
+    resolve(td?.children || []);
+  } else if (data.type === 'secondClass') {
+    // 返回该二级类码下的数据类码
+    for (const td of treeDataCache.value) {
+      const sc = (td.children || []).find((c: any) => c.code === data.code);
+      if (sc) { resolve(sc.children || []); return; }
+    }
+    resolve([]);
+  } else if (data.type === 'dataCategory') {
+    // 从 API 懒加载数据码
+    try {
+      const typeDomainCode = node.parent?.parent?.data?.code;
+      const secondClassCode = node.parent?.data?.code;
+      if (!typeDomainCode || !secondClassCode) { resolve([]); return; }
+      const dataCodes = await validateService.getDictTreeDataCodes(
+        typeDomainCode, secondClassCode, data.code,
+      );
+      resolve(dataCodes);
+    } catch {
+      resolve([]);
+    }
+  } else {
+    resolve([]);
+  }
 }
 
 function onCollapseAll() {
-  function collapseRecursive(nodes: any[]) {
-    for (const node of nodes) {
-      if (!node.isLeaf) {
-        node.collapse();
-        collapseRecursive(node.childNodes || []);
-      }
-    }
-  }
-  const rootNodes = treeRef.value?.store?.root?.childNodes || [];
-  collapseRecursive(rootNodes);
-  // 展开第一层（类型域节点）
-  for (const node of rootNodes) {
-    node.expand();
+  // 只收起第一层（类型域节点）下的子节点，保留一级目录展开
+  for (const node of treeRef.value?.store?.root?.childNodes || []) {
+    if (!node.isLeaf) node.collapse();
   }
 }
 
@@ -561,7 +560,10 @@ async function loadManualStats() {
   try {
     const scFilter = statsSecondClassFilter.value || undefined;
     const tFilter = statsTypeFilter.value || undefined;
+    console.log('DEBUG loadManualStats params:', { scFilter, tFilter });
     const result = await validateService.getManualStatistics(statsPageNum.value, statsPageSize.value, scFilter, tFilter);
+    console.log('DEBUG loadManualStats result keys:', Object.keys(result));
+    console.log('DEBUG secondClassOptions:', JSON.stringify(result.secondClassOptions));
     manualStats.value = result.items;
     statsTotal.value = result.total;
     secondClassOptions.value = result.secondClassOptions || [];
@@ -826,9 +828,6 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
-.tree-filter-input {
-  width: 300px;
-}
 
 .custom-tree-node {
   display: flex;

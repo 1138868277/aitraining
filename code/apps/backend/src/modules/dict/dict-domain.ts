@@ -53,16 +53,19 @@ function getTypeDomainCode(typeCode?: string): string | null {
   // 支持多种类型代码格式：
   // 1. F1, F2, F3, F4 -> F (风力发电)
   // 2. G1, G2 -> G (光伏发电)
-  // 3. Y0 -> 返回null，表示不过滤类型（通用）
-  // 4. 01 -> F (假设01对应风力发电)
-  // 5. 02 -> G (假设02对应光伏发电)
-  // 6. 03 -> Y (假设03对应水力发电)
-  // 7. 04 -> Y (假设04对应储能电站)
+  // 3. S1, S2 -> S (水力发电)
+  // 4. Y0 -> 返回null，表示不过滤类型（通用）
+  // 5. 01 -> F (假设01对应风力发电)
+  // 6. 02 -> G (假设02对应光伏发电)
+  // 7. 03 -> Y (假设03对应水力发电)
+  // 8. 04 -> Y (假设04对应储能电站)
 
   if (typeCode.startsWith('F') || typeCode === '01') {
     return 'F';
   } else if (typeCode.startsWith('G') || typeCode === '02') {
     return 'G';
+  } else if (typeCode.startsWith('S') || typeCode === '05') {
+    return 'S';
   } else if (typeCode === 'Y0' || typeCode === '03' || typeCode === '04') {
     // Y表示通用，不过滤类型
     return null;

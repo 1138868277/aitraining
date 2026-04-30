@@ -128,6 +128,7 @@
               <el-select v-model="addForm.typeCode" placeholder="请选择类型" filterable clearable style="width: 100%" @change="onAddTypeChange">
                 <el-option label="F 风力发电" value="F" />
                 <el-option label="G 光伏发电" value="G" />
+                <el-option label="S 水力发电" value="S" />
                 <el-option label="Y 通用" value="Y" />
               </el-select>
             </el-form-item>
@@ -511,7 +512,7 @@ interface ConditionField {
 
 const conditionFields: ConditionField[] = [
   { key: 'stationCode', label: '场站', required: true, disabled: () => false, type: 'select' },
-  { key: 'typeCode', label: '类型', required: true, disabled: () => false, type: 'select', quickOptions: ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'Y0'] },
+  { key: 'typeCode', label: '类型', required: true, disabled: () => false, type: 'select', quickOptions: ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'S1', 'Y0'] },
   { key: 'projectLineCode', label: '项目期号&并网线路', required: true, disabled: () => false, type: 'input', quickOptions: ['111', '112', '121', '122'] },
   { key: 'prefixNo', label: '前缀号', required: true, disabled: () => false, type: 'select' },
   { key: 'firstClassCode', label: '一级类码', required: true, disabled: () => false, type: 'select' },
@@ -921,6 +922,7 @@ async function loadAddDataTypeOptions() {
 // F/G/Y 映射到具体类型码，用于加载二级类码
 const TYPE_CODE_MAP: Record<string, string> = {
   F: 'F1',
+  S: 'S1',
   G: 'G1',
   Y: 'Y0',
 };
@@ -1076,6 +1078,7 @@ async function onQuickSearchRowClick(row: {
   // 类型域 -> 具体类型码映射（type_domain_code 如 'F' 需转为 'F1'）
   const typeCodeMap: Record<string, string> = {
     F: 'F1',
+  S: 'S1',
     G: 'G1',
   };
   // 如果类型已锁定，使用当前值；否则使用快捷搜索的映射值
@@ -1240,8 +1243,22 @@ async function onConditionChange(key: string) {
     dictOptions[nextKey] = [];
   }
 
-  // 类型代码变更时，重新加载二级类码列表，但保持其他筛选条件不变
+  // 类型代码变更时，重新加载二级类码列表，并清空后续级联字段
   if (key === 'typeCode') {
+    // 先清空二级类码及其后续的级联筛选字段
+    conditions.secondClassCode = '';
+    conditions.secondExtCodeStart = '1';
+    conditions.secondExtCodeCount = '1';
+    conditions.thirdClassCode = '';
+    conditions.thirdExtCodeStart = '0';
+    conditions.thirdExtCodeCount = '1';
+    conditions.dataTypeCode = '';
+    conditions.dataCode = [];
+    dictOptions['secondClassCode'] = [];
+    dictOptions['thirdClassCode'] = [];
+    dictOptions['dataTypeCode'] = [];
+    dictOptions['dataCode'] = [];
+    // 再加载新类型下的二级类码选项
     try {
       const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
       dictOptions['secondClassCode'] = secondClassItems;

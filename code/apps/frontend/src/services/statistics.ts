@@ -90,12 +90,17 @@ export async function getCodeGenGroupDetail(group: {
 
 // ========== 2. 编码字典统计 ==========
 
-export async function getDictOverview(): Promise<{
+let dictOverviewCache: any = null;
+
+export async function getDictOverview(forceRefresh = false): Promise<{
   wind: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
   solar: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
+  hydro: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
 }> {
+  if (!forceRefresh && dictOverviewCache) return dictOverviewCache;
   const res = await api.get('/statistics/dict/overview');
-  return res.data;
+  dictOverviewCache = res.data;
+  return dictOverviewCache;
 }
 
 export async function getDictNewAddition(startTime?: string, endTime?: string): Promise<{

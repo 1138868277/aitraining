@@ -327,7 +327,7 @@ export async function getCodeGenGroupDetail(
 
 // ========== 2. 编码字典统计 ==========
 
-/** 字典整体概览（按风电/光伏拆分） */
+/** 字典整体概览（按风电/光伏/水电拆分） */
 export async function getDictOverview(): Promise<{
   wind: {
     firstClassCount: number; secondClassCount: number; thirdClassCount: number;
@@ -337,47 +337,61 @@ export async function getDictOverview(): Promise<{
     firstClassCount: number; secondClassCount: number; thirdClassCount: number;
     dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
   };
-}> {
-  async function getTypeDetail(typeCode: 'F' | 'G'): Promise<{
+  hydro: {
     firstClassCount: number; secondClassCount: number; thirdClassCount: number;
     dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
-  }> {
-    const t = typeCode;
-    const [first, second, third, cat, codeGroup, codeManual] = await Promise.all([
-      query<{ c: string }>(
-        `SELECT COUNT(DISTINCT first_class_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1`,
-        [t]),
-      query<{ c: string }>(
-        `SELECT COUNT(DISTINCT second_class_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code IS NOT NULL`,
-        [t]),
-      query<{ c: string }>(
-        `SELECT COUNT(DISTINCT t.third_class_code) AS c FROM ${schema}.cec_new_energy_third_class_dict t
-         WHERE t.if_delete = '0' AND t.second_class_code IN (
-           SELECT DISTINCT second_class_code FROM ${schema}.cec_new_energy_code_dict
-           WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code IS NOT NULL
-         )`, [t]),
-      query<{ c: string }>(
-        `SELECT COUNT(DISTINCT data_category_code) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND data_category_code IS NOT NULL`,
-        [t]),
-      query<{ c: string }>(
-        `SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND data_code IS NOT NULL AND (is_manual IS NULL OR is_manual = '0')`,
-        [t]),
-      query<{ c: string }>(
-        `SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND type_domain_code = $1 AND data_code IS NOT NULL AND is_manual = '1'`,
-        [t]),
-    ]);
+  };
+}> {
+  // 一次查询获取三个类型域的主表聚合数据
+  const [mainRows, thirdRows] = await Promise.all([
+    query<{
+      td: string; fc: string; sc: string; dc: string; dg: string; dm: string;
+    }>(
+      `SELECT
+         type_domain_code AS td,
+         COUNT(DISTINCT first_class_code) AS fc,
+         COUNT(DISTINCT second_class_code) AS sc,
+         COUNT(DISTINCT data_category_code) AS dc,
+         COUNT(*) FILTER (WHERE data_code IS NOT NULL AND (is_manual IS NULL OR is_manual = '0')) AS dg,
+         COUNT(*) FILTER (WHERE data_code IS NOT NULL AND is_manual = '1') AS dm
+       FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND type_domain_code IN ('F', 'G', 'S')
+       GROUP BY type_domain_code`),
+    // 一次查询获取三个类型域的三级类码计数（使用子查询避免慢 JOIN）
+    query<{ td: string; c: string }>(
+      `SELECT d.type_domain_code AS td, COUNT(DISTINCT t.third_class_code) AS c
+       FROM ${schema}.cec_new_energy_third_class_dict t
+       INNER JOIN (SELECT DISTINCT type_domain_code, second_class_code
+                   FROM ${schema}.cec_new_energy_code_dict
+                   WHERE if_delete = '0' AND type_domain_code IN ('F', 'G', 'S')) d
+         ON d.second_class_code = t.second_class_code
+       WHERE t.if_delete = '0'
+       GROUP BY d.type_domain_code`),
+  ]);
+
+  function toMap(rows: { td: string; [key: string]: any }[]): Record<string, any> {
+    const map: Record<string, any> = {};
+    for (const r of rows) map[r.td] = r;
+    return map;
+  }
+
+  const mainMap = toMap(mainRows);
+  const thirdMap = toMap(thirdRows);
+
+  function build(td: string) {
+    const m = mainMap[td];
+    const t = thirdMap[td];
     return {
-      firstClassCount: Number(first[0]?.c || 0),
-      secondClassCount: Number(second[0]?.c || 0),
-      thirdClassCount: Number(third[0]?.c || 0),
-      dataCategoryCount: Number(cat[0]?.c || 0),
-      dataCodeGroup: Number(codeGroup[0]?.c || 0),
-      dataCodeManual: Number(codeManual[0]?.c || 0),
+      firstClassCount: Number(m?.fc || 0),
+      secondClassCount: Number(m?.sc || 0),
+      thirdClassCount: Number(t?.c || 0),
+      dataCategoryCount: Number(m?.dc || 0),
+      dataCodeGroup: Number(m?.dg || 0),
+      dataCodeManual: Number(m?.dm || 0),
     };
   }
 
-  const [wind, solar] = await Promise.all([getTypeDetail('F'), getTypeDetail('G')]);
-  return { wind, solar };
+  return { wind: build('F'), solar: build('G'), hydro: build('S') };
 }
 
 /** 字典新增情况 */
@@ -426,6 +440,7 @@ export async function getDictTypeDomainDist(): Promise<{
       COALESCE(type_domain_code, 'OTHER') AS td,
       CASE WHEN type_domain_code = 'F' THEN '风电'
            WHEN type_domain_code = 'G' THEN '光伏'
+           WHEN type_domain_code = 'S' THEN '水电'
            ELSE '其他' END AS tn,
       COUNT(DISTINCT second_class_code) AS sc,
       COUNT(DISTINCT data_category_code) AS dc,

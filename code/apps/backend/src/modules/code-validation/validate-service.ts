@@ -191,6 +191,15 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
   return validateDomain.getDictTree();
 }
 
+/** 懒加载获取数据类码下的数据码 */
+export async function getDictTreeDataCodes(
+  typeDomainCode: string,
+  secondClassCode: string,
+  dataCategoryCode: string,
+): Promise<DictTreeNode[]> {
+  return validateDomain.getDictTreeDataCodes(typeDomainCode, secondClassCode, dataCategoryCode);
+}
+
 /** 分页查询手动添加记录 */
 export async function getManualStatistics(
   pageNum: number,

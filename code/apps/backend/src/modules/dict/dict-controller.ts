@@ -85,6 +85,24 @@ router.get('/api/dict/tree', async (_req: Request, res: Response) => {
   }
 });
 
+/** 懒加载获取数据类码下的数据码（展开树节点时调用） */
+router.get('/api/dict/tree/data-codes', async (req: Request, res: Response) => {
+  try {
+    const typeDomainCode = req.query.typeDomainCode as string;
+    const secondClassCode = req.query.secondClassCode as string;
+    const dataCategoryCode = req.query.dataCategoryCode as string;
+    if (!typeDomainCode || !secondClassCode || !dataCategoryCode) {
+      error(res, ErrorCode.DICT_LOAD_FAILED, '参数不完整', 400);
+      return;
+    }
+    const items = await validateService.getDictTreeDataCodes(typeDomainCode, secondClassCode, dataCategoryCode);
+    success(res, items);
+  } catch (err) {
+    console.error('Failed to load tree data codes:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '数据码加载失败', 500);
+  }
+});
+
 /** 分页查询手动添加的编码统计（必须在通配路由之前注册） */
 router.get('/api/dict/manual-statistics', async (req: Request, res: Response) => {
   try {

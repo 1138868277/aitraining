@@ -31,6 +31,18 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
   return res.data;
 }
 
+/** 懒加载获取数据类码下的数据码 */
+export async function getDictTreeDataCodes(
+  typeDomainCode: string,
+  secondClassCode: string,
+  dataCategoryCode: string,
+): Promise<DictTreeNode[]> {
+  const res = await api.get('/dict/tree/data-codes', {
+    params: { typeDomainCode, secondClassCode, dataCategoryCode },
+  });
+  return res.data;
+}
+
 /** 分页查询手动添加记录 */
 export async function getManualStatistics(
   pageNum: number,

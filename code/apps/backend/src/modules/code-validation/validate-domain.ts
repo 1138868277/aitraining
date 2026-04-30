@@ -8,7 +8,11 @@ const schema = config.db.schema;
 
 const dictTreeCache = new MemoryCache<DictTreeNode[]>();
 const DICT_TREE_CACHE_KEY = 'dictTree';
-const DICT_TREE_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+const DICT_TREE_CACHE_TTL = 30 * 60 * 1000; // 30 分钟
+/** 用于服务启动时预加载，避免用户首次等待 */
+export function prewarmDictTree(): void {
+  getDictTree().catch(() => {});
+}
 
 export function invalidateDictTreeCache(): void {
   dictTreeCache.del(DICT_TREE_CACHE_KEY);
@@ -112,106 +116,80 @@ export interface ResolvedCodeItem {
   matchedCodes: Array<{ code: string; name: string }>;
 }
 
-/** 获取字典树数据（四层：类型域→二级类码→数据类码→数据码） */
+/** 获取字典树数据（三级：类型域→二级类码→数据类码，数据码展开时懒加载） */
 export async function getDictTree(): Promise<DictTreeNode[]> {
   // 优先读缓存
   const cached = dictTreeCache.get(DICT_TREE_CACHE_KEY);
   if (cached) return cached;
 
-  // 一次性查询所有数据，在内存中组装树结构
-  const allRows = await dbQuery<{
-    second_class_code: string;
-    second_class_name: string;
-    data_category_code: string;
-    data_category_name: string;
-    data_code: string;
-    data_name: string;
-    is_manual: string;
-    type_domain_code: string;
-  }>(
-    `SELECT second_class_code, second_class_name,
-            data_category_code, data_category_name,
-            data_code, data_name, is_manual, type_domain_code
-     FROM ${schema}.cec_new_energy_code_dict
-     WHERE if_delete = '0'
-       AND NOT (data_code IS NOT NULL AND data_code = data_name)
-     ORDER BY type_domain_code, second_class_code, data_category_code, data_code`,
-  );
+  // 三个并行轻量查询，不含数据码
+  const [typeDomains, secondClasses, dataCategories] = await Promise.all([
+    dbQuery<{ td: string }>(
+      `SELECT DISTINCT type_domain_code AS td
+       FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' ORDER BY td`,
+    ),
+    dbQuery<{ td: string; sc: string; sn: string }>(
+      `SELECT DISTINCT type_domain_code AS td,
+              second_class_code AS sc, second_class_name AS sn
+       FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' ORDER BY td, sc`,
+    ),
+    dbQuery<{ td: string; sc: string; dc: string; dn: string; hm: boolean; cnt: number }>(
+      `SELECT type_domain_code AS td, second_class_code AS sc,
+              data_category_code AS dc, data_category_name AS dn,
+              BOOL_OR(is_manual = '1') AS hm, COUNT(*) AS cnt
+       FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND data_code IS NOT NULL
+       GROUP BY td, sc, dc, dn
+       ORDER BY td, sc, dc`,
+    ),
+  ]);
 
   const typeLabel: Record<string, string> = {
     F: '风电',
     G: '光伏',
+    S: '水电',
   };
 
-  // 使用 Map 去重和组装
   const typeDomainMap = new Map<string, DictTreeNode>();
   const secondClassMap = new Map<string, DictTreeNode>();
-  const dcMap = new Map<string, DictTreeNode>();
-  const seenDataCodes = new Set<string>();
 
-  for (const row of allRows) {
-    const tdCode = row.type_domain_code || 'OTHER';
-
-    // 类型域（最外层 F/G）
-    if (!typeDomainMap.has(tdCode)) {
-      typeDomainMap.set(tdCode, {
-        code: tdCode,
-        name: typeLabel[tdCode] || tdCode,
-        type: 'typeDomain',
-        children: [],
-      });
-    }
-
-    // 二级类码
-    const scKey = `${tdCode}|${row.second_class_code}`;
-    if (!secondClassMap.has(scKey)) {
-      const scNode: DictTreeNode = {
-        code: row.second_class_code,
-        name: row.second_class_name,
-        type: 'secondClass',
-        children: [],
-      };
-      secondClassMap.set(scKey, scNode);
-      typeDomainMap.get(tdCode)!.children!.push(scNode);
-    }
-
-    // 数据类码
-    const dcKey = `${scKey}|${row.data_category_code}`;
-    if (!dcMap.has(dcKey)) {
-      const dcNode: DictTreeNode = {
-        code: row.data_category_code,
-        name: row.data_category_name,
-        type: 'dataCategory',
-        isManual: row.is_manual,
-        children: [],
-      };
-      dcMap.set(dcKey, dcNode);
-      secondClassMap.get(scKey)!.children!.push(dcNode);
-    }
-
-    // 数据码（按二级类码+数据类码+数据码去重）
-    const dataCodeKey = `${dcKey}|${row.data_code}`;
-    if (row.data_code && !seenDataCodes.has(dataCodeKey)) {
-      seenDataCodes.add(dataCodeKey);
-      const dcNode = dcMap.get(dcKey)!;
-      dcNode.children!.push({
-        code: row.data_code,
-        name: row.data_name,
-        type: 'dataCode',
-        isManual: row.is_manual,
-      });
-    }
+  for (const row of typeDomains) {
+    typeDomainMap.set(row.td, {
+      code: row.td,
+      name: typeLabel[row.td] || row.td,
+      type: 'typeDomain',
+      children: [],
+    });
   }
 
-  // 计算子节点数量，同时根据子节点修正数据类码的 isManual
+  for (const row of secondClasses) {
+    const scKey = `${row.td}|${row.sc}`;
+    typeDomainMap.get(row.td)?.children!.push(
+      secondClassMap.set(scKey, {
+        code: row.sc,
+        name: row.sn,
+        type: 'secondClass',
+        children: [],
+      }).get(scKey)!,
+    );
+  }
+
+  for (const row of dataCategories) {
+    const scKey = `${row.td}|${row.sc}`;
+    secondClassMap.get(scKey)?.children!.push({
+      code: row.dc,
+      name: row.dn,
+      type: 'dataCategory',
+      isManual: row.hm ? '1' : '0',
+      childCount: Number(row.cnt),
+      children: [],
+    });
+  }
+
   for (const td of typeDomainMap.values()) {
     for (const sc of td.children!) {
-      for (const dc of sc.children!) {
-        dc.childCount = dc.children?.length || 0;
-        if (dc.children?.some((child) => child.isManual === '1')) {
-          dc.isManual = '1';
-        }
-      }
       sc.childCount = sc.children?.length || 0;
     }
     td.childCount = td.children?.length || 0;
@@ -222,10 +200,38 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
   return result;
 }
 
-/** 根据 type_code 获取 type_domain_code（F1→F, G1→G, Y0→null） */
+/** 懒加载获取指定数据类码下的数据码 */
+export async function getDictTreeDataCodes(
+  typeDomainCode: string,
+  secondClassCode: string,
+  dataCategoryCode: string,
+): Promise<DictTreeNode[]> {
+  const rows = await dbQuery<{ dcode: string; dname: string; im: string }>(
+    `SELECT data_code AS dcode, data_name AS dname, is_manual AS im
+     FROM ${schema}.cec_new_energy_code_dict
+     WHERE if_delete = '0'
+       AND type_domain_code = $1
+       AND second_class_code = $2
+       AND data_category_code = $3
+       AND data_code IS NOT NULL
+       AND data_code != data_name
+     ORDER BY data_code`,
+    [typeDomainCode, secondClassCode, dataCategoryCode],
+  );
+  return rows.map(r => ({
+    code: r.dcode,
+    name: r.dname,
+    type: 'dataCode' as const,
+    isManual: r.im,
+  }));
+}
+
+
+/** 根据 type_code 获取 type_domain_code（F1→F, G1→G, S1→S, Y0→null） */
 function typeCodeToDomain(typeCode: string): string | null {
   if (typeCode.startsWith('F')) return 'F';
   if (typeCode.startsWith('G')) return 'G';
+  if (typeCode.startsWith('S')) return 'S';
   return null;
 }
 
@@ -295,6 +301,7 @@ export async function getManualStatistics(
     `SELECT SUBSTRING(type_code, 1, 1) AS code,
             CASE WHEN SUBSTRING(type_code, 1, 1) = 'F' THEN '风电'
                  WHEN SUBSTRING(type_code, 1, 1) = 'G' THEN '光伏'
+                 WHEN SUBSTRING(type_code, 1, 1) = 'S' THEN '水电'
                  ELSE '其他' END AS name
      FROM ${schema}.cec_new_energy_type_dict
      WHERE if_delete = '0'
