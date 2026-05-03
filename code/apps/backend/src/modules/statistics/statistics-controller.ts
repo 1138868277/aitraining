@@ -54,7 +54,7 @@ router.get('/api/statistics/code-gen/by-type', async (_req: Request, res: Respon
 router.get('/api/statistics/code-gen/by-second-class', async (req: Request, res: Response) => {
   try {
     const type = req.query.type as string;
-    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
+    const typeFilter = type === 'wind' || type === 'solar' || type === 'hydro' ? type : undefined;
     const data = await statisticsService.getCodeGenBySecondClass(typeFilter);
     success(res, data);
   } catch (err) {
@@ -109,6 +109,21 @@ router.get('/api/statistics/code-gen/group-detail', async (req: Request, res: Re
   } catch (err) {
     console.error('Failed to get code gen group detail:', err);
     error(res, ErrorCode.SYSTEM_ERROR, '查询分组详情失败', 500);
+  }
+});
+
+/** 按分组维度批量删除编码记录 */
+router.post('/api/statistics/code-gen/delete-groups', async (req: Request, res: Response) => {
+  try {
+    const groups = req.body.groups;
+    if (!Array.isArray(groups) || groups.length === 0) {
+      return error(res, ErrorCode.MISSING_PARAMETER, '请选择要删除的编码组', 400);
+    }
+    const deletedCount = await statisticsService.deleteCodeGenGroups(groups);
+    success(res, { deletedCount });
+  } catch (err) {
+    console.error('Failed to delete code gen groups:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '删除编码记录失败', 500);
   }
 });
 
@@ -248,7 +263,7 @@ router.get('/api/statistics/measurement/drill-down', async (req: Request, res: R
 router.get('/api/statistics/measurement/by-second-class', async (req: Request, res: Response) => {
   try {
     const type = req.query.type as string;
-    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
+    const typeFilter = type === 'wind' || type === 'solar' || type === 'hydro' ? type : undefined;
     const data = await statisticsService.getMeasureBySecondClass(typeFilter);
     success(res, data);
   } catch (err) {

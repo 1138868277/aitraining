@@ -81,18 +81,14 @@ export function generateCodeFromConditions(conditions: GenerateCodeRequest): str
 
 /** 拼接编码名称
  *
- * 格式：场站名称 + 二级类扩展码名称 + 二级类码名称 + 三级类扩展码 + 三级类码 + 数据码
- * - F类型且二级类扩展码数量>1：XX号机
- * - G类型且二级类扩展码数量>1：XX号方阵
- * - 三级类扩展码数量>1：#XX，否则为空
+ * 格式：场站 + 二级类扩展码 + '号' + 二级类码 + 三级类扩展码 + '#' + 三级类码 + 数据码
+ * - 二级类扩展码为0000时不展示扩展码和"号"
+ * - 三级类扩展码为0000时不展示扩展码和"#"
  * - 数据编码去掉括号及括号中的内容
  */
 export function generateCodeName(conditions: GenerateCodeRequest, dictNames: Record<string, string>): string | string[] {
   const secondExtCodes = parseExtendFormat(conditions.secondExtCode);
   const thirdExtCodes = parseExtendFormat(conditions.thirdExtCode);
-
-  const isFType = conditions.typeCode.startsWith('F');
-  const isGType = conditions.typeCode.startsWith('G');
 
   const stationName = dictNames.stationName || conditions.stationCode;
   const secondClassName = dictNames.secondClassName || conditions.secondClassCode;
@@ -106,24 +102,12 @@ export function generateCodeName(conditions: GenerateCodeRequest, dictNames: Rec
   const results: string[] = [];
 
   for (const secondExt of secondExtCodes) {
-    let secondExtName: string;
-    if (isFType && secondExtCodes.length > 1) {
-      secondExtName = `${parseInt(secondExt, 10)}号机`;
-    } else if (isGType && secondExtCodes.length > 1) {
-      secondExtName = `${parseInt(secondExt, 10)}号方阵`;
-    } else {
-      secondExtName = '';
-    }
+    const secondExtPart = secondExt === '0000' ? '' : `${parseInt(secondExt, 10)}号`;
 
     for (const thirdExt of thirdExtCodes) {
-      let thirdExtName: string;
-      if (thirdExtCodes.length > 1) {
-        thirdExtName = `#${parseInt(thirdExt, 10)}`;
-      } else {
-        thirdExtName = '';
-      }
+      const thirdExtPart = thirdExt === '0000' ? '' : `${parseInt(thirdExt, 10)}#`;
 
-      results.push([stationName, secondExtName, secondClassName, thirdExtName, thirdClassName, dataName].join(''));
+      results.push([stationName, secondExtPart, secondClassName, thirdExtPart, thirdClassName, dataName].join(''));
     }
   }
 

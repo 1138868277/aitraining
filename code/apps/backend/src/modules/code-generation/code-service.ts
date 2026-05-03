@@ -41,6 +41,8 @@ async function lookupCodeNames(conditions: GenerateCodeRequest): Promise<Record<
       const typeDomainCode = conditions.typeCode
         ? (conditions.typeCode.startsWith('F') || conditions.typeCode === '01' ? 'F'
           : conditions.typeCode.startsWith('G') || conditions.typeCode === '02' ? 'G'
+          : conditions.typeCode.startsWith('S') || conditions.typeCode === '05' ? 'S'
+          : conditions.typeCode === 'Y0' || conditions.typeCode === '03' || conditions.typeCode === '04' ? null
           : null)
         : null;
       const params: any[] = [conditions.dataCode, conditions.dataTypeCode || '00', conditions.secondClassCode];

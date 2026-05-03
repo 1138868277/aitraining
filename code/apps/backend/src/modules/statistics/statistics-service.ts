@@ -11,6 +11,7 @@ export const getCodeGenByStation = domain.getCodeGenByStation;
 export const getCodeGenTrend = domain.getCodeGenTrend;
 export const getCodeGenList = domain.getCodeGenList;
 export const getCodeGenGroupDetail = domain.getCodeGenGroupDetail;
+export const deleteCodeGenGroups = domain.deleteCodeGenGroups;
 
 // ========== 2. 编码字典统计 ==========
 

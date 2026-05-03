@@ -2,19 +2,20 @@
   <div class="tab-content">
     <!-- 概览卡片 -->
     <el-row :gutter="16" class="mb-16">
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">累计生成</div><div class="stat-value">{{ overview.totalCodes }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">今日生成</div><div class="stat-value primary">{{ overview.todayCodes }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">本周生成</div><div class="stat-value success">{{ overview.thisWeekCodes }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">本月生成</div><div class="stat-value warning">{{ overview.thisMonthCodes }}</div></div></el-card></el-col>
+      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">累计生成</div><div class="stat-value primary">{{ overview.totalCodes }}</div></div></el-card></el-col>
+      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">今<span class="label-unit label-unit-success">日</span>生成</div><div class="stat-value success">{{ overview.todayCodes }}</div></div></el-card></el-col>
+      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">本<span class="label-unit label-unit-hydro">周</span>生成</div><div class="stat-value hydro">{{ overview.thisWeekCodes }}</div></div></el-card></el-col>
+      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">本<span class="label-unit label-unit-warning">月</span>生成</div><div class="stat-value warning">{{ overview.thisMonthCodes }}</div></div></el-card></el-col>
     </el-row>
 
     <!-- 类型维度 -->
     <el-card class="mb-16">
       <template #header><span class="section-title">类型维度</span></template>
       <el-row :gutter="16">
-        <el-col :span="8"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon wind"><span class="dot" />风电</div><div class="stat-value primary">{{ typeStats.windCount }}</div></div></el-card></el-col>
-        <el-col :span="8"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon solar"><span class="dot" />光伏</div><div class="stat-value success">{{ typeStats.solarCount }}</div></div></el-card></el-col>
-        <el-col :span="8"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon other"><span class="dot" />不区分类型</div><div class="stat-value warning">{{ typeStats.otherCount }}</div></div></el-card></el-col>
+        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon wind"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><line x1="10" y1="9" x2="10" y2="17" stroke="#409EFF" stroke-width="1.6" stroke-linecap="round"/><path d="M10 9 L3 3 L10 6 L17 3 Z" fill="#409EFF"/><circle cx="10" cy="6" r="1.8" fill="#409EFF"/></svg>风电</div><div class="stat-value primary">{{ typeStats.windCount }}</div></div></el-card></el-col>
+        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon solar"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><circle cx="10" cy="10" r="3.5" fill="none" stroke="#67C23A" stroke-width="1.5"/><line x1="10" y1="2" x2="10" y2="4.5" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="10" y1="15.5" x2="10" y2="18" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="2" y1="10" x2="4.5" y2="10" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="15.5" y1="10" x2="18" y2="10" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="4.3" y1="4.3" x2="6.1" y2="6.1" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="13.9" y1="13.9" x2="15.7" y2="15.7" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="4.3" y1="15.7" x2="6.1" y2="13.9" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="13.9" y1="6.1" x2="15.7" y2="4.3" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/></svg>光伏</div><div class="stat-value success">{{ typeStats.solarCount }}</div></div></el-card></el-col>
+        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon hydro"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><path d="M10 2 C10 2 4 9.5 4 13 C4 16.3 6.7 19 10 19 C13.3 19 16 16.3 16 13 C16 9.5 10 2 10 2 Z" fill="none" stroke="#36CFC9" stroke-width="1.5"/></svg>水电</div><div class="stat-value hydro">{{ typeStats.hydroCount }}</div></div></el-card></el-col>
+        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon other"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><circle cx="10" cy="6" r="2" fill="none" stroke="#E6A23C" stroke-width="1.4"/><circle cx="6" cy="14" r="2" fill="none" stroke="#E6A23C" stroke-width="1.4"/><circle cx="14" cy="14" r="2" fill="none" stroke="#E6A23C" stroke-width="1.4"/></svg>不区分类型</div><div class="stat-value warning">{{ typeStats.otherCount }}</div></div></el-card></el-col>
       </el-row>
     </el-card>
 
@@ -28,6 +29,7 @@
               <el-radio-group v-model="secondClassType" size="small" @change="loadSecondClass">
                 <el-radio-button value="wind">风电</el-radio-button>
                 <el-radio-button value="solar">光伏</el-radio-button>
+                <el-radio-button value="hydro">水电</el-radio-button>
               </el-radio-group>
             </div>
           </template>
@@ -62,7 +64,8 @@
       </el-select>
       <el-button type="primary" @click="onListFilter">查询</el-button>
       <el-button @click="onResetListFilter">重置</el-button>
-      <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中明细</el-button>
+      <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中</el-button>
+      <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleDeleteSelected">删除选中</el-button>
     </div>
 
     <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand" :row-class-name="getExpandRowClass" @selection-change="onSelectionChange">
@@ -119,13 +122,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import * as XLSX from 'xlsx';
 import * as statsService from '@/services/statistics';
 import VChart from 'vue-echarts';
 import 'echarts';
 
 const overview = ref({ totalCodes: 0, todayCodes: 0, thisWeekCodes: 0, thisMonthCodes: 0 });
-const typeStats = ref({ windCount: 0, solarCount: 0, otherCount: 0 });
+const typeStats = ref({ windCount: 0, solarCount: 0, hydroCount: 0, otherCount: 0 });
 const secondClassType = ref('wind');
 const secondClassItems = ref<Array<{ name: string; value: number; percentage: number }>>([]);
 const stationItems = ref<Array<{ name: string; value: number; percentage: number }>>([]);
@@ -393,6 +397,33 @@ function getExpandRowClass({ row }: { row: any }) {
   return isRowExpanded(row) ? 'row-expanded-active' : '';
 }
 
+async function handleDeleteSelected() {
+  if (selectedRows.value.length === 0) return;
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedRows.value.length} 组编码吗？删除后数据将置为失效状态。`,
+      '确认删除',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
+    );
+    const groups = selectedRows.value.map((row: any) => ({
+      typeCode: row.type_code,
+      stationCode: row.station_code,
+      secondClassCode: row.second_class_code,
+      thirdClassCode: row.third_class_code,
+      dataTypeCode: row.data_type_code,
+      dataCode: row.data_code,
+    }));
+    const result = await statsService.deleteCodeGenGroups(groups);
+    ElMessage.success(`已删除 ${result.deletedCount} 条编码记录`);
+    selectedRows.value = [];
+    loadCodeList();
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '删除失败');
+    }
+  }
+}
+
 onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStation(); loadCodeList(); });
 </script>
 
@@ -401,18 +432,25 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .mb-16 { margin-bottom: 16px; }
 .stat-card { text-align: center; padding: 8px 0; }
 .stat-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
-.stat-value { font-size: 28px; font-weight: 700; color: #303133; }
+.label-unit { display: inline-block; padding: 0 5px; border-radius: 3px; background: #f0f0f0; color: #606266; font-weight: 600; font-size: 13px; line-height: 1.6; }
+.label-unit-success { background: #f0f9eb; color: #67C23A; }
+.label-unit-hydro { background: #e6f9f8; color: #36CFC9; }
+.label-unit-warning { background: #fdf6ec; color: #E6A23C; }
+.stat-value { font-size: 28px; font-weight: 700; color: #303133; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; letter-spacing: 1px; }
 .stat-value.primary { color: #409EFF; }
 .stat-value.success { color: #67C23A; }
+.stat-value.hydro { color: #36CFC9; }
 .stat-value.warning { color: #E6A23C; }
 .chart-container { height: 320px; width: 100%; }
 .chart-container-h { height: 360px; width: 100%; }
 .chart-card { height: 100%; }
 .section-title { font-weight: 600; font-size: 15px; }
 .type-icon { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.type-icon-svg { flex-shrink: 0; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .type-icon.wind .dot { background: #409EFF; }
 .type-icon.solar .dot { background: #67C23A; }
+.type-icon.hydro .dot { background: #36CFC9; }
 .type-icon.other .dot { background: #E6A23C; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .list-section { margin-top: 32px; border-top: 1px solid #e4e7ed; padding-top: 24px; }

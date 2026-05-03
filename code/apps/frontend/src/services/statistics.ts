@@ -16,7 +16,7 @@ export async function getCodeGenByDimension(
   return res.data;
 }
 
-export async function getCodeGenByType(): Promise<{ windCount: number; solarCount: number; otherCount: number }> {
+export async function getCodeGenByType(): Promise<{ windCount: number; solarCount: number; hydroCount: number; otherCount: number }> {
   const res = await api.get('/statistics/code-gen/by-type');
   return res.data;
 }
@@ -85,6 +85,18 @@ export async function getCodeGenGroupDetail(group: {
   dataCode: string;
 }): Promise<Array<{ code: string; name: string; create_date: string }>> {
   const res = await api.get('/statistics/code-gen/group-detail', { params: group });
+  return res.data;
+}
+
+export async function deleteCodeGenGroups(groups: Array<{
+  typeCode: string;
+  stationCode: string;
+  secondClassCode: string;
+  thirdClassCode: string;
+  dataTypeCode: string;
+  dataCode: string;
+}>): Promise<{ deletedCount: number }> {
+  const res = await api.post('/statistics/code-gen/delete-groups', { groups });
   return res.data;
 }
 

@@ -12,7 +12,7 @@
         <div class="quick-search-row">
           <el-input
             v-model="quickSearchText"
-            placeholder="输入数据码名称模糊搜索，或输入5位数字精确匹配"
+            placeholder="数据码模糊搜索 或 编码后5位"
             clearable
             @input="onQuickSearchInput"
             @clear="onQuickSearchClear"
@@ -452,7 +452,8 @@
               </el-select>
               <el-button type="primary" @click="onListFilter">查询</el-button>
               <el-button @click="onResetListFilter">重置</el-button>
-              <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中明细</el-button>
+              <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中</el-button>
+              <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleDeleteSelected">删除选中</el-button>
             </div>
 
             <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand" :row-class-name="getExpandRowClass" @selection-change="onSelectionChange">
@@ -905,6 +906,33 @@ async function handleExport() {
 
 function getExpandRowClass({ row }: { row: any }) {
   return isRowExpanded(row) ? 'row-expanded-active' : '';
+}
+
+async function handleDeleteSelected() {
+  if (selectedRows.value.length === 0) return;
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedRows.value.length} 组编码吗？删除后数据将置为失效状态。`,
+      '确认删除',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
+    );
+    const groups = selectedRows.value.map((row: any) => ({
+      typeCode: row.type_code,
+      stationCode: row.station_code,
+      secondClassCode: row.second_class_code,
+      thirdClassCode: row.third_class_code,
+      dataTypeCode: row.data_type_code,
+      dataCode: row.data_code,
+    }));
+    const result = await statsService.deleteCodeGenGroups(groups);
+    ElMessage.success(`已删除 ${result.deletedCount} 条编码记录`);
+    selectedRows.value = [];
+    loadCodeList();
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '删除失败');
+    }
+  }
 }
 
 /** 快捷筛选 */

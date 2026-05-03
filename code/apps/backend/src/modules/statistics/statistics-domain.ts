@@ -32,22 +32,25 @@ export async function getCodeGenOverview(): Promise<{
   };
 }
 
-/** 编码生成按类型统计（风电/光伏/其他） */
+/** 编码生成按类型统计（风电/光伏/水电/其他） */
 export async function getCodeGenByType(): Promise<{
-  windCount: number; solarCount: number; otherCount: number;
+  windCount: number; solarCount: number; hydroCount: number; otherCount: number;
 }> {
   const sql = `
     SELECT
       COUNT(CASE WHEN SUBSTRING(code, 5, 2) LIKE 'F%' OR SUBSTRING(code, 5, 2) = '01' THEN 1 END) AS wind,
       COUNT(CASE WHEN SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02' THEN 1 END) AS solar,
+      COUNT(CASE WHEN SUBSTRING(code, 5, 2) LIKE 'S%' OR SUBSTRING(code, 5, 2) = '05' THEN 1 END) AS hydro,
       COUNT(CASE WHEN NOT (SUBSTRING(code, 5, 2) LIKE 'F%' OR SUBSTRING(code, 5, 2) = '01'
-                        OR SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02') THEN 1 END) AS other
+                        OR SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02'
+                        OR SUBSTRING(code, 5, 2) LIKE 'S%' OR SUBSTRING(code, 5, 2) = '05') THEN 1 END) AS other
     FROM ${dbc.schema}.cec_new_energy_createcode
     WHERE if_delete = '0'`;
-  const r = await query<{ wind: string; solar: string; other: string }>(sql);
+  const r = await query<{ wind: string; solar: string; hydro: string; other: string }>(sql);
   return {
     windCount: Number(r[0]?.wind || 0),
     solarCount: Number(r[0]?.solar || 0),
+    hydroCount: Number(r[0]?.hydro || 0),
     otherCount: Number(r[0]?.other || 0),
   };
 }
@@ -94,7 +97,7 @@ export async function getCodeGenByDimension(
 
 /** 编码生成按二级类码统计（编码 + 名称） */
 export async function getCodeGenBySecondClass(
-  typeFilter?: 'wind' | 'solar',
+  typeFilter?: 'wind' | 'solar' | 'hydro',
 ): Promise<{
   items: Array<{ name: string; value: number; percentage: number }>
 }> {
@@ -106,6 +109,9 @@ export async function getCodeGenBySecondClass(
   } else if (typeFilter === 'solar') {
     typeCondition = "AND (SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02')";
     dictTypeCondition = "AND (type_code LIKE 'G%' OR type_code = '02')";
+  } else if (typeFilter === 'hydro') {
+    typeCondition = "AND (SUBSTRING(code, 5, 2) LIKE 'S%' OR SUBSTRING(code, 5, 2) = '05')";
+    dictTypeCondition = "AND (type_code LIKE 'S%' OR type_code = '05')";
   }
   const sql = `
     SELECT t.code_val, d.second_class_name AS name_val, t.cnt
@@ -261,10 +267,10 @@ export async function getCodeGenList(
     FROM ${dbc.schema}.cec_new_energy_createcode c
     LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON SUBSTRING(c.code, 5, 2) = t.type_code
     LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON SUBSTRING(c.code, 1, 4) = s.station_code
-    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code) sc ON SUBSTRING(c.code, 13, 3) = sc.second_class_code
-    LEFT JOIN (SELECT third_class_code, MIN(third_class_name) AS third_class_name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL GROUP BY third_class_code) tc ON SUBSTRING(c.code, 20, 3) = tc.third_class_code
-    LEFT JOIN (SELECT data_category_code, MIN(data_category_name) AS data_type_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code) dtd_type ON SUBSTRING(c.code, 27, 2) = dtd_type.data_category_code
-    LEFT JOIN (SELECT data_category_code, data_code, MIN(data_name) AS data_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL GROUP BY data_category_code, data_code) dtd_code ON SUBSTRING(c.code, 27, 2) = dtd_code.data_category_code AND SUBSTRING(c.code, 29, 3) = dtd_code.data_code
+    LEFT JOIN (SELECT DISTINCT second_class_code, type_code, second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL) sc ON SUBSTRING(c.code, 13, 3) = sc.second_class_code AND SUBSTRING(c.code, 5, 2) = sc.type_code
+    LEFT JOIN (SELECT DISTINCT third_class_code, second_class_code, type_code, third_class_name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL) tc ON SUBSTRING(c.code, 20, 3) = tc.third_class_code AND SUBSTRING(c.code, 13, 3) = tc.second_class_code AND SUBSTRING(c.code, 5, 2) = tc.type_code
+    LEFT JOIN (SELECT DISTINCT data_category_code, type_domain_code, data_category_name AS data_type_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL) dtd_type ON SUBSTRING(c.code, 27, 2) = dtd_type.data_category_code AND SUBSTRING(c.code, 5, 1) = dtd_type.type_domain_code
+    LEFT JOIN (SELECT DISTINCT data_category_code, data_code, type_domain_code, data_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL) dtd_code ON SUBSTRING(c.code, 27, 2) = dtd_code.data_category_code AND SUBSTRING(c.code, 29, 3) = dtd_code.data_code AND SUBSTRING(c.code, 5, 1) = dtd_code.type_domain_code
     WHERE ${whereClause}
     GROUP BY ${dimsGroup}, t.type_name, s.station_name, sc.second_class_name, tc.third_class_name, dtd_type.data_type_name, dtd_code.data_name
     ORDER BY max_create_tm DESC
@@ -345,6 +351,39 @@ export async function getCodeGenGroupDetail(
     group.typeCode, group.stationCode, group.secondClassCode,
     group.thirdClassCode, group.dataTypeCode, group.dataCode,
   ]);
+}
+
+/** 按分组维度软删除编码生成记录 */
+export async function deleteCodeGenGroups(
+  groups: Array<{
+    typeCode: string;
+    stationCode: string;
+    secondClassCode: string;
+    thirdClassCode: string;
+    dataTypeCode: string;
+    dataCode: string;
+  }>,
+): Promise<number> {
+  if (groups.length === 0) return 0;
+  let totalDeleted = 0;
+  for (const g of groups) {
+    const sql = `
+      UPDATE ${dbc.schema}.cec_new_energy_createcode
+      SET if_delete = '1', modify_tm = NOW()
+      WHERE if_delete = '0'
+        AND SUBSTRING(code, 5, 2) = $1
+        AND SUBSTRING(code, 1, 4) = $2
+        AND SUBSTRING(code, 13, 3) = $3
+        AND SUBSTRING(code, 20, 3) = $4
+        AND SUBSTRING(code, 27, 2) = $5
+        AND SUBSTRING(code, 29, 3) = $6`;
+    const result = await query(sql, [
+      g.typeCode, g.stationCode, g.secondClassCode,
+      g.thirdClassCode, g.dataTypeCode, g.dataCode,
+    ]);
+    totalDeleted += (result as any)?.rowCount || 0;
+  }
+  return totalDeleted;
 }
 
 // ========== 2. 编码字典统计 ==========
