@@ -48,23 +48,25 @@
     <div class="list-section-header">编码生成列表</div>
 
     <div class="list-filter-bar">
-      <el-select v-model="listFilters.typeCode" placeholder="类型" clearable style="width:150px" @change="onListFilter">
+      <el-select v-model="listFilters.typeCode" placeholder="类型" clearable style="width:150px" @change="onTypeChange" :teleported="false">
         <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
       </el-select>
-      <el-select v-model="listFilters.stationCode" placeholder="场站" clearable style="width:150px" @change="onListFilter">
+      <el-select v-model="listFilters.stationCode" placeholder="场站" clearable style="width:150px" @change="onListFilter" :teleported="false">
         <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
       </el-select>
-      <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" clearable style="width:150px" @change="onListFilter">
+      <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
         <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
       </el-select>
-      <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" clearable style="width:150px" @change="onListFilter">
+      <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" clearable style="width:150px" @change="onListFilter" :teleported="false">
         <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
       </el-select>
       <el-button type="primary" @click="onListFilter">查询</el-button>
       <el-button @click="onResetListFilter">重置</el-button>
+      <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中明细</el-button>
     </div>
 
-    <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand">
+    <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand" :row-class-name="getExpandRowClass" @selection-change="onSelectionChange">
+      <el-table-column type="selection" width="45" fixed />
       <el-table-column type="index" label="序号" width="60" fixed />
       <el-table-column label="类型" width="90" prop="type_code" />
       <el-table-column label="场站" min-width="150">
@@ -91,10 +93,11 @@
       <el-table-column type="expand">
         <template #default="{ row }">
           <div v-if="row._detailLoading" style="text-align:center;padding:12px">加载中...</div>
-          <el-table v-else :data="row._detailList" border stripe size="small">
+          <el-table v-else :data="row._detailList" border stripe size="small" class="detail-table">
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column label="测点编码" width="300" prop="code" />
-            <el-table-column label="测点名称" min-width="200" prop="name" />
+            <el-table-column label="测点名称" width="500" prop="name" />
+            <el-table-column label="生成时间" width="200" prop="create_date" />
           </el-table>
         </template>
       </el-table-column>
@@ -116,6 +119,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
+import * as XLSX from 'xlsx';
 import * as statsService from '@/services/statistics';
 import VChart from 'vue-echarts';
 import 'echarts';
@@ -282,9 +286,7 @@ async function loadCodeList() {
     const result = await statsService.getCodeGenList(listPageNum.value, listPageSize.value, listFilters);
     codeList.value = enrichListData(result.list || []);
     listTotal.value = result.total || 0;
-    if (filterOptionMap.value.typeCodes.length === 0) {
-      filterOptionMap.value = result.filterOptions;
-    }
+    filterOptionMap.value = result.filterOptions;
   } catch {
     codeList.value = [];
     listTotal.value = 0;
@@ -313,6 +315,19 @@ async function onGroupExpand(row: any, expandedRows: any[]) {
   }
 }
 
+function onTypeChange() {
+  listFilters.secondClassCode = undefined;
+  listFilters.dataTypeCode = undefined;
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
+function onSecondClassChange() {
+  listFilters.dataTypeCode = undefined;
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
 function onListFilter() {
   listPageNum.value = 1;
   loadCodeList();
@@ -325,6 +340,57 @@ function onResetListFilter() {
   listFilters.dataTypeCode = undefined;
   listPageNum.value = 1;
   loadCodeList();
+}
+
+const selectedRows = ref<any[]>([]);
+
+function onSelectionChange(rows: any[]) {
+  selectedRows.value = rows;
+}
+
+async function handleExport() {
+  const rows: Array<Record<string, string>> = [];
+  for (const row of selectedRows.value) {
+    let details = row._detailList;
+    if (!details || details.length === 0) {
+      try {
+        details = await statsService.getCodeGenGroupDetail({
+          typeCode: row.type_code,
+          stationCode: row.station_code,
+          secondClassCode: row.second_class_code,
+          thirdClassCode: row.third_class_code,
+          dataTypeCode: row.data_type_code,
+          dataCode: row.data_code,
+        });
+      } catch { continue; }
+    }
+    for (const d of details) {
+      rows.push({
+        类型: row.type_code,
+        场站: `${row.station_code} ${row.station_name}`.trim(),
+        二级类码: `${row.second_class_code} ${row.second_class_name}`.trim(),
+        三级类码: `${row.third_class_code} ${row.third_class_name}`.trim(),
+        数据类码: `${row.data_type_code} ${row.data_type_name}`.trim(),
+        数据码: `${row.data_code} ${row.data_name}`.trim(),
+        测点编码: d.code,
+        测点名称: d.name,
+        生成时间: d.create_date,
+      });
+    }
+  }
+  if (rows.length === 0) return;
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '明细');
+  ws['!cols'] = [
+    { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 20 }, { wch: 12 }
+  ];
+  XLSX.writeFile(wb, `编码明细_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function getExpandRowClass({ row }: { row: any }) {
+  return isRowExpanded(row) ? 'row-expanded-active' : '';
 }
 
 onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStation(); loadCodeList(); });
@@ -355,4 +421,8 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .list-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
 :deep(.el-table__expand-column) { display: none; }
 .code-count { display: inline-block; min-width: 28px; font-weight: 700; color: #409EFF; margin-right: 4px; }
+:deep(.row-expanded-active) { background-color: #f0f9ff; }
+:deep(.row-expanded-active > td) { color: #409EFF; font-weight: 600; }
+:deep(.detail-table th),
+:deep(.detail-table td) { background-color: #f0f9ff !important; }
 </style>

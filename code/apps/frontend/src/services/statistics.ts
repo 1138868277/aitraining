@@ -83,7 +83,7 @@ export async function getCodeGenGroupDetail(group: {
   thirdClassCode: string;
   dataTypeCode: string;
   dataCode: string;
-}): Promise<Array<{ code: string; name: string }>> {
+}): Promise<Array<{ code: string; name: string; create_date: string }>> {
   const res = await api.get('/statistics/code-gen/group-detail', { params: group });
   return res.data;
 }

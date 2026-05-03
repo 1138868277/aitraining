@@ -256,7 +256,8 @@ export async function getCodeGenList(
       COALESCE(tc.third_class_name, '') AS third_class_name,
       COALESCE(dtd_type.data_type_name, '') AS data_type_name,
       COALESCE(dtd_code.data_name, '') AS data_name,
-      COUNT(*) AS code_count
+      COUNT(*) AS code_count,
+      MAX(c.create_tm) AS max_create_tm
     FROM ${dbc.schema}.cec_new_energy_createcode c
     LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON SUBSTRING(c.code, 5, 2) = t.type_code
     LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON SUBSTRING(c.code, 1, 4) = s.station_code
@@ -266,20 +267,41 @@ export async function getCodeGenList(
     LEFT JOIN (SELECT data_category_code, data_code, MIN(data_name) AS data_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL GROUP BY data_category_code, data_code) dtd_code ON SUBSTRING(c.code, 27, 2) = dtd_code.data_category_code AND SUBSTRING(c.code, 29, 3) = dtd_code.data_code
     WHERE ${whereClause}
     GROUP BY ${dimsGroup}, t.type_name, s.station_name, sc.second_class_name, tc.third_class_name, dtd_type.data_type_name, dtd_code.data_name
-    ORDER BY code_count DESC
+    ORDER BY max_create_tm DESC
     LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
   const list = await query(listSql, [...params, pageSize, offset]);
 
-  // 筛选条件选项
+  // 筛选条件选项（联动过滤：类型→二级类码→数据类码）
   const [typeOptions, stationOptions, secondClassOptions, dataTypeOptions] = await Promise.all([
     query<{ code: string; name: string }>(
       `SELECT type_code AS code, type_name AS name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
+
     query<{ code: string; name: string }>(
       `SELECT station_code AS code, station_name AS name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
-    query<{ code: string; name: string }>(
-      `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code ORDER BY code`),
-    query<{ code: string; name: string }>(
-      `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code ORDER BY code`),
+
+    // 二级类码：如果已选类型则按类型过滤
+    (() => {
+      let sql = `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL`;
+      const p: string[] = [];
+      if (filters.typeCode) {
+        sql += ` AND type_code = $1`;
+        p.push(filters.typeCode);
+      }
+      sql += ` GROUP BY second_class_code ORDER BY code`;
+      return query<{ code: string; name: string }>(sql, p);
+    })(),
+
+    // 数据类码：如果已选二级类码则按二级类码过滤
+    (() => {
+      let sql = `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL`;
+      const p: string[] = [];
+      if (filters.secondClassCode) {
+        sql += ` AND second_class_code = $1`;
+        p.push(filters.secondClassCode);
+      }
+      sql += ` GROUP BY data_category_code ORDER BY code`;
+      return query<{ code: string; name: string }>(sql, p);
+    })(),
   ]);
 
   return {
@@ -307,9 +329,9 @@ export async function getCodeGenGroupDetail(
     dataTypeCode: string;
     dataCode: string;
   },
-): Promise<Array<{ code: string; name: string }>> {
+): Promise<Array<{ code: string; name: string; create_date: string }>> {
   const sql = `
-    SELECT code, name
+    SELECT code, name, TO_CHAR(create_tm, 'YYYY-MM-DD') AS create_date
     FROM ${dbc.schema}.cec_new_energy_createcode
     WHERE if_delete = '0'
       AND SUBSTRING(code, 5, 2) = $1
@@ -319,7 +341,7 @@ export async function getCodeGenGroupDetail(
       AND SUBSTRING(code, 27, 2) = $5
       AND SUBSTRING(code, 29, 3) = $6
     ORDER BY code`;
-  return query<{ code: string; name: string }>(sql, [
+  return query<{ code: string; name: string; create_date: string }>(sql, [
     group.typeCode, group.stationCode, group.secondClassCode,
     group.thirdClassCode, group.dataTypeCode, group.dataCode,
   ]);

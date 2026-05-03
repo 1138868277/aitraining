@@ -434,57 +434,77 @@
           <el-empty v-if="generatedCodes.length === 0" description="暂无生成记录" />
         </el-tab-pane>
 
-        <!-- 已保存标签页 -->
-        <el-tab-pane label="已生成编码" name="saved">
-          <div class="saved-filter-bar">
-            <el-date-picker
-              v-model="savedDateRange"
-              type="datetimerange"
-              range-separator="至"
-              start-placeholder="开始时间"
-              end-placeholder="结束时间"
-              value-format="YYYY-MM-DD HH:mm:ss"
-              style="width: 380px"
-            />
-            <el-button size="small" type="primary" @click="onSavedTimeFilter">查询</el-button>
-            <el-button size="small" @click="onSavedTimeReset">重置</el-button>
+        <!-- 已生成编码列表 -->
+        <el-tab-pane label="编码列表" name="saved">
+          <div class="list-section">
+            <div class="list-filter-bar">
+              <el-select v-model="listFilters.typeCode" placeholder="类型" clearable style="width:150px" @change="onTypeChange" :teleported="false">
+                <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
+              </el-select>
+              <el-select v-model="listFilters.stationCode" placeholder="场站" clearable style="width:150px" @change="onListFilter" :teleported="false">
+                <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+              </el-select>
+              <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
+                <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+              </el-select>
+              <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" clearable style="width:150px" @change="onListFilter" :teleported="false">
+                <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
+              </el-select>
+              <el-button type="primary" @click="onListFilter">查询</el-button>
+              <el-button @click="onResetListFilter">重置</el-button>
+              <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中明细</el-button>
+            </div>
+
+            <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand" :row-class-name="getExpandRowClass" @selection-change="onSelectionChange">
+              <el-table-column type="selection" width="45" fixed />
+              <el-table-column type="index" label="序号" width="60" fixed />
+              <el-table-column label="类型" width="90" prop="type_code" />
+              <el-table-column label="场站" min-width="150">
+                <template #default="{ row }">{{ row.station_name ? `${row.station_code} ${row.station_name}` : row.station_code }}</template>
+              </el-table-column>
+              <el-table-column label="二级类码" min-width="150">
+                <template #default="{ row }">{{ row.second_class_name ? `${row.second_class_code} ${row.second_class_name}` : row.second_class_code }}</template>
+              </el-table-column>
+              <el-table-column label="三级类码" min-width="150">
+                <template #default="{ row }">{{ row.third_class_name ? `${row.third_class_code} ${row.third_class_name}` : row.third_class_code }}</template>
+              </el-table-column>
+              <el-table-column label="数据类码" min-width="90">
+                <template #default="{ row }">{{ row.data_type_name ? `${row.data_type_code} ${row.data_type_name}` : row.data_type_code }}</template>
+              </el-table-column>
+              <el-table-column label="数据码" min-width="120">
+                <template #default="{ row }">{{ row.data_name ? `${row.data_code} ${row.data_name}` : row.data_code }}</template>
+              </el-table-column>
+              <el-table-column label="操作" min-width="140">
+                <template #default="{ row }">
+                  <span class="code-count">{{ row.code_count }}</span>
+                  <el-button size="small" @click="toggleRowExpand(row)">{{ isRowExpanded(row) ? '收起' : '明细' }}</el-button>
+                </template>
+              </el-table-column>
+              <el-table-column type="expand">
+                <template #default="{ row }">
+                  <div v-if="row._detailLoading" style="text-align:center;padding:12px">加载中...</div>
+                  <el-table v-else :data="row._detailList" border stripe size="small" class="detail-table">
+                    <el-table-column type="index" label="序号" width="60" />
+                    <el-table-column label="测点编码" width="300" prop="code" />
+                    <el-table-column label="测点名称" width="500" prop="name" />
+                    <el-table-column label="生成时间" width="200" prop="create_date" />
+                  </el-table>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <div class="list-pagination">
+              <el-pagination
+                v-model:current-page="listPageNum"
+                v-model:page-size="listPageSize"
+                :total="listTotal"
+                :page-sizes="[10, 20, 50, 100]"
+                layout="total, sizes, prev, pager, next"
+                @current-change="loadCodeList"
+                @size-change="loadCodeList"
+              />
+            </div>
           </div>
-
-          <!-- 选中操作栏 -->
-          <div v-if="savedCodes.length > 0" class="saved-selection-bar">
-            <el-input-number
-              v-model="savedRangeStart"
-              :min="1"
-              :max="Math.max(1, savedCodes.length)"
-              size="small"
-              controls-position="right"
-              style="width: 100px"
-            />
-            <span class="range-separator">~</span>
-            <el-input-number
-              v-model="savedRangeEnd"
-              :min="1"
-              :max="Math.max(1, savedCodes.length)"
-              size="small"
-              controls-position="right"
-              style="width: 100px"
-            />
-            <el-button size="small" @click="selectSavedRange">选中</el-button>
-            <el-button size="small" @click="clearSavedSelection">取消选中</el-button>
-            <el-button size="small" @click="copySelectedSaved">复制选中</el-button>
-            <el-button size="small" @click="deleteSelectedSaved">删除选中</el-button>
-            <el-button size="small" @click="exportSelectedSaved">导出选中</el-button>
-          </div>
-
-          <el-table ref="savedTableRef" :data="savedCodes" border stripe style="width: 100%" v-loading="savedLoading" @selection-change="onSavedSelectionChange">
-            <el-table-column type="selection" width="50" />
-            <el-table-column type="index" label="序号" width="60" />
-            <el-table-column prop="code" label="编码" width="320" />
-            <el-table-column prop="name" label="编码名称" min-width="200" />
-            <el-table-column prop="generate_time" label="生成时间" width="180" />
-          </el-table>
-          <el-empty v-if="savedCodes.length === 0 && !savedLoading" description="暂无保存记录" />
-
         </el-tab-pane>
 
       </el-tabs>
@@ -498,6 +518,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import * as XLSX from 'xlsx';
 import * as dictService from '@/services/dict';
 import * as codeService from '@/services/code-generation';
+import * as statsService from '@/services/statistics';
 import { generateCodeRequestSchema } from '@cec/contracts';
 
 interface ConditionField {
@@ -710,6 +731,180 @@ async function deleteSelectedSaved() {
       ElMessage.error(err.message || '删除失败');
     }
   }
+}
+
+// ===== 编码生成列表（从统计分析复制）=====
+const mainTableRef = ref<any>(null);
+const codeList = ref<any[]>([]);
+const listTotal = ref(0);
+const listPageNum = ref(1);
+const listPageSize = ref(20);
+const listLoading = ref(false);
+const expandedRowKeys = ref<string[]>([]);
+
+function getRowKey(row: any): string {
+  return `${row.type_code}|${row.station_code}|${row.second_class_code}|${row.third_class_code}|${row.data_type_code}|${row.data_code}`;
+}
+
+function isRowExpanded(row: any): boolean {
+  return expandedRowKeys.value.includes(getRowKey(row));
+}
+
+async function toggleRowExpand(row: any) {
+  const key = getRowKey(row);
+  const idx = expandedRowKeys.value.indexOf(key);
+  if (idx >= 0) {
+    expandedRowKeys.value.splice(idx, 1);
+  } else {
+    if (row._detailList.length === 0) {
+      row._detailLoading = true;
+      try {
+        row._detailList = await statsService.getCodeGenGroupDetail({
+          typeCode: row.type_code,
+          stationCode: row.station_code,
+          secondClassCode: row.second_class_code,
+          thirdClassCode: row.third_class_code,
+          dataTypeCode: row.data_type_code,
+          dataCode: row.data_code,
+        });
+      } catch {
+        row._detailList = [];
+      } finally {
+        row._detailLoading = false;
+      }
+    }
+    expandedRowKeys.value.push(key);
+  }
+}
+
+function enrichListData(list: any[]) {
+  return list.map(item => ({ ...item, rowKey: getRowKey(item), _detailList: [], _detailLoading: false }));
+}
+
+const filterOptionMap = ref<{
+  typeCodes: Array<{ code: string; name: string }>;
+  stationCodes: Array<{ code: string; name: string }>;
+  secondClassCodes: Array<{ code: string; name: string }>;
+  dataTypeCodes: Array<{ code: string; name: string }>;
+}>({ typeCodes: [], stationCodes: [], secondClassCodes: [], dataTypeCodes: [] });
+const listFilters = reactive({
+  typeCode: undefined as string | undefined,
+  stationCode: undefined as string | undefined,
+  secondClassCode: undefined as string | undefined,
+  dataTypeCode: undefined as string | undefined,
+});
+
+async function loadCodeList() {
+  listLoading.value = true;
+  try {
+    const result = await statsService.getCodeGenList(listPageNum.value, listPageSize.value, listFilters);
+    codeList.value = enrichListData(result.list || []);
+    listTotal.value = result.total || 0;
+    filterOptionMap.value = result.filterOptions;
+  } catch {
+    codeList.value = [];
+    listTotal.value = 0;
+  } finally {
+    listLoading.value = false;
+  }
+}
+
+async function onGroupExpand(row: any, expandedRows: any[]) {
+  if (!expandedRows.includes(row)) return;
+  if (row._detailList.length > 0) return;
+  row._detailLoading = true;
+  try {
+    row._detailList = await statsService.getCodeGenGroupDetail({
+      typeCode: row.type_code,
+      stationCode: row.station_code,
+      secondClassCode: row.second_class_code,
+      thirdClassCode: row.third_class_code,
+      dataTypeCode: row.data_type_code,
+      dataCode: row.data_code,
+    });
+  } catch {
+    row._detailList = [];
+  } finally {
+    row._detailLoading = false;
+  }
+}
+
+function onTypeChange() {
+  listFilters.secondClassCode = undefined;
+  listFilters.dataTypeCode = undefined;
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
+function onSecondClassChange() {
+  listFilters.dataTypeCode = undefined;
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
+function onListFilter() {
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
+function onResetListFilter() {
+  listFilters.typeCode = undefined;
+  listFilters.stationCode = undefined;
+  listFilters.secondClassCode = undefined;
+  listFilters.dataTypeCode = undefined;
+  listPageNum.value = 1;
+  loadCodeList();
+}
+
+const selectedRows = ref<any[]>([]);
+
+function onSelectionChange(rows: any[]) {
+  selectedRows.value = rows;
+}
+
+async function handleExport() {
+  const rows: Array<Record<string, string>> = [];
+  for (const row of selectedRows.value) {
+    let details = row._detailList;
+    if (!details || details.length === 0) {
+      try {
+        details = await statsService.getCodeGenGroupDetail({
+          typeCode: row.type_code,
+          stationCode: row.station_code,
+          secondClassCode: row.second_class_code,
+          thirdClassCode: row.third_class_code,
+          dataTypeCode: row.data_type_code,
+          dataCode: row.data_code,
+        });
+      } catch { continue; }
+    }
+    for (const d of details) {
+      rows.push({
+        类型: row.type_code,
+        场站: `${row.station_code} ${row.station_name}`.trim(),
+        二级类码: `${row.second_class_code} ${row.second_class_name}`.trim(),
+        三级类码: `${row.third_class_code} ${row.third_class_name}`.trim(),
+        数据类码: `${row.data_type_code} ${row.data_type_name}`.trim(),
+        数据码: `${row.data_code} ${row.data_name}`.trim(),
+        测点编码: d.code,
+        测点名称: d.name,
+        生成时间: d.create_date,
+      });
+    }
+  }
+  if (rows.length === 0) return;
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '明细');
+  ws['!cols'] = [
+    { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 20 }, { wch: 12 }
+  ];
+  XLSX.writeFile(wb, `编码明细_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function getExpandRowClass({ row }: { row: any }) {
+  return isRowExpanded(row) ? 'row-expanded-active' : '';
 }
 
 /** 快捷筛选 */
@@ -1223,6 +1418,9 @@ onMounted(async () => {
 
     // 加载最近条件记录
     loadRecentConditions();
+
+    // 加载编码生成列表
+    loadCodeList();
   } catch (err: any) {
     ElMessage.error('筛选条件加载失败，请刷新重试');
   }
@@ -1511,8 +1709,8 @@ async function handleSaveCodes() {
     };
     const result = await codeService.saveCodeRecords(generatedCodes.value, context);
     ElMessage.success(`已保存 ${result.savedCount} 条`);
-    savedPageNum.value = 1;
-    loadSavedCodes();
+    listPageNum.value = 1;
+    loadCodeList();
     activeTab.value = 'saved';
   } catch (err: any) {
     ElMessage.error(err.message || '保存失败');
@@ -1552,8 +1750,8 @@ function onSavedTimeReset() {
 /** 切换标签页时保持滚动位置，并在切换到已保存标签页时加载数据 */
 function onTabClick(tab: any) {
   const scrollY = window.scrollY;
-  if (tab.props?.name === 'saved' && savedCodes.value.length === 0) {
-    loadSavedCodes();
+  if (tab.props?.name === 'saved' && codeList.value.length === 0) {
+    loadCodeList();
   }
   nextTick(() => {
     window.scrollTo(0, scrollY);
@@ -2144,5 +2342,17 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   font-size: 13px;
   color: #909399;
 }
+
+/* ===== 编码生成列表样式 ===== */
+.list-section { padding-top: 0; }
+.list-section-header { font-weight: 600; font-size: 16px; margin-bottom: 16px; }
+.list-filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.list-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
+:deep(.el-table__expand-column) { display: none; }
+.code-count { display: inline-block; min-width: 28px; font-weight: 700; color: #409EFF; margin-right: 4px; }
+:deep(.row-expanded-active) { background-color: #f0f9ff; }
+:deep(.row-expanded-active > td) { color: #409EFF; font-weight: 600; }
+:deep(.detail-table th),
+:deep(.detail-table td) { background-color: #f0f9ff !important; }
 
 </style>
