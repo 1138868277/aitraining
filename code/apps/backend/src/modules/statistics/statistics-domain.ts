@@ -1,7 +1,7 @@
 import { query, queryOne } from '../../db/index.js';
 import { config } from '../../config/index.js';
 
-const schema = config.db.schema;
+const dbc = config.db;
 
 // ========== 编码生成统计 ==========
 
@@ -18,7 +18,7 @@ export async function getCodeGenOverview(): Promise<{
       COUNT(CASE WHEN create_tm >= CURRENT_DATE THEN 1 END) AS today_codes,
       COUNT(CASE WHEN create_tm >= date_trunc('week', CURRENT_DATE) THEN 1 END) AS week_codes,
       COUNT(CASE WHEN create_tm >= date_trunc('month', CURRENT_DATE) THEN 1 END) AS month_codes
-    FROM ${schema}.cec_new_energy_createcode
+    FROM ${dbc.schema}.cec_new_energy_createcode
     WHERE if_delete = '0'`;
   const r = await query<{
     total_codes: string; today_codes: string;
@@ -42,7 +42,7 @@ export async function getCodeGenByType(): Promise<{
       COUNT(CASE WHEN SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02' THEN 1 END) AS solar,
       COUNT(CASE WHEN NOT (SUBSTRING(code, 5, 2) LIKE 'F%' OR SUBSTRING(code, 5, 2) = '01'
                         OR SUBSTRING(code, 5, 2) LIKE 'G%' OR SUBSTRING(code, 5, 2) = '02') THEN 1 END) AS other
-    FROM ${schema}.cec_new_energy_createcode
+    FROM ${dbc.schema}.cec_new_energy_createcode
     WHERE if_delete = '0'`;
   const r = await query<{ wind: string; solar: string; other: string }>(sql);
   return {
@@ -79,7 +79,7 @@ export async function getCodeGenByDimension(
   }
 
   const sql = `SELECT ${col} AS name, COUNT(*) AS cnt
-    FROM ${schema}.cec_new_energy_createcode
+    FROM ${dbc.schema}.cec_new_energy_createcode
     WHERE ${conditions}
     GROUP BY ${col} ORDER BY cnt DESC`;
   const rows = await query<{ name: string; cnt: string }>(sql, params);
@@ -111,11 +111,11 @@ export async function getCodeGenBySecondClass(
     SELECT t.code_val, d.second_class_name AS name_val, t.cnt
     FROM (
       SELECT SUBSTRING(code, 13, 3) AS code_val, COUNT(*) AS cnt
-      FROM ${schema}.cec_new_energy_createcode
+      FROM ${dbc.schema}.cec_new_energy_createcode
       WHERE if_delete = '0' ${typeCondition}
       GROUP BY SUBSTRING(code, 13, 3)
     ) t
-    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' ${dictTypeCondition} GROUP BY second_class_code) d
+    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' ${dictTypeCondition} GROUP BY second_class_code) d
       ON t.code_val = d.second_class_code
     ORDER BY t.cnt DESC`;
   const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
@@ -136,11 +136,11 @@ export async function getCodeGenByStation(): Promise<{
     SELECT t.code_val, d.station_name AS name_val, t.cnt
     FROM (
       SELECT SUBSTRING(code, 1, 4) AS code_val, COUNT(*) AS cnt
-      FROM ${schema}.cec_new_energy_createcode
+      FROM ${dbc.schema}.cec_new_energy_createcode
       WHERE if_delete = '0'
       GROUP BY SUBSTRING(code, 1, 4)
     ) t
-    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') d
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0') d
       ON t.code_val = d.station_code
     ORDER BY t.cnt DESC`;
   const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
@@ -158,7 +158,7 @@ export async function getCodeGenTrend(
   days: number = 30,
 ): Promise<{ items: Array<{ date: string; count: number }> }> {
   const sql = `SELECT TO_CHAR(create_tm, 'YYYY-MM-DD') AS dt, COUNT(*) AS cnt
-    FROM ${schema}.cec_new_energy_createcode
+    FROM ${dbc.schema}.cec_new_energy_createcode
     WHERE if_delete = '0' AND create_tm >= CURRENT_DATE - $1::integer
     GROUP BY dt ORDER BY dt`;
   const rows = await query<{ dt: string; cnt: string }>(sql, [String(days)]);
@@ -242,7 +242,7 @@ export async function getCodeGenList(
     SUBSTRING(c.code, 27, 2),
     SUBSTRING(c.code, 29, 3)`;
 
-  const countSql = `SELECT COUNT(*) AS total FROM (SELECT 1 FROM ${schema}.cec_new_energy_createcode c WHERE ${whereClause} GROUP BY ${dimsGroup}) t`;
+  const countSql = `SELECT COUNT(*) AS total FROM (SELECT 1 FROM ${dbc.schema}.cec_new_energy_createcode c WHERE ${whereClause} GROUP BY ${dimsGroup}) t`;
   const countResult = await queryOne<{ total: string }>(countSql, params);
   const total = Number(countResult?.total || 0);
 
@@ -257,13 +257,13 @@ export async function getCodeGenList(
       COALESCE(dtd_type.data_type_name, '') AS data_type_name,
       COALESCE(dtd_code.data_name, '') AS data_name,
       COUNT(*) AS code_count
-    FROM ${schema}.cec_new_energy_createcode c
-    LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON SUBSTRING(c.code, 5, 2) = t.type_code
-    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON SUBSTRING(c.code, 1, 4) = s.station_code
-    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code) sc ON SUBSTRING(c.code, 13, 3) = sc.second_class_code
-    LEFT JOIN (SELECT third_class_code, MIN(third_class_name) AS third_class_name FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL GROUP BY third_class_code) tc ON SUBSTRING(c.code, 20, 3) = tc.third_class_code
-    LEFT JOIN (SELECT data_category_code, MIN(data_category_name) AS data_type_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code) dtd_type ON SUBSTRING(c.code, 27, 2) = dtd_type.data_category_code
-    LEFT JOIN (SELECT data_category_code, data_code, MIN(data_name) AS data_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL GROUP BY data_category_code, data_code) dtd_code ON SUBSTRING(c.code, 27, 2) = dtd_code.data_category_code AND SUBSTRING(c.code, 29, 3) = dtd_code.data_code
+    FROM ${dbc.schema}.cec_new_energy_createcode c
+    LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON SUBSTRING(c.code, 5, 2) = t.type_code
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON SUBSTRING(c.code, 1, 4) = s.station_code
+    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code) sc ON SUBSTRING(c.code, 13, 3) = sc.second_class_code
+    LEFT JOIN (SELECT third_class_code, MIN(third_class_name) AS third_class_name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL GROUP BY third_class_code) tc ON SUBSTRING(c.code, 20, 3) = tc.third_class_code
+    LEFT JOIN (SELECT data_category_code, MIN(data_category_name) AS data_type_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code) dtd_type ON SUBSTRING(c.code, 27, 2) = dtd_type.data_category_code
+    LEFT JOIN (SELECT data_category_code, data_code, MIN(data_name) AS data_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL GROUP BY data_category_code, data_code) dtd_code ON SUBSTRING(c.code, 27, 2) = dtd_code.data_category_code AND SUBSTRING(c.code, 29, 3) = dtd_code.data_code
     WHERE ${whereClause}
     GROUP BY ${dimsGroup}, t.type_name, s.station_name, sc.second_class_name, tc.third_class_name, dtd_type.data_type_name, dtd_code.data_name
     ORDER BY code_count DESC
@@ -273,13 +273,13 @@ export async function getCodeGenList(
   // 筛选条件选项
   const [typeOptions, stationOptions, secondClassOptions, dataTypeOptions] = await Promise.all([
     query<{ code: string; name: string }>(
-      `SELECT type_code AS code, type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
+      `SELECT type_code AS code, type_name AS name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
     query<{ code: string; name: string }>(
-      `SELECT station_code AS code, station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
+      `SELECT station_code AS code, station_name AS name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
     query<{ code: string; name: string }>(
-      `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code ORDER BY code`),
+      `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code ORDER BY code`),
     query<{ code: string; name: string }>(
-      `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code ORDER BY code`),
+      `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code ORDER BY code`),
   ]);
 
   return {
@@ -310,7 +310,7 @@ export async function getCodeGenGroupDetail(
 ): Promise<Array<{ code: string; name: string }>> {
   const sql = `
     SELECT code, name
-    FROM ${schema}.cec_new_energy_createcode
+    FROM ${dbc.schema}.cec_new_energy_createcode
     WHERE if_delete = '0'
       AND SUBSTRING(code, 5, 2) = $1
       AND SUBSTRING(code, 1, 4) = $2
@@ -354,15 +354,15 @@ export async function getDictOverview(): Promise<{
          COUNT(DISTINCT data_category_code) AS dc,
          COUNT(*) FILTER (WHERE data_code IS NOT NULL AND (is_manual IS NULL OR is_manual = '0')) AS dg,
          COUNT(*) FILTER (WHERE data_code IS NOT NULL AND is_manual = '1') AS dm
-       FROM ${schema}.cec_new_energy_code_dict
+       FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND type_domain_code IN ('F', 'G', 'S')
        GROUP BY type_domain_code`),
     // 一次查询获取三个类型域的三级类码计数（使用子查询避免慢 JOIN）
     query<{ td: string; c: string }>(
       `SELECT d.type_domain_code AS td, COUNT(DISTINCT t.third_class_code) AS c
-       FROM ${schema}.cec_new_energy_third_class_dict t
+       FROM ${dbc.schema}.cec_new_energy_third_class_dict t
        INNER JOIN (SELECT DISTINCT type_domain_code, second_class_code
-                   FROM ${schema}.cec_new_energy_code_dict
+                   FROM ${dbc.schema}.cec_new_energy_code_dict
                    WHERE if_delete = '0' AND type_domain_code IN ('F', 'G', 'S')) d
          ON d.second_class_code = t.second_class_code
        WHERE t.if_delete = '0'
@@ -408,15 +408,15 @@ export async function getDictNewAddition(
   if (endTime) { cond += ` AND create_tm <= $${params.length + 1}::date + 1`; params.push(endTime); }
 
   const [totalRes, manualRes, scRes, dateRes] = await Promise.all([
-    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_code_dict WHERE ${cond}`, params),
-    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_code_dict WHERE ${cond} AND is_manual = '1'`, params),
+    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${dbc.schema}.cec_new_energy_code_dict WHERE ${cond}`, params),
+    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${dbc.schema}.cec_new_energy_code_dict WHERE ${cond} AND is_manual = '1'`, params),
     query<{ sc: string; sn: string; c: string }>(
       `SELECT second_class_code AS sc, second_class_name AS sn, COUNT(*) AS c
-       FROM ${schema}.cec_new_energy_code_dict WHERE ${cond}
+       FROM ${dbc.schema}.cec_new_energy_code_dict WHERE ${cond}
        GROUP BY second_class_code, second_class_name ORDER BY c DESC LIMIT 20`, params),
     query<{ dt: string; c: string }>(
       `SELECT TO_CHAR(create_tm, 'YYYY-MM-DD') AS dt, COUNT(*) AS c
-       FROM ${schema}.cec_new_energy_code_dict WHERE ${cond}
+       FROM ${dbc.schema}.cec_new_energy_code_dict WHERE ${cond}
        GROUP BY dt ORDER BY dt`, params),
   ]);
 
@@ -445,7 +445,7 @@ export async function getDictTypeDomainDist(): Promise<{
       COUNT(DISTINCT second_class_code) AS sc,
       COUNT(DISTINCT data_category_code) AS dc,
       COUNT(*) AS cc
-    FROM ${schema}.cec_new_energy_code_dict
+    FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0'
     GROUP BY type_domain_code ORDER BY type_domain_code`;
   const rows = await query<{ td: string; tn: string; sc: string; dc: string; cc: string }>(sql);
@@ -519,7 +519,7 @@ async function batchInsertPoints(
       seg.second_ext_code, seg.third_class_code, seg.third_ext_code,
       seg.data_category_code, seg.data_code, batchId);
   }
-  const sql = `INSERT INTO ${schema}.cec_new_energy_measurement_points
+  const sql = `INSERT INTO ${dbc.schema}.cec_new_energy_measurement_points
     (code, station_code, type_code, project_line_code, prefix_no,
      first_class_code, second_class_code, second_ext_code,
      third_class_code, third_ext_code, data_category_code, data_code,
@@ -550,7 +550,7 @@ export async function importMeasurementFile(
   const batchId = importStore.batchId;
 
   // 先清空所有旧数据
-  await query(`DELETE FROM ${schema}.cec_new_energy_measurement_points`);
+  await query(`DELETE FROM ${dbc.schema}.cec_new_energy_measurement_points`);
 
   try {
     const wb = XLSX.read(fileBuffer, { type: 'buffer' });
@@ -649,7 +649,7 @@ export async function getMeasureOverview(): Promise<{
       COUNT(CASE WHEN type_code NOT LIKE 'F%' AND type_code NOT LIKE 'G%'
              AND type_code != '01' AND type_code != '02' THEN 1 END) AS other,
       MAX(create_tm) AS last_import_time
-    FROM ${schema}.cec_new_energy_measurement_points
+    FROM ${dbc.schema}.cec_new_energy_measurement_points
     WHERE if_delete = '0'`;
   const r = await query<{ total: string; wind: string; solar: string; other: string; last_import_time: string }>(sql);
   return {
@@ -683,7 +683,7 @@ export async function getMeasureByDimension(
   };
 
   const sql = `SELECT ${col} AS name, COUNT(*) AS cnt
-    FROM ${schema}.cec_new_energy_measurement_points
+    FROM ${dbc.schema}.cec_new_energy_measurement_points
     WHERE if_delete = '0' AND ${col} IS NOT NULL
     GROUP BY ${col} ORDER BY cnt DESC LIMIT 50`;
   const rows = await query<{ name: string; cnt: string }>(sql);
@@ -719,12 +719,12 @@ export async function getMeasureDrillDown(
 
   const params: string[] = typeCode !== 'F' && typeCode !== 'G' ? [typeCode] : [];
 
-  const totalSql = `SELECT COUNT(*) AS c FROM ${schema}.cec_new_energy_measurement_points WHERE if_delete = '0' AND ${filter}`;
+  const totalSql = `SELECT COUNT(*) AS c FROM ${dbc.schema}.cec_new_energy_measurement_points WHERE if_delete = '0' AND ${filter}`;
   const totalRes = await query<{ c: string }>(totalSql, params);
   const total = Number(totalRes[0]?.c || 0);
 
   const sql2 = `SELECT second_class_code AS name, COUNT(*) AS cnt
-    FROM ${schema}.cec_new_energy_measurement_points
+    FROM ${dbc.schema}.cec_new_energy_measurement_points
     WHERE if_delete = '0' AND ${filter} AND second_class_code IS NOT NULL
     GROUP BY name ORDER BY cnt DESC`;
   const rows = await query<{ name: string; cnt: string }>(sql2, params);
@@ -757,11 +757,11 @@ export async function getMeasureBySecondClass(
     SELECT t.code_val, d.second_class_name AS name_val, t.cnt
     FROM (
       SELECT second_class_code AS code_val, COUNT(*) AS cnt
-      FROM ${schema}.cec_new_energy_measurement_points
+      FROM ${dbc.schema}.cec_new_energy_measurement_points
       WHERE if_delete = '0' ${typeCondition}
       GROUP BY second_class_code
     ) t
-    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' ${dictTypeCondition} GROUP BY second_class_code) d
+    LEFT JOIN (SELECT second_class_code, MIN(second_class_name) AS second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' ${dictTypeCondition} GROUP BY second_class_code) d
       ON t.code_val = d.second_class_code
     ORDER BY t.cnt DESC`;
   const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
@@ -785,11 +785,11 @@ export async function getMeasureByStation(): Promise<{
     SELECT t.code_val, d.station_name AS name_val, t.cnt
     FROM (
       SELECT station_code AS code_val, COUNT(*) AS cnt
-      FROM ${schema}.cec_new_energy_measurement_points
+      FROM ${dbc.schema}.cec_new_energy_measurement_points
       WHERE if_delete = '0'
       GROUP BY station_code
     ) t
-    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') d
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0') d
       ON t.code_val = d.station_code
     ORDER BY t.cnt DESC`;
   const rows = await query<{ code_val: string; name_val: string | null; cnt: string }>(sql);
@@ -857,7 +857,7 @@ export async function getMeasureList(
   const whereClause = conditions.join(' AND ');
 
   console.log('[DEBUG] getMeasureList: before count query, whereClause:', whereClause, 'params:', params);
-  const countSql = `SELECT COUNT(*) AS total FROM ${schema}.cec_new_energy_measurement_points mp WHERE ${whereClause}`;
+  const countSql = `SELECT COUNT(*) AS total FROM ${dbc.schema}.cec_new_energy_measurement_points mp WHERE ${whereClause}`;
   const countResult = await queryOne<{ total: string }>(countSql, params);
   const total = Number(countResult?.total || 0);
   console.log('[DEBUG] getMeasureList: count result:', total);
@@ -865,7 +865,7 @@ export async function getMeasureList(
   const offset = (pageNum - 1) * pageSize;
 
   // 先查出分页的 code 列表
-  const pageSql = `SELECT mp.code FROM ${schema}.cec_new_energy_measurement_points mp WHERE ${whereClause} ORDER BY mp.create_tm DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+  const pageSql = `SELECT mp.code FROM ${dbc.schema}.cec_new_energy_measurement_points mp WHERE ${whereClause} ORDER BY mp.create_tm DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
   console.log('[DEBUG] getMeasureList: pageSql:', pageSql, 'values:', [...params, pageSize, offset]);
   const pageRows = await query<{ code: string }>(pageSql, [...params, pageSize, offset]);
   const codes = pageRows.map(r => r.code);
@@ -891,13 +891,13 @@ export async function getMeasureList(
       COALESCE(tc.third_class_name, '') AS third_class_name,
       COALESCE(dt.data_category_name, '') AS data_type_name,
       COALESCE(dc.data_name, '') AS data_name
-    FROM ${schema}.cec_new_energy_measurement_points mp
-    LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON mp.type_code = t.type_code
-    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON mp.station_code = s.station_code
-    LEFT JOIN (SELECT second_class_code, second_class_name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL) sc ON mp.second_class_code = sc.second_class_code
-    LEFT JOIN (SELECT third_class_code, third_class_name FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL) tc ON mp.third_class_code = tc.third_class_code
-    LEFT JOIN (SELECT data_category_code, data_category_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL) dt ON mp.data_category_code = dt.data_category_code
-    LEFT JOIN (SELECT data_category_code, data_code, data_name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL) dc ON mp.data_category_code = dc.data_category_code AND mp.data_code = dc.data_code
+    FROM ${dbc.schema}.cec_new_energy_measurement_points mp
+    LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON mp.type_code = t.type_code
+    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON mp.station_code = s.station_code
+    LEFT JOIN (SELECT second_class_code, second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL) sc ON mp.second_class_code = sc.second_class_code
+    LEFT JOIN (SELECT third_class_code, third_class_name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL) tc ON mp.third_class_code = tc.third_class_code
+    LEFT JOIN (SELECT data_category_code, data_category_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL) dt ON mp.data_category_code = dt.data_category_code
+    LEFT JOIN (SELECT data_category_code, data_code, data_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL) dc ON mp.data_category_code = dc.data_category_code AND mp.data_code = dc.data_code
     WHERE mp.code IN (${placeholders})
     ORDER BY mp.create_tm DESC`;
   const list = await query(listSql, [...codes]);
@@ -920,13 +920,13 @@ export async function getMeasureFilterOptions(): Promise<{
 }> {
   const [typeOptions, stationOptions, secondClassOptions, dataTypeOptions] = await Promise.all([
     query<{ code: string; name: string }>(
-      `SELECT type_code AS code, type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
+      `SELECT type_code AS code, type_name AS name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
     query<{ code: string; name: string }>(
-      `SELECT station_code AS code, station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
+      `SELECT station_code AS code, station_name AS name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
     query<{ code: string; name: string }>(
-      `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code ORDER BY code`),
+      `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code ORDER BY code`),
     query<{ code: string; name: string }>(
-      `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code ORDER BY code`),
+      `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code ORDER BY code`),
   ]);
   return {
     typeCodes: typeOptions,
@@ -937,7 +937,7 @@ export async function getMeasureFilterOptions(): Promise<{
 }
 
 export async function clearMeasurementData(): Promise<void> {
-  await query(`DELETE FROM ${schema}.cec_new_energy_measurement_points`);
+  await query(`DELETE FROM ${dbc.schema}.cec_new_energy_measurement_points`);
   importStore.importing = false;
   importStore.batchId = null;
   importStore.totalRows = 0;

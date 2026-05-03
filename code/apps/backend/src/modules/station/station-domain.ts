@@ -1,7 +1,7 @@
 import { query } from '../../db/index.js';
 import { config } from '../../config/index.js';
 
-const schema = config.db.schema;
+const dbc = config.db;
 
 export interface StationRow {
   station_id: number;
@@ -38,7 +38,7 @@ export async function listStation(
   const where = conditions.join(' AND ');
 
   const countResult = await query<{ cnt: number }>(
-    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_station_dict WHERE ${where}`,
+    `SELECT COUNT(*) AS cnt FROM ${dbc.schema}.cec_new_energy_station_dict WHERE ${where}`,
     params,
   );
   const total = Number(countResult[0].cnt);
@@ -47,7 +47,7 @@ export async function listStation(
   const items = await query<StationRow>(
     `SELECT station_id, station_code, station_name, management_domain,
             creator, modifier, create_tm, modify_tm
-     FROM ${schema}.cec_new_energy_station_dict
+     FROM ${dbc.schema}.cec_new_energy_station_dict
      WHERE ${where}
      ORDER BY station_code
      LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -62,7 +62,7 @@ export async function listAllStation(): Promise<StationRow[]> {
   return query<StationRow>(
     `SELECT station_id, station_code, station_name, management_domain,
             creator, modifier, create_tm, modify_tm
-     FROM ${schema}.cec_new_energy_station_dict
+     FROM ${dbc.schema}.cec_new_energy_station_dict
      WHERE if_delete = '0'
      ORDER BY station_code`,
   );
@@ -73,7 +73,7 @@ export async function findByCode(code: string): Promise<StationRow | null> {
   const rows = await query<StationRow>(
     `SELECT station_id, station_code, station_name, management_domain,
             creator, modifier, create_tm, modify_tm
-     FROM ${schema}.cec_new_energy_station_dict
+     FROM ${dbc.schema}.cec_new_energy_station_dict
      WHERE if_delete = '0' AND station_code = $1`,
     [code],
   );
@@ -85,7 +85,7 @@ export async function findById(id: number): Promise<StationRow | null> {
   const rows = await query<StationRow>(
     `SELECT station_id, station_code, station_name, management_domain,
             creator, modifier, create_tm, modify_tm
-     FROM ${schema}.cec_new_energy_station_dict
+     FROM ${dbc.schema}.cec_new_energy_station_dict
      WHERE if_delete = '0' AND station_id = $1`,
     [String(id)],
   );
@@ -100,7 +100,7 @@ export async function createStation(input: {
   creator: string;
 }): Promise<StationRow> {
   const rows = await query<StationRow>(
-    `INSERT INTO ${schema}.cec_new_energy_station_dict
+    `INSERT INTO ${dbc.schema}.cec_new_energy_station_dict
      (station_code, station_name, management_domain, creator, modifier, create_tm, modify_tm)
      VALUES ($1, $2, $3, $4, $4, NOW(), NOW())
      RETURNING station_id, station_code, station_name, management_domain,
@@ -134,7 +134,7 @@ export async function batchCreateStation(
   }
 
   await query(
-    `INSERT INTO ${schema}.cec_new_energy_station_dict
+    `INSERT INTO ${dbc.schema}.cec_new_energy_station_dict
      (station_code, station_name, management_domain, creator, modifier, create_tm, modify_tm)
      VALUES ${valuePlaceholders.join(', ')}`,
     params,
@@ -170,7 +170,7 @@ export async function updateStation(
   params.push(String(id));
 
   const rows = await query<StationRow>(
-    `UPDATE ${schema}.cec_new_energy_station_dict
+    `UPDATE ${dbc.schema}.cec_new_energy_station_dict
      SET ${sets.join(', ')}
      WHERE station_id = $${idx} AND if_delete = '0'
      RETURNING station_id, station_code, station_name, management_domain,
@@ -183,7 +183,7 @@ export async function updateStation(
 /** 逻辑删除场站 */
 export async function deleteStation(id: number, modifier: string): Promise<boolean> {
   const result = await query(
-    `UPDATE ${schema}.cec_new_energy_station_dict
+    `UPDATE ${dbc.schema}.cec_new_energy_station_dict
      SET if_delete = '1', modifier = $2, modify_tm = NOW()
      WHERE station_id = $1 AND if_delete = '0'`,
     [String(id), modifier],
@@ -194,7 +194,7 @@ export async function deleteStation(id: number, modifier: string): Promise<boole
 /** 一键删除所有场站（逻辑删除） */
 export async function deleteAllStation(modifier: string): Promise<number> {
   const result = await query(
-    `UPDATE ${schema}.cec_new_energy_station_dict
+    `UPDATE ${dbc.schema}.cec_new_energy_station_dict
      SET if_delete = '1', modifier = $1, modify_tm = NOW()
      WHERE if_delete = '0'`,
     [modifier],
@@ -204,7 +204,7 @@ export async function deleteAllStation(modifier: string): Promise<number> {
 
 /** 检查场站编码是否已存在 */
 export async function existsByCode(code: string, excludeId?: number): Promise<boolean> {
-  let sql = `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_station_dict
+  let sql = `SELECT COUNT(*) AS cnt FROM ${dbc.schema}.cec_new_energy_station_dict
     WHERE if_delete = '0' AND station_code = $1`;
   const params: (string | null)[] = [code];
   if (excludeId) {
@@ -225,7 +225,7 @@ export async function findExistingCodes(codes: string[]): Promise<StationCodeNam
   if (codes.length === 0) return [];
   const placeholders = codes.map((_, i) => `$${i + 1}`);
   const rows = await query<{ station_code: string; station_name: string }>(
-    `SELECT station_code, station_name FROM ${schema}.cec_new_energy_station_dict
+    `SELECT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict
      WHERE if_delete = '0' AND station_code IN (${placeholders.join(',')})`,
     codes,
   );

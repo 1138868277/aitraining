@@ -7,12 +7,12 @@ export interface DictItem {
   parentCode?: string;
 }
 
-const schema = config.db.schema;
+const dbc = config.db;
 
 /** 获取场站字典列表 */
 export async function getStationDict(): Promise<DictItem[]> {
   const sql = `SELECT station_code AS code, station_name AS name
-    FROM ${schema}.cec_new_energy_station_dict
+    FROM ${dbc.schema}.cec_new_energy_station_dict
     WHERE if_delete = '0' ORDER BY station_code`;
   return query(sql);
 }
@@ -20,7 +20,7 @@ export async function getStationDict(): Promise<DictItem[]> {
 /** 获取类型字典列表 */
 export async function getTypeDict(): Promise<DictItem[]> {
   const sql = `SELECT type_code AS code, type_name AS name
-    FROM ${schema}.cec_new_energy_type_dict
+    FROM ${dbc.schema}.cec_new_energy_type_dict
     WHERE if_delete = '0' ORDER BY type_code`;
   return query(sql);
 }
@@ -28,7 +28,7 @@ export async function getTypeDict(): Promise<DictItem[]> {
 /** 获取前缀字典列表 */
 export async function getPrefixDict(): Promise<DictItem[]> {
   const sql = `SELECT prefix_no AS code, prefix_name AS name
-    FROM ${schema}.cec_new_energy_prefix_dict
+    FROM ${dbc.schema}.cec_new_energy_prefix_dict
     WHERE if_delete = '0' ORDER BY prefix_no`;
   return query(sql);
 }
@@ -36,7 +36,7 @@ export async function getPrefixDict(): Promise<DictItem[]> {
 /** 获取项目期号&并网线路字典列表 */
 export async function getProjectLineDict(): Promise<DictItem[]> {
   const sql = `SELECT project_line_code AS code, project_line_name AS name
-    FROM ${schema}.cec_new_energy_project_line_dict
+    FROM ${dbc.schema}.cec_new_energy_project_line_dict
     WHERE if_delete = '0' ORDER BY project_line_code`;
   return query(sql);
 }
@@ -87,7 +87,7 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
   if (parentCode.length === 2) {
     // parentCode可能是一级类码或数据类码
     // 先检查是否是一级类码
-    const checkFirstSql = `SELECT COUNT(*) as cnt FROM ${schema}.cec_new_energy_first_class_dict WHERE first_class_code = $1`;
+    const checkFirstSql = `SELECT COUNT(*) as cnt FROM ${dbc.schema}.cec_new_energy_first_class_dict WHERE first_class_code = $1`;
     const checkResult = await query<{ cnt: number }>(checkFirstSql, [parentCode]);
     if (checkResult[0].cnt > 0) {
       // 是一级类码，返回对应的二级类码
@@ -98,7 +98,7 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
       } else {
         // 使用原来的逻辑，从标准编码字典表查询
         let level2Sql = `SELECT DISTINCT second_class_code AS code, second_class_name AS name
-          FROM ${schema}.cec_new_energy_code_dict
+          FROM ${dbc.schema}.cec_new_energy_code_dict
           WHERE if_delete = '0' AND first_class_code = $1 AND second_class_code IS NOT NULL`;
 
         const params: any[] = [parentCode];
@@ -113,7 +113,7 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
     } else {
       // 可能是数据类码，返回对应的数据编码
       let dataCodeSql = `SELECT DISTINCT data_code AS code, data_name AS name
-        FROM ${schema}.cec_new_energy_code_dict
+        FROM ${dbc.schema}.cec_new_energy_code_dict
         WHERE if_delete = '0' AND data_category_code = $1 AND data_code IS NOT NULL`;
 
       const params: any[] = [parentCode];
@@ -128,7 +128,7 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
   } else if (parentCode.length === 3) {
     // parentCode是二级类码，直接查询三级类码表
     let thirdClassSql = `SELECT DISTINCT third_class_code AS code, third_class_name AS name
-      FROM ${schema}.cec_new_energy_third_class_dict
+      FROM ${dbc.schema}.cec_new_energy_third_class_dict
       WHERE if_delete = '0' AND second_class_code = $1`;
 
     const params: any[] = [parentCode];
@@ -155,7 +155,7 @@ export async function getCodeDictByParent(parentCode?: string, typeCode?: string
 /** 获取数据类字典 */
 export async function getDataTypeDict(): Promise<DictItem[]> {
   const sql = `SELECT DISTINCT data_category_code AS code, data_category_name AS name
-    FROM ${schema}.cec_new_energy_code_dict
+    FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND data_category_code IS NOT NULL ORDER BY data_category_code`;
   return query(sql);
 }
@@ -163,7 +163,7 @@ export async function getDataTypeDict(): Promise<DictItem[]> {
 /** 获取一级类码字典 */
 export async function getFirstClassDict(): Promise<DictItem[]> {
   const sql = `SELECT first_class_code AS code, first_class_name AS name
-    FROM ${schema}.cec_new_energy_first_class_dict
+    FROM ${dbc.schema}.cec_new_energy_first_class_dict
     WHERE if_delete = '0' ORDER BY first_class_code`;
   return query(sql);
 }
@@ -171,7 +171,7 @@ export async function getFirstClassDict(): Promise<DictItem[]> {
 /** 根据类型代码获取二级类码列表 */
 export async function getSecondClassByType(typeCode: string): Promise<DictItem[]> {
   const sql = `SELECT second_class_code AS code, second_class_name AS name
-    FROM ${schema}.cec_new_energy_second_class_type_dict
+    FROM ${dbc.schema}.cec_new_energy_second_class_type_dict
     WHERE if_delete = '0' AND type_code = $1
     ORDER BY second_class_code`;
   return query(sql, [typeCode]);
@@ -182,7 +182,7 @@ export async function getDataCodeByDataType(dataTypeCode: string, secondClassCod
   const typeDomainCode = getTypeDomainCode(typeCode);
 
   let sql = `SELECT data_code AS code, data_name AS name
-    FROM ${schema}.cec_new_energy_code_dict
+    FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND data_category_code = $1`;
 
   const params: any[] = [dataTypeCode];
@@ -247,14 +247,14 @@ export async function quickSearchDict(
 
   // 1. 总数（带筛选条件）
   const countResult = await query<{ cnt: number }>(
-    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND ${searchClause} ${filterSql}`,
+    `SELECT COUNT(*) AS cnt FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND ${searchClause} ${filterSql}`,
     [...searchParams, ...filterParams],
   );
   const total = Number(countResult[0].cnt);
 
   // 2. 全量类型列表（不限分页）
   const typeRows = await query<{ typeCode: string }>(
-    `SELECT DISTINCT type_domain_code AS "typeCode" FROM ${schema}.cec_new_energy_code_dict
+    `SELECT DISTINCT type_domain_code AS "typeCode" FROM ${dbc.schema}.cec_new_energy_code_dict
      WHERE if_delete = '0' AND ${searchClause} ORDER BY type_domain_code`,
     searchParams,
   );
@@ -262,7 +262,7 @@ export async function quickSearchDict(
   // 3. 全量二级类码列表（不限分页，含类型信息用于前端联动筛选）
   const secondClassRows = await query<{ secondClassCode: string; secondClassName: string; typeCode: string }>(
     `SELECT DISTINCT second_class_code AS "secondClassCode", second_class_name AS "secondClassName", type_domain_code AS "typeCode"
-     FROM ${schema}.cec_new_energy_code_dict
+     FROM ${dbc.schema}.cec_new_energy_code_dict
      WHERE if_delete = '0' AND ${searchClause} ORDER BY second_class_code`,
     searchParams,
   );
@@ -273,7 +273,7 @@ export async function quickSearchDict(
       second_class_name AS "secondClassName", data_category_code AS "dataCategoryCode",
       data_category_name AS "dataCategoryName", data_code AS "dataCode", data_name AS "dataName",
       is_manual AS "isManual"
-    FROM ${schema}.cec_new_energy_code_dict
+    FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND ${searchClause} ${filterSql}
     ORDER BY second_class_code, data_category_code, data_code
     LIMIT $${filterIdx} OFFSET $${filterIdx + 1}`;
@@ -306,7 +306,7 @@ export async function createManualCode(input: {
   const dataCategoryName = input.dataCategoryName || input.dataCategoryCode;
   const dataName = input.dataName || input.dataCode;
 
-  const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
+  const sql = `INSERT INTO ${dbc.schema}.cec_new_energy_code_dict
     (type_domain_code, type_code, first_class_code, first_class_name,
      second_class_code, second_class_name,
      data_category_code, data_category_name, data_code, data_name,
@@ -338,7 +338,7 @@ export async function getMaxDataCode(
   typeCode: string,
 ): Promise<string | null> {
   const typeDomainCode = getTypeDomainCode(typeCode) || 'Y';
-  const sql = `SELECT MAX(data_code) AS max_code FROM ${schema}.cec_new_energy_code_dict
+  const sql = `SELECT MAX(data_code) AS max_code FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code = $2 AND type_domain_code = $3`;
   const result = await query<{ max_code: string | null }>(sql, [secondClassCode, dataCategoryCode, typeDomainCode]);
   return result[0]?.max_code || null;
@@ -350,7 +350,7 @@ export async function getMaxDataCategoryCode(
   typeCode: string,
 ): Promise<string | null> {
   const typeDomainCode = getTypeDomainCode(typeCode) || 'Y';
-  const sql = `SELECT MAX(data_category_code) AS max_code FROM ${schema}.cec_new_energy_code_dict
+  const sql = `SELECT MAX(data_category_code) AS max_code FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND second_class_code = $1 AND type_domain_code = $2`;
   const result = await query<{ max_code: string | null }>(sql, [secondClassCode, typeDomainCode]);
   return result[0]?.max_code || null;
@@ -367,7 +367,7 @@ export async function checkExistingDataCategories(
   if (uniqueCodes.length === 0) return [];
 
   const placeholders = uniqueCodes.map((_, i) => `$${i + 3}`);
-  const sql = `SELECT DISTINCT data_category_code FROM ${schema}.cec_new_energy_code_dict
+  const sql = `SELECT DISTINCT data_category_code FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND second_class_code = $1 AND type_domain_code = $2
     AND data_category_code IN (${placeholders.join(',')})`;
   const rows = await query<{ data_category_code: string }>(sql, [secondClassCode, typeDomainCode, ...uniqueCodes]);
@@ -386,7 +386,7 @@ export async function checkExistingDataCodes(
   if (uniqueCodes.length === 0) return [];
 
   const placeholders = uniqueCodes.map((_, i) => `$${i + 4}`);
-  const sql = `SELECT DISTINCT data_code FROM ${schema}.cec_new_energy_code_dict
+  const sql = `SELECT DISTINCT data_code FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code = $2
     AND type_domain_code = $3 AND data_code IN (${placeholders.join(',')})`;
   const rows = await query<{ data_code: string }>(sql, [secondClassCode, dataCategoryCode, typeDomainCode, ...uniqueCodes]);
@@ -431,7 +431,7 @@ export async function batchCreateManualCode(input: {
     idx += 11;
   }
 
-  const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
+  const sql = `INSERT INTO ${dbc.schema}.cec_new_energy_code_dict
     (type_domain_code, type_code, first_class_code, first_class_name,
      second_class_code, second_class_name,
      data_category_code, data_category_name, data_code, data_name,
@@ -471,31 +471,31 @@ export async function parseCode(code: string): Promise<{
     secondClasses, thirdClasses, codeDictItems,
   ] = await Promise.all([
     query<{ name: string }>(
-      `SELECT station_name AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0' AND station_code = $1`,
+      `SELECT station_name AS name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0' AND station_code = $1`,
       [stationCode],
     ),
     query<{ name: string }>(
-      `SELECT type_name AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0' AND type_code = $1`,
+      `SELECT type_name AS name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0' AND type_code = $1`,
       [typeCode],
     ),
     query<{ name: string }>(
-      `SELECT prefix_name AS name FROM ${schema}.cec_new_energy_prefix_dict WHERE if_delete = '0' AND prefix_no = $1`,
+      `SELECT prefix_name AS name FROM ${dbc.schema}.cec_new_energy_prefix_dict WHERE if_delete = '0' AND prefix_no = $1`,
       [prefixNo],
     ),
     query<{ name: string }>(
-      `SELECT first_class_name AS name FROM ${schema}.cec_new_energy_first_class_dict WHERE if_delete = '0' AND first_class_code = $1`,
+      `SELECT first_class_name AS name FROM ${dbc.schema}.cec_new_energy_first_class_dict WHERE if_delete = '0' AND first_class_code = $1`,
       [firstClassCode],
     ),
     query<{ name: string }>(
-      `SELECT second_class_name AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code = $1 AND type_code = $2`,
+      `SELECT second_class_name AS name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code = $1 AND type_code = $2`,
       [secondClassCode, typeCode],
     ),
     query<{ name: string }>(
-      `SELECT third_class_name AS name FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code = $1`,
+      `SELECT third_class_name AS name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code = $1`,
       [thirdClassCode],
     ),
     query<{ data_category_name: string; data_name: string }>(
-      `SELECT data_category_name, data_name FROM ${schema}.cec_new_energy_code_dict
+      `SELECT data_category_name, data_name FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND data_category_code = $1 AND data_code = $2
        LIMIT 1`,
       [dataCategoryCode, dataCode],
@@ -540,7 +540,7 @@ export async function getDataTypeBySecondClass(typeCode: string, secondClassCode
   const typeDomainCode = getTypeDomainCode(typeCode);
 
   let sql = `SELECT DISTINCT data_category_code AS code, data_category_name AS name
-    FROM ${schema}.cec_new_energy_code_dict
+    FROM ${dbc.schema}.cec_new_energy_code_dict
     WHERE if_delete = '0' AND second_class_code = $1`;
 
   const params: any[] = [secondClassCode];

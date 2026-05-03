@@ -11,6 +11,7 @@
         <el-menu-item index="/code-generate">编码生成</el-menu-item>
         <el-menu-item index="/code-validate">字典管理</el-menu-item>
         <el-menu-item index="/statistics">统计分析</el-menu-item>
+        <el-menu-item index="/system-settings">系统设置</el-menu-item>
       </el-menu>
       <div class="header-time">{{ currentTime }}</div>
     </el-header>

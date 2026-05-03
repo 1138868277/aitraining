@@ -7,6 +7,7 @@ import codeRouter from './modules/code-generation/code-controller.js';
 import validateRouter from './modules/code-validation/validate-controller.js';
 import statisticsRouter from './modules/statistics/statistics-controller.js';
 import stationRouter from './modules/station/station-controller.js';
+import datasourceRouter from './modules/datasource/datasource-controller.js';
 
 export function createApp() {
   const app = express();
@@ -59,6 +60,7 @@ export function createApp() {
   app.use(validateRouter);
   app.use(statisticsRouter);
   app.use(stationRouter);
+  app.use(datasourceRouter);
 
   // 全局错误处理
   app.use(globalErrorHandler);

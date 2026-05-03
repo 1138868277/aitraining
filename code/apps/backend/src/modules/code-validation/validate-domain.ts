@@ -4,7 +4,7 @@ import { query as dbQuery } from '../../db/index.js';
 import { config } from '../../config/index.js';
 import { MemoryCache } from '../../common/memory-cache.js';
 
-const schema = config.db.schema;
+const dbc = config.db;
 
 const dictTreeCache = new MemoryCache<DictTreeNode[]>();
 const DICT_TREE_CACHE_KEY = 'dictTree';
@@ -126,20 +126,20 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
   const [typeDomains, secondClasses, dataCategories] = await Promise.all([
     dbQuery<{ td: string }>(
       `SELECT DISTINCT type_domain_code AS td
-       FROM ${schema}.cec_new_energy_code_dict
+       FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' ORDER BY td`,
     ),
     dbQuery<{ td: string; sc: string; sn: string }>(
       `SELECT DISTINCT type_domain_code AS td,
               second_class_code AS sc, second_class_name AS sn
-       FROM ${schema}.cec_new_energy_code_dict
+       FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' ORDER BY td, sc`,
     ),
     dbQuery<{ td: string; sc: string; dc: string; dn: string; hm: boolean; cnt: number }>(
       `SELECT type_domain_code AS td, second_class_code AS sc,
               data_category_code AS dc, data_category_name AS dn,
               BOOL_OR(is_manual = '1') AS hm, COUNT(*) AS cnt
-       FROM ${schema}.cec_new_energy_code_dict
+       FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND data_code IS NOT NULL
        GROUP BY td, sc, dc, dn
        ORDER BY td, sc, dc`,
@@ -208,7 +208,7 @@ export async function getDictTreeDataCodes(
 ): Promise<DictTreeNode[]> {
   const rows = await dbQuery<{ dcode: string; dname: string; im: string }>(
     `SELECT data_code AS dcode, data_name AS dname, is_manual AS im
-     FROM ${schema}.cec_new_energy_code_dict
+     FROM ${dbc.schema}.cec_new_energy_code_dict
      WHERE if_delete = '0'
        AND type_domain_code = $1
        AND second_class_code = $2
@@ -272,7 +272,7 @@ export async function getManualStatistics(
       conditions.push(`(
         d.type_code = $${tcIdx}
         OR (d.type_code IS NULL AND d.second_class_code IN (
-          SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
+          SELECT second_class_code FROM ${dbc.schema}.cec_new_energy_second_class_type_dict
           WHERE type_code = $${tcIdx} AND if_delete = '0'
         ))
       )`);
@@ -283,7 +283,7 @@ export async function getManualStatistics(
 
   // 总数
   const countResult = await dbQuery<{ cnt: string }>(
-    `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict d WHERE ${whereClause}`,
+    `SELECT COUNT(*) AS cnt FROM ${dbc.schema}.cec_new_energy_code_dict d WHERE ${whereClause}`,
     params,
   );
   const total = Number(countResult[0].cnt);
@@ -291,7 +291,7 @@ export async function getManualStatistics(
   // 二级类码选项（受 typeCode 过滤）
   const optionRows = await dbQuery<{ code: string; name: string }>(
     `SELECT DISTINCT d.second_class_code AS code, d.second_class_name AS name
-     FROM ${schema}.cec_new_energy_code_dict d
+     FROM ${dbc.schema}.cec_new_energy_code_dict d
      WHERE ${whereClause} ORDER BY code`,
     params,
   );
@@ -303,7 +303,7 @@ export async function getManualStatistics(
                  WHEN SUBSTRING(type_code, 1, 1) = 'G' THEN '光伏'
                  WHEN SUBSTRING(type_code, 1, 1) = 'S' THEN '水电'
                  ELSE '其他' END AS name
-     FROM ${schema}.cec_new_energy_type_dict
+     FROM ${dbc.schema}.cec_new_energy_type_dict
      WHERE if_delete = '0'
      GROUP BY SUBSTRING(type_code, 1, 1)
      ORDER BY code`,
@@ -321,24 +321,24 @@ export async function getManualStatistics(
             d.data_name AS "dataName",
             d.create_tm AS "createTm",
             COALESCE(d.type_code, (
-              SELECT t.type_code FROM ${schema}.cec_new_energy_second_class_type_dict sct
-              JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+              SELECT t.type_code FROM ${dbc.schema}.cec_new_energy_second_class_type_dict sct
+              JOIN ${dbc.schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
               WHERE sct.second_class_code = d.second_class_code
                 AND sct.type_code LIKE d.type_domain_code || '%'
                 AND sct.if_delete = '0' AND t.if_delete = '0'
               LIMIT 1
             )) AS "typeCode",
             COALESCE(
-              (SELECT t.type_name FROM ${schema}.cec_new_energy_type_dict t
+              (SELECT t.type_name FROM ${dbc.schema}.cec_new_energy_type_dict t
                WHERE t.type_code = d.type_code AND t.if_delete = '0' LIMIT 1),
-              (SELECT t.type_name FROM ${schema}.cec_new_energy_second_class_type_dict sct
-               JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+              (SELECT t.type_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict sct
+               JOIN ${dbc.schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
                WHERE sct.second_class_code = d.second_class_code
                  AND sct.type_code LIKE d.type_domain_code || '%'
                  AND sct.if_delete = '0' AND t.if_delete = '0'
                LIMIT 1)
             ) AS "typeName"
-     FROM ${schema}.cec_new_energy_code_dict d
+     FROM ${dbc.schema}.cec_new_energy_code_dict d
      WHERE ${whereClause}
      ORDER BY d.create_tm DESC
      LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
@@ -378,7 +378,7 @@ export async function getAllManualStatistics(secondClassCode?: string, typeCode?
       conditions.push(`(
         d.type_code = $${tcIdx}
         OR (d.type_code IS NULL AND d.second_class_code IN (
-          SELECT second_class_code FROM ${schema}.cec_new_energy_second_class_type_dict
+          SELECT second_class_code FROM ${dbc.schema}.cec_new_energy_second_class_type_dict
           WHERE type_code = $${tcIdx} AND if_delete = '0'
         ))
       )`);
@@ -396,24 +396,24 @@ export async function getAllManualStatistics(secondClassCode?: string, typeCode?
             d.data_name AS "dataName",
             d.create_tm AS "createTm",
             COALESCE(d.type_code, (
-              SELECT t.type_code FROM ${schema}.cec_new_energy_second_class_type_dict sct
-              JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+              SELECT t.type_code FROM ${dbc.schema}.cec_new_energy_second_class_type_dict sct
+              JOIN ${dbc.schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
               WHERE sct.second_class_code = d.second_class_code
                 AND sct.type_code LIKE d.type_domain_code || '%'
                 AND sct.if_delete = '0' AND t.if_delete = '0'
               LIMIT 1
             )) AS "typeCode",
             COALESCE(
-              (SELECT t.type_name FROM ${schema}.cec_new_energy_type_dict t
+              (SELECT t.type_name FROM ${dbc.schema}.cec_new_energy_type_dict t
                WHERE t.type_code = d.type_code AND t.if_delete = '0' LIMIT 1),
-              (SELECT t.type_name FROM ${schema}.cec_new_energy_second_class_type_dict sct
-               JOIN ${schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
+              (SELECT t.type_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict sct
+               JOIN ${dbc.schema}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
                WHERE sct.second_class_code = d.second_class_code
                  AND sct.type_code LIKE d.type_domain_code || '%'
                  AND sct.if_delete = '0' AND t.if_delete = '0'
                LIMIT 1)
             ) AS "typeName"
-     FROM ${schema}.cec_new_energy_code_dict d
+     FROM ${dbc.schema}.cec_new_energy_code_dict d
      WHERE ${whereClause}
      ORDER BY d.create_tm DESC`,
     params,
@@ -472,7 +472,7 @@ export async function resolveCodesFromDB(
 
     // 查询类型名称
     const typeRows = await dbQuery<{ type_name: string }>(
-      `SELECT type_name FROM ${schema}.cec_new_energy_type_dict
+      `SELECT type_name FROM ${dbc.schema}.cec_new_energy_type_dict
        WHERE type_code = $1 AND if_delete = '0' LIMIT 1`,
       [typeCode],
     );
@@ -480,7 +480,7 @@ export async function resolveCodesFromDB(
 
     // 分层匹配：二级类码
     const scRows = await dbQuery<{ second_class_name: string }>(
-      `SELECT DISTINCT second_class_name FROM ${schema}.cec_new_energy_code_dict
+      `SELECT DISTINCT second_class_name FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code = $2
        LIMIT 1`,
       [typeDomainCode, entry.secondClassCode],
@@ -491,7 +491,7 @@ export async function resolveCodesFromDB(
 
     // 分层匹配：数据类码（在类型域+二级类码下搜索）
     const dcRows = await dbQuery<{ data_category_name: string }>(
-      `SELECT DISTINCT data_category_name FROM ${schema}.cec_new_energy_code_dict
+      `SELECT DISTINCT data_category_name FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code = $2 AND data_category_code = $3
        LIMIT 1`,
       [typeDomainCode, entry.secondClassCode, entry.dataCategoryCode],
@@ -502,7 +502,7 @@ export async function resolveCodesFromDB(
 
     // 分层匹配：数据码（在类型域+二级类码+数据类码下搜索）
     const dRows = await dbQuery<{ data_name: string }>(
-      `SELECT data_name FROM ${schema}.cec_new_energy_code_dict
+      `SELECT data_name FROM ${dbc.schema}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND type_domain_code = $1 AND second_class_code = $2
          AND data_category_code = $3 AND data_code = $4
        LIMIT 1`,
@@ -537,7 +537,7 @@ export async function saveCodeMapping(input: {
   creator: string;
 }): Promise<void> {
   await dbQuery(
-    `CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_code_mapping (
+    `CREATE TABLE IF NOT EXISTS ${dbc.schema}.cec_new_energy_code_mapping (
       id BIGSERIAL PRIMARY KEY,
       old_code VARCHAR(31) NOT NULL,
       new_code VARCHAR(31) NOT NULL,
@@ -549,7 +549,7 @@ export async function saveCodeMapping(input: {
   );
 
   await dbQuery(
-    `INSERT INTO ${schema}.cec_new_energy_code_mapping
+    `INSERT INTO ${dbc.schema}.cec_new_energy_code_mapping
      (old_code, new_code, old_name, new_name, creator, create_tm)
      VALUES ($1, $2, $3, $4, $5, NOW())`,
     [input.oldCode, input.newCode, input.oldName, input.newName, input.creator],

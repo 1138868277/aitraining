@@ -23,6 +23,12 @@ const routes = [
     component: () => import('@/views/statistics/index.vue'),
     meta: { title: '统计分析' },
   },
+  {
+    path: '/system-settings',
+    name: 'SystemSettings',
+    component: () => import('@/views/system-settings/index.vue'),
+    meta: { title: '系统设置' },
+  },
 ];
 
 const router = createRouter({
