@@ -367,6 +367,10 @@
             />
           </div>
         </el-tab-pane>
+        <!-- Tab 5: 场站维护 -->
+        <el-tab-pane label="场站维护" name="station">
+          <StationTab />
+        </el-tab-pane>
       </el-tabs>
     </el-card>
 
@@ -406,6 +410,7 @@ import * as XLSX from 'xlsx';
 import * as validateService from '@/services/validate';
 import * as dictService from '@/services/dict';
 import DictOverviewCard from './dict-overview-card.vue';
+import StationTab from './station-tab.vue';
 import type { DictTreeNode, ManualStatItem, ResolvedCodeItem } from '@cec/contracts';
 
 // ========== Tab 2: 编码解析 ==========

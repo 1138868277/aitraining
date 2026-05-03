@@ -6,6 +6,7 @@ import dictRouter from './modules/dict/dict-controller.js';
 import codeRouter from './modules/code-generation/code-controller.js';
 import validateRouter from './modules/code-validation/validate-controller.js';
 import statisticsRouter from './modules/statistics/statistics-controller.js';
+import stationRouter from './modules/station/station-controller.js';
 
 export function createApp() {
   const app = express();
@@ -57,6 +58,7 @@ export function createApp() {
   app.use(codeRouter);
   app.use(validateRouter);
   app.use(statisticsRouter);
+  app.use(stationRouter);
 
   // 全局错误处理
   app.use(globalErrorHandler);
