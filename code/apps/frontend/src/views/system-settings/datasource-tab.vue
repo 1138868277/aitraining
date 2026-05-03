@@ -4,6 +4,14 @@
       配置 PG 数据库连接信息，修改后会自动测试连接并切换。切换即时生效，无需重启服务。
     </div>
 
+    <div class="lock-bar">
+      <el-alert v-if="locked" type="info" :closable="false" show-icon>
+        <template #title>
+          数据源已锁定，点击<el-button size="small" type="primary" link @click="unlock">修改</el-button>以编辑配置
+        </template>
+      </el-alert>
+    </div>
+
     <el-form
       ref="formRef"
       :model="form"
@@ -15,7 +23,7 @@
         prop="host"
         :rules="[{ required: true, message: '请输入主机地址', trigger: 'blur' }]"
       >
-        <el-input v-model="form.host" placeholder="例如：10.1.1.113" style="width: 300px" />
+        <el-input v-model="form.host" placeholder="例如：10.1.1.113" style="width: 300px" :disabled="locked" />
       </el-form-item>
 
       <el-form-item
@@ -23,7 +31,7 @@
         prop="port"
         :rules="[{ required: true, message: '请输入端口', trigger: 'blur' }]"
       >
-        <el-input-number v-model="form.port" :min="1" :max="65535" style="width: 200px" />
+        <el-input-number v-model="form.port" :min="1" :max="65535" style="width: 200px" :disabled="locked" />
       </el-form-item>
 
       <el-form-item
@@ -31,7 +39,7 @@
         prop="database"
         :rules="[{ required: true, message: '请输入数据库名', trigger: 'blur' }]"
       >
-        <el-input v-model="form.database" placeholder="例如：training_exercises" style="width: 300px" />
+        <el-input v-model="form.database" placeholder="例如：training_exercises" style="width: 300px" :disabled="locked" />
       </el-form-item>
 
       <el-form-item
@@ -39,7 +47,7 @@
         prop="schema"
         :rules="[{ required: true, message: '请输入 Schema', trigger: 'blur' }]"
       >
-        <el-input v-model="form.schema" placeholder="例如：liuhaojun" style="width: 200px" />
+        <el-input v-model="form.schema" placeholder="例如：liuhaojun" style="width: 200px" :disabled="locked" />
       </el-form-item>
 
       <el-form-item
@@ -47,7 +55,7 @@
         prop="user"
         :rules="[{ required: true, message: '请输入用户名', trigger: 'blur' }]"
       >
-        <el-input v-model="form.user" placeholder="数据库用户名" style="width: 300px" />
+        <el-input v-model="form.user" placeholder="数据库用户名" style="width: 300px" :disabled="locked" />
       </el-form-item>
 
       <el-form-item label="密码" prop="password">
@@ -55,18 +63,24 @@
           v-model="form.password"
           placeholder="输入密码"
           style="width: 300px"
+          :disabled="locked"
         />
       </el-form-item>
 
       <el-form-item label="SSL 连接">
-        <el-switch v-model="form.ssl" />
+        <el-switch v-model="form.ssl" :disabled="locked" />
       </el-form-item>
 
       <el-form-item>
         <div class="form-actions">
-          <el-button type="primary" :loading="testing" @click="handleTestConnection">测试连接</el-button>
-          <el-button type="success" :loading="saving" @click="handleSave">保存并切换</el-button>
-          <el-button @click="loadCurrentConfig">重置</el-button>
+          <template v-if="locked">
+            <el-button type="primary" @click="unlock">修改</el-button>
+          </template>
+          <template v-else>
+            <el-button type="primary" :loading="testing" @click="handleTestConnection">测试连接</el-button>
+            <el-button type="success" :loading="saving" @click="handleSave">保存并切换</el-button>
+            <el-button @click="cancelEdit">取消</el-button>
+          </template>
         </div>
       </el-form-item>
     </el-form>
@@ -94,6 +108,7 @@ const formRef = ref<any>(null);
 const testing = ref(false);
 const saving = ref(false);
 const testResult = ref<{ ok: boolean; message: string } | null>(null);
+const locked = ref(true);
 
 const form = reactive<DatasourceConfig>({
   host: '',
@@ -164,12 +179,23 @@ async function handleSave() {
     testResult.value = result;
     if (result.ok) {
       ElMessage.success('数据源已切换');
+      locked.value = true;
     }
   } catch (err: any) {
     testResult.value = { ok: false, message: err.message || '保存失败' };
   } finally {
     saving.value = false;
   }
+}
+
+function unlock() {
+  locked.value = false;
+}
+
+function cancelEdit() {
+  locked.value = true;
+  testResult.value = null;
+  loadCurrentConfig();
 }
 
 onMounted(() => {
@@ -180,6 +206,15 @@ onMounted(() => {
 <style scoped>
 .datasource-tab {
   padding: 16px 0;
+}
+
+.lock-bar {
+  margin-bottom: 16px;
+}
+
+.lock-bar .el-alert .el-button {
+  margin: 0 4px;
+  vertical-align: baseline;
 }
 
 .tab-description {
