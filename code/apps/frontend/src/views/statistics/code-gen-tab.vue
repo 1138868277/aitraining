@@ -50,16 +50,16 @@
     <div class="list-section-header">编码生成列表</div>
 
     <div class="list-filter-bar">
-      <el-select v-model="listFilters.typeCode" placeholder="类型" clearable style="width:150px" @change="onTypeChange" :teleported="false">
+      <el-select v-model="listFilters.typeCode" placeholder="类型" filterable clearable style="width:150px" @change="onTypeChange" :teleported="false">
         <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
       </el-select>
-      <el-select v-model="listFilters.stationCode" placeholder="场站" clearable style="width:150px" @change="onListFilter" :teleported="false">
+      <el-select v-model="listFilters.stationCode" placeholder="场站" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
         <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
       </el-select>
-      <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
+      <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" filterable clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
         <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
       </el-select>
-      <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" clearable style="width:150px" @change="onListFilter" :teleported="false">
+      <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
         <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
       </el-select>
       <el-button type="primary" @click="onListFilter">查询</el-button>

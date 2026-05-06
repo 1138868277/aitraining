@@ -231,51 +231,71 @@ export async function getCodeGenList(
 
   const whereClause = conditions.join(' AND ');
 
-  // 分组统计各维度组合下的编码数量
-  const dims = `
-    SUBSTRING(c.code, 5, 2) AS type_code,
-    SUBSTRING(c.code, 1, 4) AS station_code,
-    SUBSTRING(c.code, 13, 3) AS second_class_code,
-    SUBSTRING(c.code, 20, 3) AS third_class_code,
-    SUBSTRING(c.code, 27, 2) AS data_type_code,
-    SUBSTRING(c.code, 29, 3) AS data_code`;
+  // 优化：CTE 预计算段码 → 纯 GROUP BY（无 JOIN）→ 分页 → 最后查字典名称
+  // 避免在 GROUP BY 之前做 6 个 LEFT JOIN，字典查询只作用于分页后的少量数据
+  const ctePrefix = `
+    WITH segments AS (
+      SELECT
+        SUBSTRING(c.code, 5, 2) AS type_code,
+        SUBSTRING(c.code, 1, 4) AS station_code,
+        SUBSTRING(c.code, 13, 3) AS second_class_code,
+        SUBSTRING(c.code, 20, 3) AS third_class_code,
+        SUBSTRING(c.code, 27, 2) AS data_type_code,
+        SUBSTRING(c.code, 29, 3) AS data_code,
+        c.create_tm
+      FROM ${dbc.schema}.cec_new_energy_createcode c
+      WHERE ${whereClause}
+    ),
+    grouped AS (
+      SELECT
+        type_code, station_code, second_class_code,
+        third_class_code, data_type_code, data_code,
+        COUNT(*) AS code_count,
+        MAX(create_tm) AS max_create_tm
+      FROM segments
+      GROUP BY type_code, station_code, second_class_code,
+               third_class_code, data_type_code, data_code
+    )`;
 
-  const dimsGroup = `
-    SUBSTRING(c.code, 5, 2),
-    SUBSTRING(c.code, 1, 4),
-    SUBSTRING(c.code, 13, 3),
-    SUBSTRING(c.code, 20, 3),
-    SUBSTRING(c.code, 27, 2),
-    SUBSTRING(c.code, 29, 3)`;
-
-  const countSql = `SELECT COUNT(*) AS total FROM (SELECT 1 FROM ${dbc.schema}.cec_new_energy_createcode c WHERE ${whereClause} GROUP BY ${dimsGroup}) t`;
+  const countSql = `${ctePrefix}
+    SELECT COUNT(*) AS total FROM grouped`;
   const countResult = await queryOne<{ total: string }>(countSql, params);
   const total = Number(countResult?.total || 0);
 
+  if (total === 0) {
+    return {
+      list: [], total: 0, pageNum, pageSize, pages: 0,
+      filterOptions: { typeCodes: [], stationCodes: [], secondClassCodes: [], dataTypeCodes: [] },
+    };
+  }
+
   const offset = (pageNum - 1) * pageSize;
-  const listSql = `
+  const listSql = `${ctePrefix},
+    paged AS (
+      SELECT * FROM grouped
+      ORDER BY max_create_tm DESC
+      LIMIT $${paramIdx++} OFFSET $${paramIdx++}
+    )
     SELECT
-      ${dims},
+      p.type_code, p.station_code, p.second_class_code,
+      p.third_class_code, p.data_type_code, p.data_code,
       COALESCE(t.type_name, '') AS type_name,
       COALESCE(s.station_name, '') AS station_name,
       COALESCE(sc.second_class_name, '') AS second_class_name,
       COALESCE(tc.third_class_name, '') AS third_class_name,
       COALESCE(dtd_type.data_type_name, '') AS data_type_name,
       COALESCE(dtd_code.data_name, '') AS data_name,
-      COUNT(*) AS code_count,
-      MAX(c.create_tm) AS max_create_tm
-    FROM ${dbc.schema}.cec_new_energy_createcode c
-    LEFT JOIN (SELECT DISTINCT type_code, type_name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0') t ON SUBSTRING(c.code, 5, 2) = t.type_code
-    LEFT JOIN (SELECT DISTINCT station_code, station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0') s ON SUBSTRING(c.code, 1, 4) = s.station_code
-    LEFT JOIN (SELECT DISTINCT second_class_code, type_code, second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL) sc ON SUBSTRING(c.code, 13, 3) = sc.second_class_code AND SUBSTRING(c.code, 5, 2) = sc.type_code
-    LEFT JOIN (SELECT DISTINCT third_class_code, second_class_code, type_code, third_class_name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL) tc ON SUBSTRING(c.code, 20, 3) = tc.third_class_code AND SUBSTRING(c.code, 13, 3) = tc.second_class_code AND SUBSTRING(c.code, 5, 2) = tc.type_code
-    LEFT JOIN (SELECT DISTINCT data_category_code, type_domain_code, data_category_name AS data_type_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL) dtd_type ON SUBSTRING(c.code, 27, 2) = dtd_type.data_category_code AND SUBSTRING(c.code, 5, 1) = dtd_type.type_domain_code
-    LEFT JOIN (SELECT DISTINCT data_category_code, data_code, type_domain_code, data_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL) dtd_code ON SUBSTRING(c.code, 27, 2) = dtd_code.data_category_code AND SUBSTRING(c.code, 29, 3) = dtd_code.data_code AND SUBSTRING(c.code, 5, 1) = dtd_code.type_domain_code
-    WHERE ${whereClause}
-    GROUP BY ${dimsGroup}, t.type_name, s.station_name, sc.second_class_name, tc.third_class_name, dtd_type.data_type_name, dtd_code.data_name
-    ORDER BY max_create_tm DESC
-    LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
-  const list = await query(listSql, [...params, pageSize, offset]);
+      p.code_count, p.max_create_tm
+    FROM paged p
+    LEFT JOIN (SELECT type_code, MIN(type_name) AS type_name FROM ${dbc.schema}.cec_new_energy_type_dict WHERE if_delete = '0' GROUP BY type_code) t ON p.type_code = t.type_code
+    LEFT JOIN (SELECT station_code, MIN(station_name) AS station_name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0' GROUP BY station_code) s ON p.station_code = s.station_code
+    LEFT JOIN (SELECT second_class_code, type_code, MIN(second_class_name) AS second_class_name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code, type_code) sc ON p.second_class_code = sc.second_class_code AND p.type_code = sc.type_code
+    LEFT JOIN (SELECT third_class_code, second_class_code, type_code, MIN(third_class_name) AS third_class_name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL GROUP BY third_class_code, second_class_code, type_code) tc ON p.third_class_code = tc.third_class_code AND p.second_class_code = tc.second_class_code AND p.type_code = tc.type_code
+    LEFT JOIN (SELECT data_category_code, type_domain_code, MIN(data_category_name) AS data_type_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code, type_domain_code) dtd_type ON p.data_type_code = dtd_type.data_category_code AND SUBSTRING(p.type_code, 1, 1) = dtd_type.type_domain_code
+    LEFT JOIN (SELECT data_category_code, data_code, type_domain_code, MIN(data_name) AS data_name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL GROUP BY data_category_code, data_code, type_domain_code) dtd_code ON p.data_type_code = dtd_code.data_category_code AND p.data_code = dtd_code.data_code AND SUBSTRING(p.type_code, 1, 1) = dtd_code.type_domain_code
+    ORDER BY p.max_create_tm DESC`;
+  const listParams = [...params, pageSize, offset];
+  const list = await query(listSql, listParams);
 
   // 筛选条件选项（联动过滤：类型→二级类码→数据类码）
   const [typeOptions, stationOptions, secondClassOptions, dataTypeOptions] = await Promise.all([
