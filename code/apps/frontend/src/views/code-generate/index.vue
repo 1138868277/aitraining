@@ -4,7 +4,7 @@
     <el-card class="quick-filter-card">
       <template #header>
         <div class="quick-filter-header">
-          <span>快捷搜索</span>
+          <span class="card-title">快速检索</span>
           <el-button size="small" type="primary" @click="showAddDialog = true">新增</el-button>
         </div>
       </template>
@@ -186,11 +186,11 @@
       </template>
     </el-dialog>
 
-    <!-- 顶部筛选条件面板 -->
+    <!-- 顶部编码生成面板 -->
     <el-card class="condition-card">
       <template #header>
         <div class="condition-header">
-          <span>筛选条件</span>
+          <span class="card-title">编码生成</span>
           <el-popover
             ref="recentPopoverRef"
             trigger="hover"
@@ -383,7 +383,7 @@
     <el-card class="result-card">
       <template #header>
         <div class="result-header">
-          <span>编码结果</span>
+          <span class="card-title">编码结果</span>
         </div>
       </template>
 
@@ -584,7 +584,7 @@ function onPreviewSizeChange(size: number) {
   previewPageNum.value = 1;
 }
 
-/** 锁定筛选条件（本地存储持久化） */
+/** 锁定编码生成（本地存储持久化） */
 const LOCKED_FIELDS_KEY = 'locked_filter_fields';
 const LOCKED_VALUES_KEY = 'locked_filter_values';
 const LOCKABLE_FIELDS = ['stationCode', 'typeCode', 'projectLineCode', 'prefixNo', 'firstClassCode', 'secondClassCode'];
@@ -979,11 +979,11 @@ function onQuickSearchFilterChange() {
       quickSearchSecondClassFilter.value = '';
     }
   }
-  // 重新请求服务端带筛选条件的分页数据
+  // 重新请求服务端带编码生成的分页数据
   doQuickSearch();
 }
 
-/** 执行带当前筛选条件的服务端搜索 */
+/** 执行带当前编码生成的服务端搜索 */
 async function doQuickSearch(resetPage: boolean = true) {
   const text = quickSearchText.value.trim();
   if (!text) return;
@@ -1297,7 +1297,7 @@ function onQuickSearchClear() {
   quickSearchTypeOptions.value = [];
 }
 
-/** 点击快捷搜索结果行，自动填入筛选条件 */
+/** 点击快速检索结果行，自动填入编码生成 */
 async function onQuickSearchRowClick(row: {
   typeCode: string;
   secondClassCode: string; secondClassName: string;
@@ -1312,7 +1312,7 @@ async function onQuickSearchRowClick(row: {
   S: 'S1',
     G: 'G1',
   };
-  // 如果类型已锁定，使用当前值；否则使用快捷搜索的映射值
+  // 如果类型已锁定，使用当前值；否则使用快速检索的映射值
   const resolvedTypeCode = lockedFields.typeCode
     ? conditions.typeCode
     : (typeCodeMap[row.typeCode] || row.typeCode);
@@ -1400,7 +1400,7 @@ const expectedCodeCount = computed(() => {
 // 初始化加载顶级字典
 onMounted(async () => {
   try {
-    // 加载锁定的筛选条件状态
+    // 加载锁定的编码生成状态
     loadLockedState();
 
     const [stations, types, prefixes, firstClass] = await Promise.all([
@@ -1458,7 +1458,7 @@ onMounted(async () => {
     // 加载编码生成列表
     loadCodeList();
   } catch (err: any) {
-    ElMessage.error('筛选条件加载失败，请刷新重试');
+    ElMessage.error('编码生成加载失败，请刷新重试');
   }
 });
 
@@ -1615,7 +1615,7 @@ function limitCountInput(value: string, key: string) {
 
 // 扩展数字输入框变化处理
 function onExtendNumberChange(key: string) {
-  // 扩展码不与其他筛选条件联动，只清空已生成的编码
+  // 扩展码不与其他编码生成联动，只清空已生成的编码
   if (generatedCodes.value.length > 0) {
     generatedCodes.value = [];
   }
@@ -1900,7 +1900,7 @@ function formatDataCode(dataCode: string | string[]): string {
   }).join('、');
 }
 
-/** 保存当前条件到最近记录（只存筛选条件编码，不存名称） */
+/** 保存当前条件到最近记录（只存编码生成编码，不存名称） */
 async function saveCurrentConditions() {
   const snapshot: Record<string, any> = {};
   conditionFields.forEach((field) => {
@@ -1923,7 +1923,7 @@ async function saveCurrentConditions() {
   }
 }
 
-/** 应用最近条件记录：一键切换所有筛选条件 */
+/** 应用最近条件记录：一键切换所有编码生成 */
 async function applyRecentCondition(item: { conditionData: Record<string, any> }) {
   const saved = item.conditionData;
   if (!saved || Object.keys(saved).length === 0) return;
@@ -2002,6 +2002,14 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 15px;
+  padding-left: 10px;
+  border-left: 3px solid #409eff;
+  line-height: 1.4;
 }
 
 .quick-filter-body {
