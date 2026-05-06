@@ -548,6 +548,14 @@ const conditionFields: ConditionField[] = [
 
 const conditions = reactive<Record<string, any>>({});
 const dictOptions = reactive<Record<string, Array<{ code: string; name: string }>>>({});
+
+/** 记录上一次的类型编码，用于判断是否跨类型家族切换 */
+const previousTypeCode = ref('');
+
+/** 从类型编码中提取家族前缀，如 F1->F, G1->G, S1->S, Y0->Y */
+function getTypeFamily(typeCode: string): string {
+  return typeCode ? typeCode.charAt(0) : '';
+}
 const generatedCodes = ref<Array<{ code: string; name: string; generateTime: string }>>([]);
 
 /** 预览分页数据 */
@@ -1469,29 +1477,38 @@ async function onConditionChange(key: string) {
     dictOptions[nextKey] = [];
   }
 
-  // 类型代码变更时，重新加载二级类码列表，并清空后续级联字段
+  // 类型代码变更时，重新加载二级类码列表
   if (key === 'typeCode') {
-    // 先清空二级类码及其后续的级联筛选字段
-    conditions.secondClassCode = '';
-    conditions.secondExtCodeStart = '1';
-    conditions.secondExtCodeCount = '1';
-    conditions.thirdClassCode = '';
-    conditions.thirdExtCodeStart = '0';
-    conditions.thirdExtCodeCount = '1';
-    conditions.dataTypeCode = '';
-    conditions.dataCode = [];
-    dictOptions['secondClassCode'] = [];
-    dictOptions['thirdClassCode'] = [];
-    dictOptions['dataTypeCode'] = [];
-    dictOptions['dataCode'] = [];
-    // 再加载新类型下的二级类码选项
+    const newFamily = getTypeFamily(conditions[key]);
+    const oldFamily = getTypeFamily(previousTypeCode.value);
+
+    if (newFamily !== oldFamily) {
+      // 跨类型家族切换（如 F->G），清空二级类码及其后续级联字段
+      conditions.secondClassCode = '';
+      conditions.secondExtCodeStart = '1';
+      conditions.secondExtCodeCount = '1';
+      conditions.thirdClassCode = '';
+      conditions.thirdExtCodeStart = '0';
+      conditions.thirdExtCodeCount = '1';
+      conditions.dataTypeCode = '';
+      conditions.dataCode = [];
+      dictOptions['secondClassCode'] = [];
+      dictOptions['thirdClassCode'] = [];
+      dictOptions['dataTypeCode'] = [];
+      dictOptions['dataCode'] = [];
+    }
+
+    // 加载新类型下的二级类码选项
     try {
       const secondClassItems = await dictService.getSecondClassByType(conditions[key]);
       dictOptions['secondClassCode'] = secondClassItems;
     } catch {}
-    if (generatedCodes.value.length > 0) {
+
+    if (newFamily !== oldFamily && generatedCodes.value.length > 0) {
       generatedCodes.value = [];
     }
+
+    previousTypeCode.value = conditions[key];
     return;
   }
 
