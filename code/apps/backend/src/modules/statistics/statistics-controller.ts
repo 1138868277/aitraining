@@ -324,4 +324,22 @@ router.delete('/api/statistics/measurement/clear', async (_req: Request, res: Re
   }
 });
 
+/** 批量校验编码是否在测点表中存在 */
+router.post('/api/statistics/measurement/check-codes', async (req: Request, res: Response) => {
+  try {
+    const codes = req.body.codes;
+    if (!Array.isArray(codes) || codes.length === 0) {
+      return error(res, ErrorCode.MISSING_PARAMETER, '请提供待校验的编码列表', 400);
+    }
+    if (codes.length > 1000) {
+      return error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次校验数量超出限制（上限1000条）', 400);
+    }
+    const result = await statisticsService.checkMeasurementCodesExist(codes);
+    success(res, result);
+  } catch (err) {
+    console.error('Failed to check codes:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '校验失败', 500);
+  }
+});
+
 export default router;

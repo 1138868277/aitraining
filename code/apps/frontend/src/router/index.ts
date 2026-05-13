@@ -12,10 +12,16 @@ const routes = [
     meta: { title: '编码生成' },
   },
   {
+    path: '/code-verify',
+    name: 'CodeVerify',
+    component: () => import('@/views/code-verify/index.vue'),
+    meta: { title: '编码校验' },
+  },
+  {
     path: '/code-validate',
     name: 'CodeValidate',
     component: () => import('@/views/code-validate/index.vue'),
-    meta: { title: '编码校验' },
+    meta: { title: '字典管理' },
   },
   {
     path: '/statistics',

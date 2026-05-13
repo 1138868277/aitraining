@@ -1027,3 +1027,15 @@ export async function clearMeasurementData(): Promise<void> {
   importStore.status = 'IDLE';
   importStore.message = undefined;
 }
+
+/** 批量校验编码是否在测点表中存在 */
+export async function checkMeasurementCodesExist(
+  codes: string[],
+): Promise<Array<{ code: string; exists: boolean }>> {
+  if (codes.length === 0) return [];
+  const placeholders = codes.map((_, i) => `$${i + 1}`).join(',');
+  const sql = `SELECT code FROM ${dbc.schema}.cec_new_energy_measurement_points WHERE code IN (${placeholders}) AND if_delete = '0'`;
+  const rows = await query<{ code: string }>(sql, codes);
+  const existSet = new Set(rows.map(r => r.code));
+  return codes.map(code => ({ code, exists: existSet.has(code) }));
+}

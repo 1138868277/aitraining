@@ -33,3 +33,4 @@ export const getMeasureList = domain.getMeasureList;
 export const getMeasureFilterOptions = domain.getMeasureFilterOptions;
 export const clearMeasurementData = domain.clearMeasurementData;
 export const cancelImport = domain.cancelImport;
+export const checkMeasurementCodesExist = domain.checkMeasurementCodesExist;

@@ -239,3 +239,9 @@ export async function clearMeasurementData(): Promise<void> {
 export async function cancelImport(): Promise<void> {
   await api.post('/statistics/measurement/cancel-import');
 }
+
+/** 批量校验编码是否在测点表中存在 */
+export async function checkMeasurementCodesExist(codes: string[]): Promise<Array<{ code: string; exists: boolean }>> {
+  const res = await api.post('/statistics/measurement/check-codes', { codes });
+  return res.data;
+}
