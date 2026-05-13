@@ -464,11 +464,12 @@ export async function parseCode(code: string): Promise<{
   const thirdExtCode = code.slice(22, 26);
   const dataCategoryCode = code.slice(26, 28);
   const dataCode = code.slice(28, 31);
+  const typeDomainCode = typeCode.charAt(0);
 
   // 并行查询所有段
   const [
     stations, types, prefixes, firstClasses,
-    secondClasses, thirdClasses, codeDictItems,
+    secondClasses, thirdClasses, dataCategories, dataCodes,
   ] = await Promise.all([
     query<{ name: string }>(
       `SELECT station_name AS name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE if_delete = '0' AND station_code = $1`,
@@ -491,14 +492,22 @@ export async function parseCode(code: string): Promise<{
       [secondClassCode, typeCode],
     ),
     query<{ name: string }>(
-      `SELECT third_class_name AS name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code = $1`,
-      [thirdClassCode],
+      `SELECT third_class_name AS name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND type_code = $1 AND second_class_code = $2 AND third_class_code = $3`,
+      [typeCode, secondClassCode, thirdClassCode],
     ),
-    query<{ data_category_name: string; data_name: string }>(
-      `SELECT data_category_name, data_name FROM ${dbc.schema}.cec_new_energy_code_dict
-       WHERE if_delete = '0' AND data_category_code = $1 AND data_code = $2
+    query<{ data_category_name: string }>(
+      `SELECT data_category_name FROM ${dbc.schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code = $2
+         AND (type_code = $3 OR (type_code IS NULL AND type_domain_code = $4))
        LIMIT 1`,
-      [dataCategoryCode, dataCode],
+      [secondClassCode, dataCategoryCode, typeCode, typeDomainCode],
+    ),
+    query<{ data_name: string }>(
+      `SELECT data_name FROM ${dbc.schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code = $2 AND data_code = $3
+         AND (type_code = $4 OR (type_code IS NULL AND type_domain_code = $5))
+       LIMIT 1`,
+      [secondClassCode, dataCategoryCode, dataCode, typeCode, typeDomainCode],
     ),
   ]);
 
@@ -512,8 +521,8 @@ export async function parseCode(code: string): Promise<{
     { label: '二级类扩展码', code: secondExtCode, name: secondExtCode === '0000' ? '无扩展' : '扩展编码' },
     { label: '三级类码', code: thirdClassCode, name: thirdClasses[0]?.name || '未识别' },
     { label: '三级类扩展码', code: thirdExtCode, name: thirdExtCode === '0000' ? '无扩展' : '扩展编码' },
-    { label: '数据类码', code: dataCategoryCode, name: codeDictItems[0]?.data_category_name || '未识别' },
-    { label: '数据码', code: dataCode, name: codeDictItems[0]?.data_name || '未识别' },
+    { label: '数据类码', code: dataCategoryCode, name: dataCategories[0]?.data_category_name || '未识别' },
+    { label: '数据码', code: dataCode, name: dataCodes[0]?.data_name || '未识别' },
   ];
 
   const unrecognizedCount = segments.filter(s => s.name === '未识别').length;
