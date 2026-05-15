@@ -87,3 +87,28 @@ export async function saveCodeMapping(data: {
   const res = await api.post('/validate/save-code-mapping', data);
   return res.data;
 }
+
+/** 编码修正：批量修正编码 */
+export async function batchCorrectCodes(
+  items: Array<{ code: string; description: string; modification: string }>,
+): Promise<{
+  items: Array<{
+    oldCode: string;
+    newCode: string;
+    description: string;
+    modification: string;
+    changes: Array<{
+      segmentLabel: string;
+      oldValue: string;
+      newValue: string;
+      start: number;
+      length: number;
+    }>;
+    duplicate: boolean;
+    correctionTime: string;
+  }>;
+  totalCount: number;
+}> {
+  const res = await api.post('/validate/correct-codes', { items });
+  return res.data;
+}

@@ -262,6 +262,118 @@
             </div>
           </div>
         </el-tab-pane>
+
+        <!-- Tab 4: 编码修正 -->
+        <el-tab-pane label="编码修正" name="correct">
+          <div class="correct-container">
+            <el-card shadow="never" class="correct-upload-section">
+              <div class="correct-upload-title">导入修正数据</div>
+              <el-upload
+                drag
+                action="#"
+                accept=".xlsx,.xls"
+                :auto-upload="false"
+                :on-change="handleCorrectFileUpload"
+                :on-exceed="handleUploadExceed"
+                :limit="1"
+                :file-list="correctFileList"
+              >
+                <template #default>
+                  <template v-if="correctFileList.length === 0">
+                    <el-icon class="el-icon--upload">
+                      <svg viewBox="0 0 1024 1024" width="40" height="40" fill="#909399">
+                        <path d="M544 864V288h-64v576H352l160 160 160-160z"/>
+                        <path d="M128 128h768v128H128z"/>
+                      </svg>
+                    </el-icon>
+                    <div class="el-upload__text">拖拽文件到此处，或<em>点击上传</em></div>
+                  </template>
+                  <template v-else>
+                    <div class="excel-file-display">
+                      <svg viewBox="0 0 1024 1024" width="64" height="64" fill="#67c23a">
+                        <path d="M854.6 288.7L639.4 73.4c-6-6-14.2-9.4-22.7-9.4H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V311.3c0-8.5-3.4-16.6-9.4-22.6zM790.2 326H602V137.8L790.2 326zM840 896H184V96h368v232c0 17.7 14.3 32 32 32h232v536h24zM421.1 476.4l-42.4 86.1-42.4-86.1h-39.9l60.9 124.3-67.6 132.3h40.6l45.5-93.8 45.5 93.8h41.5l-67.2-131.6 59.1-124.9zM544 599.8h72.3v-39.9H544v-45.6h82.4v-40.4H503.6V733h41.4l0.3-133.2h-0.6z"/>
+                      </svg>
+                      <div class="excel-file-name">{{ correctFileList[0]?.name }}</div>
+                      <div class="excel-file-size">{{ formatFileSize(correctFileList[0]?.size) }}</div>
+                    </div>
+                  </template>
+                </template>
+                <template #tip>
+                  <div class="el-upload__tip">
+                    支持 .xlsx/.xls 文件，请确保包含"测点编码"、"测点描述"和"修改内容"三列<br/>
+                    修改内容格式示例：<code>二级类码修改为003，数据类码修改为11，数据码修改为005</code>
+                  </div>
+                </template>
+              </el-upload>
+              <div class="correct-hint" v-if="correctItems.length > 0">
+                已解析 {{ correctItems.length }} 条待修正编码
+              </div>
+              <div class="correct-actions">
+                <el-button
+                  type="primary"
+                  :disabled="correctItems.length === 0 || correcting"
+                  @click="handleCorrectCodes"
+                >{{ correcting ? '修正中 ' + correctProgress + '%' : '开始修正' }}</el-button>
+                <el-button :disabled="correctItems.length === 0" @click="clearCorrect">清空</el-button>
+              </div>
+              <div v-if="correcting" class="correct-progress-wrapper">
+                <el-progress
+                  :percentage="correctProgress"
+                  :stroke-width="16"
+                  :format="progressFormat"
+                  class="correct-progress"
+                />
+                <span class="correct-progress-text">正在修正第 {{ correctedCount }}/{{ correctItems.length }} 条</span>
+              </div>
+            </el-card>
+
+            <div v-if="correctResults.length > 0" class="correct-result-section">
+              <div class="correct-result-header">
+                <span>修正结果（共 {{ correctResults.length }} 条）</span>
+                <el-tag type="warning" effect="plain" v-if="correctDuplicateCount > 0">
+                  {{ correctDuplicateCount }} 条重复
+                </el-tag>
+                <el-button type="success" @click="exportCorrectResults">导出 Excel</el-button>
+              </div>
+              <el-table :data="correctResults" border stripe style="width: 100%" max-height="600">
+                <el-table-column type="index" label="序号" width="60" fixed />
+                <el-table-column label="测点编码（旧）" min-width="300">
+                  <template #default="{ row }">
+                    <div class="code-segment-compare">
+                      <span
+                        v-for="(seg, idx) in row.oldSegments"
+                        :key="idx"
+                        class="seg-code"
+                        :class="getChangedClass(row, seg.label, 'old')"
+                      >{{ seg.code }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="测点编码（新）" min-width="300">
+                  <template #default="{ row }">
+                    <div class="code-segment-compare">
+                      <span
+                        v-for="(seg, idx) in row.newSegments"
+                        :key="idx"
+                        class="seg-code"
+                        :class="getChangedClass(row, seg.label, 'new')"
+                      >{{ seg.code }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="description" label="测点描述" min-width="180" />
+                <el-table-column prop="modification" label="修改内容" min-width="260" />
+                <el-table-column label="重复校验结果" width="130">
+                  <template #default="{ row }">
+                    <span v-if="!row.duplicate" class="audit-pass">✓ 不重复</span>
+                    <span v-else class="audit-fail">✗ 重复</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="correctionTime" label="修正时间" width="180" />
+              </el-table>
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
 
@@ -549,6 +661,160 @@ function clearAudit() {
   auditInput.value = '';
   auditResults.value = [];
 }
+
+// ========== 编码修正 ==========
+const correctFileList = ref<Array<{ name: string; size: number }>>([]);
+const correctItems = ref<Array<{ code: string; description: string; modification: string }>>([]);
+const correcting = ref(false);
+const correctProgress = ref(0);
+const correctedCount = ref(0);
+const correctResults = ref<Array<any>>([]);
+const CHUNK_SIZE = 50; // 每批处理条数
+
+/** 编码段位定义（与后端一致） */
+const CODE_SEGMENTS = [
+  { label: '场站编码', start: 0, length: 4 },
+  { label: '类型编码', start: 4, length: 2 },
+  { label: '项目期号', start: 6, length: 3 },
+  { label: '前缀号', start: 9, length: 1 },
+  { label: '一级类码', start: 10, length: 2 },
+  { label: '二级类码', start: 12, length: 3 },
+  { label: '二级类扩展码', start: 15, length: 4 },
+  { label: '三级类码', start: 19, length: 3 },
+  { label: '三级类扩展码', start: 22, length: 4 },
+  { label: '数据类码', start: 26, length: 2 },
+  { label: '数据码', start: 28, length: 3 },
+];
+
+/** 将31位编码按段位拆分 */
+function splitCodeIntoSegments(code: string): Array<{ label: string; code: string }> {
+  return CODE_SEGMENTS.map(seg => ({
+    label: seg.label,
+    code: code.substring(seg.start, seg.start + seg.length),
+  }));
+}
+
+const correctDuplicateCount = computed(() => {
+  return correctResults.value.filter(r => r.duplicate).length;
+});
+
+function handleCorrectFileUpload(file: any) {
+  correctFileList.value = [{ name: file.name, size: file.size }];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json<any>(firstSheet);
+
+      const items: Array<{ code: string; description: string; modification: string }> = [];
+      for (const row of jsonData) {
+        const code = row['测点编码'] || '';
+        const description = row['测点描述'] || '';
+        const modification = row['修改内容'] || '';
+        if (code && modification) {
+          items.push({
+            code: String(code).trim(),
+            description: String(description).trim(),
+            modification: String(modification).trim(),
+          });
+        }
+      }
+
+      if (items.length === 0) {
+        ElMessage.warning('文件中未识别到有效数据，请确保包含"测点编码"和"修改内容"列');
+        return;
+      }
+      correctItems.value = items;
+      ElMessage.success(`已解析 ${items.length} 条待修正编码`);
+    } catch {
+      ElMessage.error('文件解析失败，请检查文件格式');
+    }
+  };
+  reader.readAsArrayBuffer(file.raw);
+  return false;
+}
+
+function progressFormat(percentage: number) {
+  return percentage + '%';
+}
+
+async function handleCorrectCodes() {
+  if (correctItems.value.length === 0) return;
+  if (correctItems.value.length > 1000) {
+    ElMessage.warning('单次修正数量超出限制（上限1000条）');
+    return;
+  }
+
+  correcting.value = true;
+  correctProgress.value = 0;
+  correctedCount.value = 0;
+  correctResults.value = [];
+  const allResults: any[] = [];
+  const total = correctItems.value.length;
+
+  try {
+    // 分批处理
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = correctItems.value.slice(i, i + CHUNK_SIZE);
+      const result = await validateService.batchCorrectCodes(chunk);
+      allResults.push(...result.items);
+
+      correctedCount.value = allResults.length;
+      correctProgress.value = Math.round((allResults.length / total) * 100);
+    }
+
+    // 为每条结果补充 oldSegments 和 newSegments
+    const enhanced = allResults.map((item: any) => ({
+      ...item,
+      oldSegments: splitCodeIntoSegments(item.oldCode),
+      newSegments: splitCodeIntoSegments(item.newCode),
+    }));
+    correctResults.value = enhanced;
+    ElMessage.success(`修正完成，共 ${allResults.length} 条`);
+  } catch (err: any) {
+    ElMessage.error(err.message || '编码修正失败');
+  } finally {
+    correcting.value = false;
+  }
+}
+
+function clearCorrect() {
+  correctFileList.value = [];
+  correctItems.value = [];
+  correctResults.value = [];
+  correctProgress.value = 0;
+  correctedCount.value = 0;
+}
+
+function getChangedClass(row: any, segmentLabel: string, type: 'old' | 'new') {
+  const changed = row.changes?.find((c: any) => c.segmentLabel === segmentLabel);
+  if (!changed) return 'seg-unchanged';
+  return type === 'old' ? 'seg-changed-old' : 'seg-changed-new';
+}
+
+function exportCorrectResults() {
+  if (correctResults.value.length === 0) {
+    ElMessage.warning('没有可导出的数据');
+    return;
+  }
+
+  const exportData = correctResults.value.map((row: any) => ({
+    '测点编码': row.oldCode,
+    '测点编码（新）': row.newCode,
+    '测点描述': row.description,
+    '修改内容': row.modification,
+    '重复校验结果': row.duplicate ? '重复' : '不重复',
+    '修正时间': row.correctionTime,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '编码修正');
+  XLSX.writeFile(wb, `编码修正结果_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  ElMessage.success('导出成功');
+}
 </script>
 
 <style scoped>
@@ -683,4 +949,45 @@ function clearAudit() {
 .audit-fail { color: #f56c6c; font-weight: 700; font-size: 15px; }
 .audit-pass-desc { color: #67c23a; }
 .audit-fail-desc { color: #f56c6c; }
+
+/* 编码修正 */
+.correct-container { padding: 8px 0; }
+.correct-upload-section { margin-bottom: 16px; border: none; max-width: 700px; }
+.correct-upload-title { font-size: 15px; font-weight: 600; color: #303133; margin-bottom: 12px; }
+.correct-hint { margin-top: 8px; font-size: 13px; color: #909399; }
+.correct-actions { margin-top: 12px; display: flex; gap: 12px; }
+.correct-result-section { margin-top: 20px; }
+.correct-result-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+}
+.code-segment-compare {
+  display: flex;
+  flex-wrap: nowrap;
+}
+.seg-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.seg-unchanged { background: transparent; color: #303133; }
+.seg-changed-old { background: #fef0f0; color: #f56c6c; text-decoration: line-through; }
+.seg-changed-new { background: #f0f9eb; color: #67c23a; font-weight: 700; }
+.correct-progress-wrapper {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.correct-progress { width: 60%; }
+.correct-progress-text { font-size: 13px; color: #606266; white-space: nowrap; }
 </style>

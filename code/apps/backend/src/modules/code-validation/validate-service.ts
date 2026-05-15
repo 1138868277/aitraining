@@ -233,3 +233,10 @@ export async function saveCodeMapping(input: {
   await validateDomain.saveCodeMapping(input);
   return { success: true };
 }
+
+/** 批量修正编码 */
+export async function batchCorrectCodes(
+  items: Array<{ code: string; description: string; modification: string }>,
+): Promise<validateDomain.CodeCorrectionResult[]> {
+  return validateDomain.batchCorrectCodes(items);
+}

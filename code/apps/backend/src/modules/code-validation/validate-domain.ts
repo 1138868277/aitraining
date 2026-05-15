@@ -555,3 +555,182 @@ export async function saveCodeMapping(input: {
     [input.oldCode, input.newCode, input.oldName, input.newName, input.creator],
   );
 }
+
+// ========== 编码修正 ==========
+
+/** 编码段位定义 */
+export const CODE_SEGMENTS = [
+  { label: '场站编码', start: 0, length: 4 },
+  { label: '类型编码', start: 4, length: 2 },
+  { label: '项目期号', start: 6, length: 3 },
+  { label: '前缀号', start: 9, length: 1 },
+  { label: '一级类码', start: 10, length: 2 },
+  { label: '二级类码', start: 12, length: 3 },
+  { label: '二级类扩展码', start: 15, length: 4 },
+  { label: '三级类码', start: 19, length: 3 },
+  { label: '三级类扩展码', start: 22, length: 4 },
+  { label: '数据类码', start: 26, length: 2 },
+  { label: '数据码', start: 28, length: 3 },
+] as const;
+
+/** 修改内容项 */
+export interface ModificationItem {
+  segmentLabel: string;
+  newValue: string;
+}
+
+/** 段位变更记录 */
+export interface SegmentChange {
+  segmentLabel: string;
+  oldValue: string;
+  newValue: string;
+  start: number;
+  length: number;
+}
+
+/** 编码修正结果 */
+export interface CodeCorrectionResult {
+  oldCode: string;
+  newCode: string;
+  description: string;
+  modification: string;
+  changes: SegmentChange[];
+  duplicate: boolean;
+  correctionTime: string;
+}
+
+/**
+ * 解析修改内容字符串
+ * 格式: "数据类码修改为11，数据码修改为112"
+ * 支持: 段位名称修改为新值，多条用中文逗号分隔
+ */
+export function parseModificationContent(content: string): ModificationItem[] {
+  const items: ModificationItem[] = [];
+  const parts = content.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+
+  for (const part of parts) {
+    const match = part.match(/^(.+?)修改为(.+)$/);
+    if (match) {
+      items.push({ segmentLabel: match[1].trim(), newValue: match[2].trim() });
+    }
+  }
+
+  return items;
+}
+
+/**
+ * 根据修改内容对31位编码进行修正
+ * @returns 修正后的编码和变更段位列表，无效则返回 null
+ */
+export function applyCodeModifications(
+  code: string,
+  modifications: ModificationItem[],
+): { newCode: string; changes: SegmentChange[] } | null {
+  if (!/^[A-Za-z0-9]{31}$/.test(code)) return null;
+
+  const segMap = new Map<string, typeof CODE_SEGMENTS[number]>(CODE_SEGMENTS.map(s => [s.label, s]));
+  let newCode = code;
+  const changes: SegmentChange[] = [];
+
+  for (const mod of modifications) {
+    const seg = segMap.get(mod.segmentLabel);
+    if (!seg) continue;
+
+    const oldValue = code.substring(seg.start, seg.start + seg.length);
+    if (oldValue === mod.newValue) continue;
+
+    // 校验新值长度
+    if (mod.newValue.length !== seg.length) continue;
+
+    newCode = newCode.substring(0, seg.start) + mod.newValue + newCode.substring(seg.start + seg.length);
+    changes.push({
+      segmentLabel: seg.label,
+      oldValue,
+      newValue: mod.newValue,
+      start: seg.start,
+      length: seg.length,
+    });
+  }
+
+  if (changes.length === 0) return null;
+  return { newCode, changes };
+}
+
+/**
+ * 批量修正编码
+ */
+export async function batchCorrectCodes(
+  items: Array<{ code: string; description: string; modification: string }>,
+): Promise<CodeCorrectionResult[]> {
+  // 确保修正记录表存在
+  await dbQuery(
+    `CREATE TABLE IF NOT EXISTS ${dbc.schema}.cec_new_energy_code_correction (
+      id BIGSERIAL PRIMARY KEY,
+      old_code VARCHAR(31) NOT NULL,
+      new_code VARCHAR(31) NOT NULL,
+      description VARCHAR(500),
+      modification TEXT,
+      duplicate CHAR(1) DEFAULT '0',
+      correction_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+  );
+
+  const results: CodeCorrectionResult[] = [];
+  const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const newCodes: string[] = [];
+
+  // 第一遍：解析和应用修改，收集新编码
+  const parsedItems: Array<{
+    original: typeof items[0];
+    newCode: string;
+    changes: SegmentChange[];
+  }> = [];
+
+  for (const item of items) {
+    const mods = parseModificationContent(item.modification);
+    if (mods.length === 0) continue;
+
+    const result = applyCodeModifications(item.code, mods);
+    if (!result) continue;
+
+    parsedItems.push({ original: item, ...result });
+    newCodes.push(result.newCode);
+  }
+
+  // 批量查询新编码是否在测点表中存在
+  const duplicateMap = new Map<string, boolean>();
+  if (newCodes.length > 0) {
+    const placeholders = newCodes.map((_, i) => `$${i + 1}`).join(',');
+    const rows = await dbQuery<{ code: string }>(
+      `SELECT code FROM ${dbc.schema}.cec_new_energy_measurement_points WHERE code IN (${placeholders}) AND if_delete = '0'`,
+      newCodes,
+    );
+    const existSet = new Set(rows.map(r => r.code));
+    for (const nc of newCodes) {
+      duplicateMap.set(nc, existSet.has(nc));
+    }
+  }
+
+  // 第二遍：构建结果并入库
+  for (const parsed of parsedItems) {
+    const duplicate = duplicateMap.get(parsed.newCode) || false;
+    results.push({
+      oldCode: parsed.original.code,
+      newCode: parsed.newCode,
+      description: parsed.original.description,
+      modification: parsed.original.modification,
+      changes: parsed.changes,
+      duplicate,
+      correctionTime: now,
+    });
+
+    await dbQuery(
+      `INSERT INTO ${dbc.schema}.cec_new_energy_code_correction
+       (old_code, new_code, description, modification, duplicate, correction_tm)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [parsed.original.code, parsed.newCode, parsed.original.description, parsed.original.modification, duplicate ? '1' : '0', now],
+    );
+  }
+
+  return results;
+}
