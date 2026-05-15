@@ -965,8 +965,17 @@ let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
 const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
 
 const quickSearchFilteredSecondClassOptions = computed(() => {
-  if (!quickSearchTypeFilter.value) return quickSearchSecondClassOptions.value;
-  return quickSearchSecondClassOptions.value.filter(s => s.typeCode === quickSearchTypeFilter.value);
+  let options = quickSearchSecondClassOptions.value;
+  if (quickSearchTypeFilter.value) {
+    options = options.filter(s => s.typeCode === quickSearchTypeFilter.value);
+  }
+  // 筛选后再按 code 去重
+  const seen = new Set<string>();
+  return options.filter(s => {
+    if (seen.has(s.code)) return false;
+    seen.add(s.code);
+    return true;
+  });
 });
 
 function onQuickSearchFilterChange() {
@@ -996,13 +1005,11 @@ async function doQuickSearch(resetPage: boolean = true) {
     quickSearchResults.value = result.items;
     quickSearchTotal.value = result.total;
     quickSearchTypeOptions.value = result.typeOptions || [];
-    const seen = new Set<string>();
-    quickSearchSecondClassOptions.value = (result.secondClassOptions || []).filter(s => {
-      const key = s.secondClassCode;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).map(s => ({ code: s.secondClassCode, name: s.secondClassName, typeCode: s.typeCode }));
+    quickSearchSecondClassOptions.value = (result.secondClassOptions || []).map(s => ({
+      code: s.secondClassCode,
+      name: s.secondClassName,
+      typeCode: s.typeCode,
+    }));
   } catch {
     quickSearchResults.value = [];
     quickSearchTotal.value = 0;
