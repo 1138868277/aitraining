@@ -330,12 +330,15 @@
             <div v-if="correctResults.length > 0" class="correct-result-section">
               <div class="correct-result-header">
                 <span>修正结果（共 {{ correctResults.length }} 条）</span>
+                <el-tag type="info" effect="plain" v-if="correctResults.length > DISPLAY_LIMIT">
+                  表格仅显示前 {{ DISPLAY_LIMIT }} 条，导出 Excel 包含全量数据
+                </el-tag>
                 <el-tag type="warning" effect="plain" v-if="correctDuplicateCount > 0">
                   {{ correctDuplicateCount }} 条重复
                 </el-tag>
                 <el-button type="success" @click="exportCorrectResults">导出 Excel</el-button>
               </div>
-              <el-table :data="correctResults" border stripe style="width: 100%" max-height="600">
+              <el-table :data="displayCorrectResults" border stripe style="width: 100%" max-height="600">
                 <el-table-column type="index" label="序号" width="60" fixed />
                 <el-table-column label="测点编码（旧）" min-width="300">
                   <template #default="{ row }">
@@ -643,8 +646,8 @@ const duplicateCount = computed(() => auditResults.value.filter(r => r.exists).l
 
 async function handleAudit() {
   if (auditCodes.value.length === 0) return;
-  if (auditCodes.value.length > 1000) {
-    ElMessage.warning('单次稽核数量超出限制（上限1000条）');
+  if (auditCodes.value.length > 10000) {
+    ElMessage.warning('单次稽核数量超出限制（上限10000条）');
     return;
   }
   auditing.value = true;
@@ -669,6 +672,7 @@ const correcting = ref(false);
 const correctProgress = ref(0);
 const correctedCount = ref(0);
 const correctResults = ref<Array<any>>([]);
+const DISPLAY_LIMIT = 100; // 表格最多显示条数
 const CHUNK_SIZE = 50; // 每批处理条数
 
 /** 编码段位定义（与后端一致） */
@@ -693,6 +697,11 @@ function splitCodeIntoSegments(code: string): Array<{ label: string; code: strin
     code: code.substring(seg.start, seg.start + seg.length),
   }));
 }
+
+/** 表格仅显示前 DISPLAY_LIMIT 条，避免大数据量卡顿 */
+const displayCorrectResults = computed(() => {
+  return correctResults.value.slice(0, DISPLAY_LIMIT);
+});
 
 const correctDuplicateCount = computed(() => {
   return correctResults.value.filter(r => r.duplicate).length;

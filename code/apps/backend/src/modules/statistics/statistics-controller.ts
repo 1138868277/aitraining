@@ -331,8 +331,8 @@ router.post('/api/statistics/measurement/check-codes', async (req: Request, res:
     if (!Array.isArray(codes) || codes.length === 0) {
       return error(res, ErrorCode.MISSING_PARAMETER, '请提供待校验的编码列表', 400);
     }
-    if (codes.length > 1000) {
-      return error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次校验数量超出限制（上限1000条）', 400);
+    if (codes.length > 10000) {
+      return error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次校验数量超出限制（上限10000条）', 400);
     }
     const result = await statisticsService.checkMeasurementCodesExist(codes);
     success(res, result);
