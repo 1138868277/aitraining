@@ -742,8 +742,8 @@ function progressFormat(percentage: number) {
 
 async function handleCorrectCodes() {
   if (correctItems.value.length === 0) return;
-  if (correctItems.value.length > 1000) {
-    ElMessage.warning('单次修正数量超出限制（上限1000条）');
+  if (correctItems.value.length > 100000) {
+    ElMessage.warning('单次修正数量超出限制（上限100000条）');
     return;
   }
 
