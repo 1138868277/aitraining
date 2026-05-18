@@ -1028,14 +1028,27 @@ export async function clearMeasurementData(): Promise<void> {
   importStore.message = undefined;
 }
 
-/** 批量校验编码是否在测点表中存在 */
+/** 批量校验编码是否重复（同时校验数据库重复和输入内重复） */
 export async function checkMeasurementCodesExist(
   codes: string[],
 ): Promise<Array<{ code: string; exists: boolean }>> {
   if (codes.length === 0) return [];
+
+  // 1. 统计输入编码中重复出现的次数
+  const inputCountMap = new Map<string, number>();
+  for (const code of codes) {
+    inputCountMap.set(code, (inputCountMap.get(code) || 0) + 1);
+  }
+
+  // 2. 查询在数据库中存在的编码
   const placeholders = codes.map((_, i) => `$${i + 1}`).join(',');
   const sql = `SELECT code FROM ${dbc.schema}.cec_new_energy_measurement_points WHERE code IN (${placeholders}) AND if_delete = '0'`;
   const rows = await query<{ code: string }>(sql, codes);
   const existSet = new Set(rows.map(r => r.code));
-  return codes.map(code => ({ code, exists: existSet.has(code) }));
+
+  // 3. 数据库重复或输入内重复均视为重复
+  return codes.map(code => ({
+    code,
+    exists: existSet.has(code) || inputCountMap.get(code)! > 1,
+  }));
 }

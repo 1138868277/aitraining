@@ -711,9 +711,16 @@ export async function batchCorrectCodes(
     }
   }
 
+  // 统计修正后编码在本次输入中的重复次数
+  const inputCountMap = new Map<string, number>();
+  for (const nc of newCodes) {
+    inputCountMap.set(nc, (inputCountMap.get(nc) || 0) + 1);
+  }
+
   // 第二遍：构建结果并入库
   for (const parsed of parsedItems) {
-    const duplicate = duplicateMap.get(parsed.newCode) || false;
+    // 数据库重复 或 输入内重复 均视为重复
+    const duplicate = duplicateMap.get(parsed.newCode) || inputCountMap.get(parsed.newCode)! > 1;
     results.push({
       oldCode: parsed.original.code,
       newCode: parsed.newCode,

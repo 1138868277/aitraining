@@ -254,8 +254,8 @@
                 </el-table-column>
                 <el-table-column label="说明" min-width="300">
                   <template #default="{ row }">
-                    <span v-if="!row.exists" class="audit-pass-desc">该编码在全量测点中不存在，可以使用</span>
-                    <span v-else class="audit-fail-desc">该编码已在全量测点中存在，请勿重复添加</span>
+                    <span v-if="!row.exists" class="audit-pass-desc">该编码不重复，可以使用</span>
+                    <span v-else class="audit-fail-desc">该编码重复（与数据库中已有编码重复或输入中存在重复）</span>
                   </template>
                 </el-table-column>
               </el-table>
