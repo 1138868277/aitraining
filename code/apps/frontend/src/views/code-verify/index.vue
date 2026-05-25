@@ -100,7 +100,7 @@
                     clearable
                     class="parse-batch-textarea"
                   />
-                  <div class="parse-batch-hint">已解析 {{ batchParseCodeList.length }} 条编码</div>
+                  <div class="parse-batch-hint">已解析 {{ batchParseCodeList.length }} 条编码（单次最多支持1000条）</div>
                   <div class="parse-batch-actions">
                     <el-button
                       type="primary"
@@ -130,6 +130,7 @@
                       size="small"
                       @click="toggleAllRows"
                     >一键收起</el-button>
+                    <el-button type="primary" size="small" @click="exportBatchParseResult">导出 Excel</el-button>
                   </div>
                   <el-table
                     ref="batchParseTableRef"
@@ -462,6 +463,27 @@ function clearBatchParse() {
   batchParseResults.value = [];
   allExpanded.value = false;
   expandedRowKeys.value = [];
+}
+
+function exportBatchParseResult() {
+  const data: Record<string, any>[] = batchParseResults.value.map((r, i) => ({
+    '序号': i + 1,
+    '编码': r.rawCode,
+    '状态': r.isValid ? '全部识别' : '部分未识别',
+    '错误信息': r.errorMessage || '',
+  }));
+  const segments = batchParseResults.value[0]?.segments || [];
+  if (segments.length > 0) {
+    batchParseResults.value.forEach((r, i) => {
+      r.segments.forEach((seg) => {
+        data[i][seg.label] = `${seg.code} ${seg.name}`;
+      });
+    });
+  }
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '编码解析结果');
+  XLSX.writeFile(wb, `编码解析结果_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function handleUploadExceed() {
