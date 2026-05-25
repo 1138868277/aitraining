@@ -206,6 +206,12 @@ onMounted(() => {
 <style scoped>
 .datasource-tab {
   padding: 16px 0;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .lock-bar {
@@ -221,9 +227,10 @@ onMounted(() => {
   font-size: 13px;
   color: #909399;
   margin-bottom: 24px;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 6px;
+  padding: 14px 16px;
+  background: #fafbff;
+  border: 1px solid #eef0f6;
+  border-radius: 8px;
   line-height: 1.6;
 }
 

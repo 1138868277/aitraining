@@ -15,7 +15,7 @@ const routes = [
     path: '/code-verify',
     name: 'CodeVerify',
     component: () => import('@/views/code-verify/index.vue'),
-    meta: { title: '编码校验' },
+    meta: { title: '编码修正' },
   },
   {
     path: '/code-validate',

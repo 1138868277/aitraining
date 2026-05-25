@@ -1,19 +1,38 @@
 <template>
   <div class="code-generate">
-    <!-- 快捷筛选面板 -->
-    <el-card class="quick-filter-card">
-      <template #header>
-        <div class="quick-filter-header">
-          <span class="card-title">快速检索</span>
-          <el-button size="small" type="primary" @click="showAddDialog = true">新增</el-button>
+    <!-- 顶部横幅 -->
+    <div class="page-hero">
+      <div class="hero-icon">⚙️</div>
+      <div class="hero-text">
+        <div class="hero-title">编码生成</div>
+        <div class="hero-subtitle">根据规则批量生成测点编码，支持导出和修正</div>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-badge">
+          <span class="stat-num">{{ savedTotal }}</span>
+          <span class="stat-label">累计编码数量</span>
         </div>
-      </template>
-      <div class="quick-filter-body">
+      </div>
+    </div>
+
+    <!-- 检索工具栏卡片 -->
+    <div class="toolbar-card">
+      <div class="toolbar-left">
+        <span class="card-title">快速检索</span>
+      </div>
+      <div class="toolbar-right">
+        <el-button type="primary" size="small" @click="showAddDialog = true">
+          <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增
+        </el-button>
+      </div>
+    </div>
+    <div class="toolbar-body">
         <div class="quick-search-row">
           <el-input
             v-model="quickSearchText"
             placeholder="数据码模糊搜索 或 编码后5位"
             clearable
+            class="search-input"
             @input="onQuickSearchInput"
             @clear="onQuickSearchClear"
           >
@@ -116,8 +135,7 @@
           v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading && quickSearchText.trim()"
           description="未找到匹配的数据码"
         />
-      </div>
-    </el-card>
+    </div>
 
     <!-- 手动新增编码字典对话框（批量） -->
     <el-dialog v-model="showAddDialog" title="新增编码字典" width="820px" :close-on-click-modal="false">
@@ -186,11 +204,10 @@
       </template>
     </el-dialog>
 
-    <!-- 顶部编码生成面板 -->
-    <el-card class="condition-card">
-      <template #header>
-        <div class="condition-header">
-          <span class="card-title">编码生成</span>
+    <!-- 编码生成条件面板 -->
+    <div class="section-card">
+      <div class="section-header">
+        <span class="card-title">编码生成</span>
           <el-popover
             ref="recentPopoverRef"
             trigger="hover"
@@ -245,11 +262,11 @@
               <el-empty v-if="recentConditions.length === 0" description="暂无最近记录" />
             </div>
           </el-popover>
-        </div>
-      </template>
+      </div>
+      <div class="section-body">
       <el-form :model="conditions" label-width="140px" label-position="top">
         <el-row :gutter="20">
-          <el-col :span="6" v-for="field in conditionFields" :key="field.key">
+          <el-col :span="6" v-for="field in conditionFields" :key="field.key" class="filter-item">
             <el-form-item :label="field.label" :required="field.required">
               <!-- 下拉选择框（带快捷选择） -->
               <div v-if="field.type === 'select'" class="input-with-quick-options">
@@ -377,15 +394,15 @@
           预计生成 {{ expectedCodeCount }} 个编码
         </span>
       </div>
-    </el-card>
+      </div>
+    </div>
 
     <!-- 编码结果展示区 -->
-    <el-card class="result-card">
-      <template #header>
-        <div class="result-header">
-          <span class="card-title">编码结果</span>
-        </div>
-      </template>
+    <div class="section-card">
+      <div class="section-header">
+        <span class="card-title">编码结果</span>
+      </div>
+      <div class="section-body">
 
       <el-tabs v-model="activeTab" @tab-click="onTabClick">
         <!-- 编码预览标签页 -->
@@ -509,13 +526,15 @@
         </el-tab-pane>
 
       </el-tabs>
-    </el-card>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Plus } from '@element-plus/icons-vue';
 import * as XLSX from 'xlsx';
 import * as dictService from '@/services/dict';
 import * as codeService from '@/services/code-generation';
@@ -936,6 +955,7 @@ async function handleDeleteSelected() {
     ElMessage.success(`已删除 ${result.deletedCount} 条编码记录`);
     selectedRows.value = [];
     loadCodeList();
+    loadCodeTotalCount();
   } catch (err: any) {
     if (err !== 'cancel') {
       ElMessage.error(err.message || '删除失败');
@@ -1464,6 +1484,8 @@ onMounted(async () => {
 
     // 加载编码生成列表
     loadCodeList();
+    // 加载编码总数
+    loadCodeTotalCount();
   } catch (err: any) {
     ElMessage.error('编码生成加载失败，请刷新重试');
   }
@@ -1761,11 +1783,22 @@ async function handleSaveCodes() {
     ElMessage.success(`已保存 ${result.savedCount} 条`);
     listPageNum.value = 1;
     loadCodeList();
+    loadCodeTotalCount();
     activeTab.value = 'saved';
   } catch (err: any) {
     ElMessage.error(err.message || '保存失败');
   } finally {
     savedSaving.value = false;
+  }
+}
+
+/** 加载编码总数（仅获取 total 计数，不加载列表） */
+async function loadCodeTotalCount() {
+  try {
+    const result = await codeService.getCodeHistory(1, 1);
+    savedTotal.value = result.total || 0;
+  } catch {
+    savedTotal.value = 0;
   }
 }
 
@@ -1997,16 +2030,103 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   max-width: 1400px;
   margin: 0 auto;
   overflow-anchor: none;
+  animation: fadeIn 0.3s ease;
 }
 
-.quick-filter-card {
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== 顶部横幅 ==================== */
+.page-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
   margin-bottom: 16px;
+  background: linear-gradient(135deg, #1a3a8a 0%, #2563eb 50%, #3b82f6 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25);
+  position: relative;
+  overflow: hidden;
 }
+.page-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.page-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: 10%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.hero-icon { font-size: 36px; line-height: 1; position: relative; z-index: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+.hero-text { flex: 1; position: relative; z-index: 1; }
+.hero-title { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; text-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.hero-subtitle { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 4px; }
 
-.quick-filter-header {
+.hero-stats { position: relative; z-index: 1; }
+.stat-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.stat-num { font-size: 26px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.2); line-height: 1; }
+.stat-label { font-size: 13px; color: rgba(255,255,255,0.85); }
+
+/* ==================== 工具栏卡片 ==================== */
+.toolbar-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 20px;
+  margin-bottom: 0;
+  background: #ffffff;
+  border-radius: 10px 10px 0 0;
+  box-shadow: none;
+  border: 1px solid #f0f0f0;
+  border-bottom: none;
+}
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
+  border-top: none;
 }
 
 .card-title {
@@ -2017,12 +2137,66 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   line-height: 1.4;
 }
 
-.quick-filter-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.search-input :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+.search-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #3b82f6 inset;
+}
+.search-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px #3b82f6 inset;
 }
 
+.quick-search-filter-bar .el-select :deep(.el-input__wrapper) {
+  border-radius: 6px;
+}
+
+/* ==================== 内容区块卡片 ==================== */
+.section-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e8ecf1;
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.section-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid #eef1f4;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+}
+
+.section-body {
+  padding: 20px 20px 16px;
+}
+
+.section-body .el-form {
+  margin: -4px;
+}
+
+.section-body .el-row {
+  margin: 0 !important;
+}
+
+.section-body .el-row .el-col {
+  padding: 4px !important;
+}
+
+.section-card + .section-card {
+  margin-top: 0;
+}
+
+/* ==================== 快速检索 ==================== */
 .quick-search-row {
   display: flex;
   align-items: flex-start;
@@ -2113,16 +2287,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   color: #606266;
 }
 
-.condition-card {
-  margin-bottom: 16px;
-}
-
-.condition-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .recent-conditions-list {
   max-height: 420px;
   overflow-y: auto;
@@ -2192,19 +2356,42 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 }
 
 .condition-actions {
-  margin-top: 16px;
+  margin-top: 20px;
+  padding: 16px 0 4px;
   display: flex;
-  gap: 12px;
-}
-
-.result-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  border-top: 1px solid #f0f2f5;
+  position: relative;
 }
 
-.result-card {
-  overflow-anchor: none;
+.condition-actions::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background: linear-gradient(90deg, #409eff, #79bbff);
+  border-radius: 0 2px 2px 0;
+}
+
+.condition-actions .el-button--primary {
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.25);
+  transition: all 0.25s ease;
+}
+
+.condition-actions .el-button--primary:hover {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.condition-actions .el-button--primary:active {
+  transform: translateY(0);
 }
 
 .preview-actions {
@@ -2263,9 +2450,134 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   flex: 1;
 }
 
+.select-with-lock .el-select :deep(.el-input__wrapper) {
+  border-radius: 6px;
+  transition: all 0.25s ease;
+}
+
+.select-with-lock .el-select :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #79bbff inset;
+}
+
+.select-with-lock .el-select :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px #409eff inset;
+}
+
+.section-body :deep(.el-form-item__label) {
+  font-weight: 600;
+  font-size: 13px;
+  color: #303133;
+  padding-bottom: 4px;
+}
+
+.section-body :deep(.el-form-item__label::before) {
+  color: #e74c3c;
+  margin-right: 4px;
+}
+
+.section-body :deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+
+.el-row .filter-item .input-with-quick-options {
+  gap: 4px;
+}
+
+.el-row .filter-item .quick-options {
+  margin-top: 4px;
+  gap: 3px;
+}
+
+.el-row .filter-item .quick-option-tag {
+  font-size: 11px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0 6px;
+}
+
+.section-body :deep(.el-input__wrapper) {
+  border-radius: 6px;
+}
+
+/* ==================== 筛选条件卡片单元 ==================== */
+.filter-item {
+  transition: all 0.25s ease;
+}
+
+.filter-item > :deep(.el-form-item) {
+  background: #f8fafc;
+  border: 1px solid #eef1f4;
+  border-radius: 10px;
+  padding: 14px 14px 8px;
+  margin-bottom: 0;
+  transition: all 0.25s ease;
+  display: block;
+}
+
+.filter-item > :deep(.el-form-item:hover) {
+  border-color: #d0d9e8;
+  background: #fafcff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.filter-item > :deep(.el-form-item.is-error) {
+  border-color: #f56c6c;
+  background: #fef0f0;
+}
+
+.filter-item > :deep(.el-form-item__label) {
+  padding: 0 0 6px;
+  line-height: 1.4;
+  font-size: 12px;
+  color: #606266;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.filter-item > :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
+.filter-item > :deep(.el-form-item__error) {
+  position: static;
+  padding-top: 2px;
+}
+
+/* 场站字段占两列 */
+.filter-item.station-field > :deep(.el-form-item) {
+  background: linear-gradient(135deg, #f0f7ff 0%, #f8faff 100%);
+  border-color: #dce8f5;
+}
+
+/* 有锁定的字段视觉提示 */
+.filter-item > :deep(.el-form-item) .select-with-lock.is-locked + .quick-options .quick-option-tag {
+  opacity: 0.4;
+}
+
 .lock-btn {
   flex-shrink: 0;
-  min-width: 60px;
+  min-width: 62px;
+  font-size: 12px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.lock-btn.el-button--warning {
+  background: #fef3e8;
+  border-color: #f9d9b3;
+  color: #d8822a;
+}
+
+.lock-btn.el-button--warning:hover {
+  background: #fde8d0;
+  border-color: #f5c58c;
+}
+
+.select-with-lock.is-locked .el-select :deep(.el-input__wrapper) {
+  background: #fef9f0;
+  border-color: #f9d9b3;
 }
 
 .quick-option-tag.is-disabled {
@@ -2277,16 +2589,27 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  margin-top: 2px;
 }
 
 .quick-option-tag {
   cursor: pointer;
   user-select: none;
+  font-size: 12px;
+  padding: 0 8px;
+  height: 24px;
+  line-height: 22px;
+  border: 1px solid #e4e7ed;
+  background: #fafafa;
+  color: #606266;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
 .quick-option-tag:hover {
   background-color: #ecf5ff;
   border-color: #c6e2ff;
+  color: #409eff;
 }
 
 .extend-number-input {
@@ -2307,6 +2630,22 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   flex: 1;
 }
 
+.extend-number-row .el-input :deep(.el-input__wrapper) {
+  border-radius: 6px;
+}
+
+.el-row .filter-item .extend-number-row {
+  gap: 4px;
+}
+
+.el-row .filter-item .extend-number-row .el-input :deep(.el-input__inner) {
+  font-size: 12px;
+}
+
+.el-row .filter-item .extend-prefix {
+  font-size: 11px;
+}
+
 .extend-prefix {
   color: #909399;
   font-size: 12px;
@@ -2315,10 +2654,25 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 
 .expected-count {
   margin-left: 12px;
-  font-size: 14px;
+  font-size: 13px;
   color: #67c23a;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  gap: 4px;
+  background: #f0f9eb;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.expected-count::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #67c23a;
+  border-radius: 50%;
+  margin-right: 2px;
 }
 
 .name-display {
@@ -2401,6 +2755,63 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   color: #909399;
 }
 
+/* ==================== 表格通用样式 ==================== */
+:deep(.el-table) {
+  border: none !important;
+}
+:deep(.el-table__inner-wrapper) {
+  border: none !important;
+}
+:deep(.el-table__body tr) {
+  transition: background 0.2s ease;
+}
+:deep(.el-table__body tr:hover) {
+  background: #f0f7ff !important;
+}
+:deep(.el-table th.el-table__cell) {
+  background: #f0f5ff !important;
+  color: #1d40af !important;
+  font-weight: 600 !important;
+}
+:deep(.el-table th.el-table__cell .cell) {
+  color: #1d40af;
+  font-weight: 600;
+  font-size: 13px;
+}
+:deep(.el-table__body tr.el-table__row--striped) {
+  background: #fafbfc;
+}
+:deep(.el-table__body tr.el-table__row--striped:hover) {
+  background: #f0f7ff !important;
+}
+
+/* ==================== 分页容器 ==================== */
+.pagination-wrapper {
+  padding: 14px 16px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #f5f5f5;
+  margin-top: 16px;
+}
+
+/* ==================== 对话框美化 ==================== */
+:deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+:deep(.el-dialog__header) {
+  padding: 20px 24px 0;
+  font-weight: 700;
+  font-size: 17px;
+}
+:deep(.el-dialog__body) {
+  padding: 20px 24px;
+}
+:deep(.el-dialog__footer) {
+  padding: 0 24px 20px;
+  border: none;
+}
+
 /* ===== 编码生成列表样式 ===== */
 .list-section { padding-top: 0; }
 .list-section-header { font-weight: 600; font-size: 16px; margin-bottom: 16px; }
@@ -2412,5 +2823,13 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 :deep(.row-expanded-active > td) { color: #409EFF; font-weight: 600; }
 :deep(.detail-table th),
 :deep(.detail-table td) { background-color: #f0f9ff !important; }
+
+/* ==================== 表格行动画 ==================== */
+:deep(.el-table__body tr:hover) { background: #f0f7ff !important; }
+:deep(.el-table__body tr) { animation: rowIn 0.25s ease both; }
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 
 </style>

@@ -9,7 +9,7 @@
         class="header-menu"
       >
         <el-menu-item index="/code-generate">编码生成</el-menu-item>
-        <el-menu-item index="/code-verify">编码校验</el-menu-item>
+        <el-menu-item index="/code-verify">编码修正</el-menu-item>
         <el-menu-item index="/code-validate">字典管理</el-menu-item>
         <el-menu-item index="/statistics">统计分析</el-menu-item>
         <el-menu-item index="/system-settings">系统设置</el-menu-item>
@@ -53,11 +53,13 @@ body {
 }
 
 .app-container {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .app-header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   background: linear-gradient(rgba(29, 107, 192, 0.82), rgba(64, 158, 255, 0.78)), url(https://images.unsplash.com/photo-1466611653917-950a37dd0b51?w=1920&q=80) center / cover;
   padding: 0 24px;
@@ -128,8 +130,8 @@ body {
 }
 
 .app-main {
+  overflow-y: auto !important;
   background: #f5f7fa;
-  min-height: calc(100vh - 60px);
   padding: 20px;
 }
 </style>

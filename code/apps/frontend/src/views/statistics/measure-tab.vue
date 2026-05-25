@@ -15,39 +15,73 @@
     </div>
 
     <!-- 概览 -->
-    <el-row :gutter="16" class="mb-16" v-if="overview.totalPoints > 0">
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">总测点数</div><div class="stat-value">{{ overview.totalPoints }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">风电</div><div class="stat-value primary">{{ overview.windCount }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">光伏</div><div class="stat-value success">{{ overview.solarCount }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">其他</div><div class="stat-value warning">{{ overview.otherCount }}</div></div></el-card></el-col>
-    </el-row>
+    <div class="overview-stats mb-16" v-if="overview.totalPoints > 0">
+      <div class="overview-stat-card">
+        <div class="os-left">
+          <div class="os-icon">📋</div>
+          <div class="os-label">总测点数</div>
+        </div>
+        <div class="os-value">{{ overview.totalPoints }}</div>
+      </div>
+      <div class="overview-stat-card">
+        <div class="os-left">
+          <div class="os-icon">🌀</div>
+          <div class="os-label">风电</div>
+        </div>
+        <div class="os-value" style="color:#409eff">{{ overview.windCount }}</div>
+      </div>
+      <div class="overview-stat-card">
+        <div class="os-left">
+          <div class="os-icon">☀️</div>
+          <div class="os-label">光伏</div>
+        </div>
+        <div class="os-value" style="color:#67c23a">{{ overview.solarCount }}</div>
+      </div>
+      <div class="overview-stat-card">
+        <div class="os-left">
+          <div class="os-icon">🔄</div>
+          <div class="os-label">其他</div>
+        </div>
+        <div class="os-value" style="color:#e6a23c">{{ overview.otherCount }}</div>
+      </div>
+    </div>
 
     <!-- 图表区 -->
     <template v-if="overview.totalPoints > 0">
-      <el-row :gutter="16" class="mb-16">
-        <el-col :span="12">
-          <el-card class="chart-card">
-            <template #header>
-              <div class="card-header">
-                <span class="section-title">二级类码维度</span>
-                <el-radio-group v-model="secondClassType" size="small">
-                  <el-radio-button value="wind">风电</el-radio-button>
-                  <el-radio-button value="solar">光伏</el-radio-button>
-                </el-radio-group>
-              </div>
-            </template>
-            <div class="chart-container-h"><v-chart v-if="secondClassData" :option="secondClassData" autoresize /></div>
-          </el-card>
-        </el-col>
-        <el-col :span="12">
-          <el-card class="chart-card">
-            <template #header><span class="section-title">场站维度</span></template>
-            <div class="chart-scroll-wrap">
-              <div class="chart-container-h" :style="{ height: stationChartHeight + 'px' }"><v-chart v-if="stationData" :option="stationData" autoresize /></div>
+      <div class="chart-row mb-16">
+        <div class="chart-col">
+          <div class="card-default chart-section">
+            <div class="card-header">
+              <span class="card-header-title">二级类码分布</span>
+              <el-radio-group v-model="secondClassType" size="small">
+                <el-radio-button value="wind">风电</el-radio-button>
+                <el-radio-button value="solar">光伏</el-radio-button>
+              </el-radio-group>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
+            <div class="card-body chart-body">
+              <template v-if="secondClassItems.length > 0">
+                <div class="chart-container-h"><v-chart :option="secondClassData" autoresize /></div>
+              </template>
+              <el-empty v-else description="暂无数据" :image-size="80" />
+            </div>
+          </div>
+        </div>
+        <div class="chart-col">
+          <div class="card-default chart-section">
+            <div class="card-header">
+              <span class="card-header-title">场站分布</span>
+            </div>
+            <div class="card-body chart-body">
+              <template v-if="stationItems.length > 0">
+                <div class="chart-scroll-wrap">
+                  <div class="chart-container-h" :style="{ height: stationChartHeight + 'px' }"><v-chart :option="stationData" autoresize /></div>
+                </div>
+              </template>
+              <el-empty v-else description="暂无场站数据" :image-size="80" />
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
     <el-empty v-else-if="!importing" description="请先导入测点数据" />
   </div>
@@ -111,36 +145,60 @@ async function onCancelImport() {
 
 const secondClassData = computed(() => {
   if (!secondClassItems.value.length) return null;
+  const items = [...secondClassItems.value].reverse();
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '8%', bottom: '3%', top: '3%', containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const p = params[0];
+        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+      },
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#e8e8e8',
+      borderWidth: 1,
+      textStyle: { fontSize: 12, color: '#303133' },
+    },
+    grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
       type: 'value',
-      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.06)' } },
+      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.05)' } },
       axisLabel: { fontSize: 10, color: '#909399' },
+      axisLine: { show: false },
+      axisTick: { show: false },
     },
     yAxis: {
       type: 'category',
-      data: secondClassItems.value.map(i => i.name).reverse(),
-      axisLabel: { fontSize: 11, fontWeight: 'bold', color: '#303133' },
+      data: items.map(i => i.name),
+      axisLabel: { fontSize: 11, fontWeight: 600, color: '#303133' },
       axisLine: { show: false },
       axisTick: { show: false },
     },
     series: [{
       type: 'bar',
-      data: secondClassItems.value.map(i => i.value).reverse(),
-      barMaxWidth: 24,
+      data: items.map(i => i.value),
+      barMaxWidth: 26,
+      barMinHeight: 8,
+      label: {
+        show: true,
+        position: 'right',
+        fontSize: 11,
+        fontWeight: 600,
+        color: '#303133',
+        formatter: (p: any) => `${p.value}`,
+      },
       itemStyle: {
-        borderRadius: [0, 4, 4, 0],
+        borderRadius: [0, 6, 6, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#4db8ff' },
-            { offset: 1, color: '#1a7bca' },
+            { offset: 0, color: '#7c9cf5' },
+            { offset: 0.5, color: '#5a7de8' },
+            { offset: 1, color: '#3b5fc9' },
           ],
         },
-        shadowBlur: 6,
-        shadowColor: 'rgba(26, 123, 202, 0.3)',
+        shadowBlur: 8,
+        shadowColor: 'rgba(59, 95, 201, 0.2)',
         shadowOffsetX: 2,
       },
     }],
@@ -149,36 +207,60 @@ const secondClassData = computed(() => {
 
 const stationData = computed(() => {
   if (!stationItems.value.length) return null;
+  const items = [...stationItems.value].reverse();
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '8%', bottom: '3%', top: '3%', containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const p = params[0];
+        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+      },
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#e8e8e8',
+      borderWidth: 1,
+      textStyle: { fontSize: 12, color: '#303133' },
+    },
+    grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
       type: 'value',
-      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.06)' } },
+      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.05)' } },
       axisLabel: { fontSize: 10, color: '#909399' },
+      axisLine: { show: false },
+      axisTick: { show: false },
     },
     yAxis: {
       type: 'category',
-      data: stationItems.value.map(i => i.name).reverse(),
-      axisLabel: { fontSize: 11, fontWeight: 'bold', color: '#303133' },
+      data: items.map(i => i.name),
+      axisLabel: { fontSize: 12, fontWeight: 600, color: '#303133' },
       axisLine: { show: false },
       axisTick: { show: false },
     },
     series: [{
       type: 'bar',
-      data: stationItems.value.map(i => i.value).reverse(),
-      barMaxWidth: 24,
+      data: items.map(i => i.value),
+      barMaxWidth: 26,
+      barMinHeight: 8,
+      label: {
+        show: true,
+        position: 'right',
+        fontSize: 11,
+        fontWeight: 600,
+        color: '#303133',
+        formatter: (p: any) => `${p.value}`,
+      },
       itemStyle: {
-        borderRadius: [0, 4, 4, 0],
+        borderRadius: [0, 6, 6, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#67C23A' },
-            { offset: 1, color: '#40944f' },
+            { offset: 0, color: '#5ad8a6' },
+            { offset: 0.5, color: '#36c27d' },
+            { offset: 1, color: '#1fa86a' },
           ],
         },
-        shadowBlur: 6,
-        shadowColor: 'rgba(64, 148, 79, 0.3)',
+        shadowBlur: 8,
+        shadowColor: 'rgba(31, 168, 106, 0.2)',
         shadowOffsetX: 2,
       },
     }],
@@ -296,21 +378,81 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.tab-content { min-height: 400px; }
+.tab-content { min-height: 400px; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .mb-16 { margin-bottom: 16px; }
-.mt-16 { margin-top: 16px; }
-.stat-card { text-align: center; padding: 8px 0; }
-.stat-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
-.stat-value { font-size: 28px; font-weight: 700; color: #303133; }
-.stat-value.primary { color: #409EFF; }
-.stat-value.success { color: #67C23A; }
-.stat-value.warning { color: #E6A23C; }
+
+/* ==================== 概览统计卡片 ==================== */
+.overview-stats { display: flex; gap: 12px; }
+.overview-stat-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 12px;
+  background: #fafbff;
+  border-radius: 8px;
+  border: 1px solid #eef0f6;
+  transition: all 0.25s ease;
+}
+.overview-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.os-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.os-icon { font-size: 24px; line-height: 1; }
+.os-value { font-size: 28px; font-weight: 700; line-height: 1.2; color: #303133; }
+.os-label { font-size: 12px; color: #909399; white-space: nowrap; }
+
+/* ==================== 通用卡片 ==================== */
+.card-default {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.card-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 12px;
+}
+.card-header-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: #409eff;
+}
+.card-body { padding: 16px; }
+.chart-body { padding: 8px 16px 16px; }
+
+/* ==================== 图表区域 ==================== */
+.chart-row { display: flex; gap: 16px; }
+.chart-col { flex: 1; min-width: 0; }
+.chart-section { height: 100%; }
 .chart-container-h { height: 360px; width: 100%; }
-.chart-card { height: 100%; }
-.section-title { font-weight: 600; font-size: 15px; }
 .chart-scroll-wrap { overflow-y: auto; max-height: 420px; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.import-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; }
+
+/* ==================== 导入栏 ==================== */
+.import-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 14px 16px; background: #fafbff; border: 1px solid #eef0f6; border-radius: 8px; }
 .import-label { font-size: 14px; font-weight: 600; color: #303133; white-space: nowrap; }
 .import-file-name { font-size: 13px; color: #606266; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .import-remain { font-size: 12px; color: #909399; white-space: nowrap; }

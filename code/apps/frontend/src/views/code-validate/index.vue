@@ -1,14 +1,27 @@
 <template>
   <div class="code-validate">
-    <el-card class="main-card">
-      <el-tabs v-model="activeTab" class="main-tabs">
+<div class="page-body">
+      <el-tabs v-model="activeTab" class="page-tabs">
         <!-- Tab 1: 字典查询 -->
         <el-tab-pane label="字典查询" name="dictTree">
-          <DictOverviewCard />
-          <div class="tree-container">
-            <div class="tree-toolbar">
-              <el-button size="default" @click="onCollapseAll">收起所有</el-button>
+          <div class="subpage-hero">
+            <div class="hero-icon">🔍</div>
+            <div class="hero-text">
+              <div class="hero-title">字典查询</div>
+              <div class="hero-subtitle">按照类型→二级类码→数据类码→数据码的层级结构浏览编码字典，支持树形展开和手动来源标识</div>
             </div>
+          </div>
+          <DictOverviewCard />
+          <div class="tree-toolbar-card">
+            <div class="toolbar-left">
+              <span class="tree-section-label">编码字典树</span>
+            </div>
+            <div class="toolbar-right">
+              <el-button size="default" @click="onCollapseAll">收起所有</el-button>
+              <el-button size="default" type="primary" :loading="loadingTree" @click="loadDictTree">刷新</el-button>
+            </div>
+          </div>
+          <div class="tree-container-card">
             <el-tree
               ref="treeRef"
               :data="dictTreeData"
@@ -18,6 +31,7 @@
               v-loading="loadingTree"
               element-loading-text="字典数据加载中..."
               highlight-current
+              class="styled-tree"
             >
               <template #default="{ node, data }">
                 <span class="custom-tree-node">
@@ -57,19 +71,27 @@
 
         <!-- Tab 2: 新增字典记录 -->
         <el-tab-pane label="字典新增" name="statistics">
-          <div class="statistics-header">
-            <span class="statistics-title">手动添加编码记录</span>
-            <div class="header-actions">
-              <el-button size="small" @click="loadManualStats">刷新</el-button>
+          <div class="subpage-hero">
+            <div class="hero-icon">📝</div>
+            <div class="hero-text">
+              <div class="hero-title">数据码新增</div>
+              <div class="hero-subtitle">手动添加数据码词典，录入新增的数据类码及其对应的数据码，支持批量操作和Excel导出</div>
+            </div>
+          </div>
+          <div class="statistics-header-card">
+            <div class="header-left">
+              <span class="section-label">新增数据码记录</span>
+            </div>
+            <div class="header-right">
+              <el-button @click="loadManualStats">刷新</el-button>
               <el-button
                 v-if="manualStats.length > 0"
-                size="small"
                 type="primary"
                 @click="handleExportStats"
               >导出Excel</el-button>
             </div>
           </div>
-          <div class="statistics-toolbar">
+          <div class="filter-bar-card">
             <el-select
               v-model="statsTypeFilter"
               placeholder="类型筛选"
@@ -99,63 +121,68 @@
               />
             </el-select>
           </div>
-          <el-table
-            :data="manualStats"
-            border
-            stripe
-            style="width: 100%"
-            class="stats-table"
-            v-loading="loadingStats"
-          >
-            <el-table-column type="index" label="序号" width="60" />
-            <el-table-column label="类型">
-              <template #default="{ row }">
-                <span v-if="row.typeCode" class="code-type">{{ row.typeCode.charAt(0) }}</span>
-                <span v-if="row.typeCode" class="name-muted">{{ row.typeCode.charAt(0) === 'F' ? '风电' : row.typeCode.charAt(0) === 'G' ? '光伏' : row.typeCode.charAt(0) === 'S' ? '水电' : '其他' }}</span>
-                <span v-else class="name-error">未识别</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="二级类码">
-              <template #default="{ row }">
-                <span class="code-second-class">{{ row.secondClassCode }}</span> <span class="name-muted">{{ row.secondClassName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="数据类码">
-              <template #default="{ row }">
-                <span class="code-data-category">{{ row.dataCategoryCode }}</span> <span class="name-muted">{{ row.dataCategoryName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="数据码">
-              <template #default="{ row }">
-                <span class="code-data-code">{{ row.dataCode }}</span> <span class="name-muted">{{ row.dataName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="增加时间" width="248">
-              <template #default="{ row }">
-                {{ formatTime(row.createTm) }}
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-if="!loadingStats && manualStats.length === 0" description="暂无手动添加记录" />
-          <div v-if="statsTotal > 0" class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="statsPageNum"
-              v-model:page-size="statsPageSize"
-              :total="statsTotal"
-              :page-sizes="[10, 20, 50, 100]"
-              layout="total, sizes, prev, pager, next"
-              @current-change="loadManualStats"
-              @size-change="loadManualStats"
-            />
+          <div class="table-container-card">
+            <el-table
+              :data="manualStats"
+              stripe
+              style="width: 100%"
+              class="styled-table"
+              v-loading="loadingStats"
+              :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
+            >
+              <el-table-column type="index" label="序号" width="60" align="center" />
+              <el-table-column label="类型" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.typeCode" size="small" color="#e8f4fd" style="color: #1677ff; border: none;">{{ row.typeCode.charAt(0) === 'F' ? '风电' : row.typeCode.charAt(0) === 'G' ? '光伏' : row.typeCode.charAt(0) === 'S' ? '水电' : '其他' }}</el-tag>
+                  <el-tag v-else size="small" type="danger">未识别</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="二级类码" min-width="180">
+                <template #default="{ row }">
+                  <span class="code-second-class">{{ row.secondClassCode }}</span>
+                  <span class="name-muted ml-1">{{ row.secondClassName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="数据类码" min-width="180">
+                <template #default="{ row }">
+                  <span class="code-data-category">{{ row.dataCategoryCode }}</span>
+                  <span class="name-muted ml-1">{{ row.dataCategoryName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="数据码" min-width="180">
+                <template #default="{ row }">
+                  <el-tag effect="plain" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace;">{{ row.dataCode }}</el-tag>
+                  <span class="name-muted ml-1">{{ row.dataName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="增加时间" width="180" align="center">
+                <template #default="{ row }">
+                  <span class="time-cell">{{ formatTime(row.createTm) }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-if="!loadingStats && manualStats.length === 0" description="暂无手动添加记录" />
+            <div v-if="statsTotal > 0" class="pagination-bar">
+              <el-pagination
+                v-model:current-page="statsPageNum"
+                v-model:page-size="statsPageSize"
+                :total="statsTotal"
+                :page-sizes="[10, 20, 50, 100]"
+                layout="total, sizes, prev, pager, next, jumper"
+                background
+                @current-change="loadManualStats"
+                @size-change="loadManualStats"
+              />
+            </div>
           </div>
         </el-tab-pane>
+
         <!-- Tab 3: 场站维护 -->
-        <el-tab-pane label="场站维护" name="station">
+        <el-tab-pane label="场站管理" name="station">
           <StationTab />
         </el-tab-pane>
       </el-tabs>
-    </el-card>
-
+    </div>
   </div>
 </template>
 
@@ -355,29 +382,79 @@ onMounted(() => {
 
 <style scoped>
 .code-validate {
-  width: 100%;
+  animation: fadeIn 0.3s ease;
 }
 
-.main-card {
-  min-height: 500px;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.main-tabs {
-  margin-top: -16px;
+/* ==================== 功能介绍卡片 ==================== */
+.hero-icon {
+  font-size: 36px;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 
-/* Tab 1: 字典查询 */
-.tree-container {
-  padding: 8px 0;
+.hero-text { flex: 1; position: relative; z-index: 1; }
+
+.hero-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
-.tree-toolbar {
+.hero-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 4px;
+}
+
+/* ==================== 页面主体 ==================== */
+.page-body {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  border: 1px solid #f0f0f0;
+  padding: 8px 16px 16px;
+}
+
+.page-tabs {
+  margin-top: -8px;
+}
+
+/* ==================== Tab 1: 字典树工具栏 ==================== */
+.tree-toolbar-card {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  padding: 8px 12px;
+  margin: 8px 0 12px;
+  background: #fafbff;
+  border-radius: 8px;
+  border: 1px solid #eef0f6;
 }
 
+.tree-section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.tree-container-card {
+  padding: 4px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.styled-tree {
+  font-size: 14px;
+}
 
 .custom-tree-node {
   display: flex;
@@ -403,24 +480,14 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.code-type-domain {
-  color: #f56c6c;
-}
-
-.code-second-class {
-  color: #409eff;
-}
-
-.code-data-category {
-  color: #67c23a;
-}
-
-.code-data-code {
-  color: #e6a23c;
-}
+.code-type-domain { color: #f56c6c; }
+.code-second-class { color: #409eff; }
+.code-data-category { color: #67c23a; }
+.code-data-code { color: #e6a23c; }
 
 .tree-node-name {
   color: #606266;
+  margin-left: 2px;
 }
 
 .tree-node-meta {
@@ -429,32 +496,30 @@ onMounted(() => {
   gap: 8px;
 }
 
-.source-tag {
-  font-size: 11px;
-}
+.source-tag { font-size: 11px; }
+.child-count { font-size: 12px; color: #909399; }
 
-.child-count {
-  font-size: 12px;
-  color: #909399;
-}
-
-/* Tab 2: 新增字典记录 */
-.statistics-header {
+/* ==================== Tab 2: 新增字典记录 ==================== */
+.statistics-header-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
 }
 
-.header-actions { display: flex; align-items: center; gap: 8px; }
-.statistics-title {
-  font-size: 16px;
+.section-label {
+  font-size: 15px;
   font-weight: 600;
   color: #303133;
   position: relative;
   padding-left: 12px;
 }
 
-.statistics-title::before {
+.section-label::before {
   content: '';
   position: absolute;
   left: 0;
@@ -465,26 +530,74 @@ onMounted(() => {
   background: #409eff;
 }
 
-.statistics-toolbar {
+.filter-bar-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 12px 0;
-  padding: 16px 16px;
-  background: #f5f7fa;
-  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #fafbff;
+  border-radius: 8px;
+  border: 1px solid #eef0f6;
 }
 
-.stats-table :deep(table) {
-  table-layout: fixed;
+.table-container-card {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
 }
 
-.pagination-wrapper {
-  margin-top: 16px;
+.styled-table :deep(.el-table__body tr:hover) {
+  background: #f0f7ff !important;
+}
+
+.styled-table :deep(.el-table__body tr) {
+  animation: rowIn 0.25s ease both;
+}
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.name-muted { color: #909399; font-size: 13px; }
+.ml-1 { margin-left: 4px; }
+
+.time-cell {
+  font-family: monospace;
+  font-size: 12px;
+  color: #666;
+}
+
+.pagination-bar {
+  padding: 14px 16px;
   display: flex;
   justify-content: flex-end;
+  border-top: 1px solid #f5f5f5;
 }
 
-/* Tab 2: 新增字典记录 - styles above */
-
+/* ==================== 子页面功能介绍卡片 ==================== */
+.subpage-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+.subpage-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
 </style>

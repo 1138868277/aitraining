@@ -1,9 +1,16 @@
 <template>
   <div class="code-verify">
-    <el-card class="main-card">
-      <el-tabs v-model="activeTab" class="main-tabs">
+<div class="page-body">
+      <el-tabs v-model="activeTab" class="page-tabs">
         <!-- Tab 1: 编码解析 -->
         <el-tab-pane label="编码解析" name="parse">
+          <div class="subpage-hero">
+            <div class="hero-icon">🔬</div>
+            <div class="hero-text">
+              <div class="hero-title">编码解析</div>
+              <div class="hero-subtitle">支持单个编码逐段解析和批量导入解析，快速识别编码结构及各段位含义</div>
+            </div>
+          </div>
           <el-tabs v-model="parseMode" class="parse-mode-tabs">
             <!-- 单个解析 -->
             <el-tab-pane label="单个解析" name="single">
@@ -193,8 +200,15 @@
           </el-tabs>
         </el-tab-pane>
 
-        <!-- Tab 3: 重复编码稽核 -->
-        <el-tab-pane label="重复编码稽核" name="audit">
+        <!-- Tab 3: 重复编码校验 -->
+        <el-tab-pane label="重复编码校验" name="audit">
+          <div class="subpage-hero">
+            <div class="hero-icon">🚫</div>
+            <div class="hero-text">
+              <div class="hero-title">重复编码校验</div>
+              <div class="hero-subtitle">批量导入编码列表，快速检查是否存在与数据库中已有编码重复或输入列表中重复的情况</div>
+            </div>
+          </div>
           <div class="audit-container">
             <div class="audit-input-section">
               <el-input
@@ -244,6 +258,13 @@
 
         <!-- Tab 4: 编码修正 -->
         <el-tab-pane label="编码修正" name="correct">
+          <div class="subpage-hero">
+            <div class="hero-icon">✏️</div>
+            <div class="hero-text">
+              <div class="hero-title">编码修正</div>
+              <div class="hero-subtitle">导入Excel修正数据，批量修改测点编码的二级类码、数据类码、数据码等段位，支持重复校验和结果导出</div>
+            </div>
+          </div>
           <div class="correct-container">
             <el-card shadow="never" class="correct-upload-section">
               <div class="correct-upload-title">导入修正数据</div>
@@ -357,7 +378,7 @@
           </div>
         </el-tab-pane>
       </el-tabs>
-    </el-card>
+    </div>
 
   </div>
 </template>
@@ -497,7 +518,7 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-// ========== 重复编码稽核 ==========
+// ========== 重复编码校验 ==========
 const auditInput = ref('');
 const auditing = ref(false);
 const auditResults = ref<Array<{ code: string; exists: boolean }>>([]);
@@ -696,9 +717,27 @@ function exportCorrectResults() {
 </script>
 
 <style scoped>
-.code-verify { width: 100%; }
-.main-card { min-height: 500px; }
-.main-tabs { margin-top: -16px; }
+.code-verify { width: 100%; animation: fadeIn 0.3s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== 功能介绍卡片 ==================== */
+.hero-icon { font-size: 36px; line-height: 1; position: relative; z-index: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+.hero-text { flex: 1; position: relative; z-index: 1; }
+.hero-title { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; text-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.hero-subtitle { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+
+.page-body {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  border: 1px solid #f0f0f0;
+  padding: 8px 16px 16px;
+}
+.page-tabs { margin-top: -8px; }
 
 /* 编码解析 */
 .parse-container { padding: 8px 0; }
@@ -806,7 +845,7 @@ function exportCorrectResults() {
 .parse-error-text { color: #f56c6c; font-size: 13px; }
 .parse-ok-text { color: #909399; }
 
-/* 重复编码稽核 */
+/* 重复编码校验 */
 .audit-container { padding: 8px 0; }
 .audit-input-section {
   display: flex;
@@ -883,4 +922,36 @@ function exportCorrectResults() {
 }
 .correct-progress { width: 60%; }
 .correct-progress-text { font-size: 13px; color: #606266; white-space: nowrap; }
+
+/* ==================== 表格行动画 ==================== */
+:deep(.el-table__body tr:hover) { background: #f0f7ff !important; }
+:deep(.el-table__body tr) { animation: rowIn 0.25s ease both; }
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ==================== 子页面功能介绍卡片 ==================== */
+.subpage-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+.subpage-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
 </style>

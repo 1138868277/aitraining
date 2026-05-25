@@ -1,10 +1,45 @@
 <template>
   <div class="station-tab">
-    <div class="tab-header">
-      <div class="header-actions">
-        <el-button type="primary" size="small" @click="addDialogVisible = true">新增场站</el-button>
-        <el-button size="small" @click="showBatchDialog = true">批量新增</el-button>
-        <el-button size="small" :disabled="stationList.length === 0" @click="handleExport">导出Excel</el-button>
+    <!-- 顶部横幅 -->
+    <div class="station-hero">
+      <div class="hero-icon">🏭</div>
+      <div class="hero-text">
+        <div class="hero-title">场站管理</div>
+        <div class="hero-subtitle">统一维护新能源场站基本信息，支持新增、编辑、批量导入和导出</div>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-badge">
+          <span class="stat-num">{{ total }}</span>
+          <span class="stat-label">场站总数</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工具栏卡片 -->
+    <div class="toolbar-card">
+      <div class="toolbar-left">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="🔍 搜索场站编码或名称"
+          clearable
+          class="search-input"
+          size="default"
+          @clear="handleSearch"
+          @keyup.enter="handleSearch"
+        />
+        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+        <el-button @click="resetSearch">重置</el-button>
+      </div>
+      <div class="toolbar-right">
+        <el-button type="primary" @click="addDialogVisible = true">
+          <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增场站
+        </el-button>
+        <el-button @click="showBatchDialog = true">
+          <el-icon style="margin-right: 4px;"><DocumentAdd /></el-icon>批量新增
+        </el-button>
+        <el-button :disabled="stationList.length === 0" @click="handleExport">
+          <el-icon style="margin-right: 4px;"><Download /></el-icon>导出Excel
+        </el-button>
         <el-popconfirm
           title="确认删除所有场站数据？此操作不可恢复"
           confirm-button-text="确认删除"
@@ -12,67 +47,114 @@
           @confirm="handleDeleteAll"
         >
           <template #reference>
-            <el-button size="small" type="danger" :disabled="stationList.length === 0">一键删除</el-button>
+            <el-button type="danger" :disabled="stationList.length === 0">
+              <el-icon style="margin-right: 4px;"><Delete /></el-icon>一键删除
+            </el-button>
           </template>
         </el-popconfirm>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <div class="search-bar">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索场站编码或名称"
-        clearable
-        style="width: 260px"
-        size="small"
-        @clear="handleSearch"
-        @keyup.enter="handleSearch"
-      />
-      <el-button size="small" type="primary" @click="handleSearch">查询</el-button>
-      <el-button size="small" @click="resetSearch">重置</el-button>
+    <!-- 统计小卡片 -->
+    <div class="stats-row">
+      <div class="stat-card stat-card-total">
+        <div class="stat-card-icon">📋</div>
+        <div class="stat-card-body">
+          <div class="stat-card-value">{{ total }}</div>
+          <div class="stat-card-label">总记录数</div>
+        </div>
+      </div>
+      <div class="stat-card stat-card-page">
+        <div class="stat-card-icon">📄</div>
+        <div class="stat-card-body">
+          <div class="stat-card-value">{{ stationList.length }}</div>
+          <div class="stat-card-label">当前页</div>
+        </div>
+      </div>
+      <div class="stat-card stat-card-search" v-if="searchKeyword">
+        <div class="stat-card-icon">🔍</div>
+        <div class="stat-card-body">
+          <div class="stat-card-value">{{ total }}</div>
+          <div class="stat-card-label">搜索结果</div>
+        </div>
+      </div>
     </div>
 
     <!-- 场站表格 -->
-    <el-table
-      :data="stationList"
-      border
-      stripe
-      style="width: 100%"
-      size="small"
-      v-loading="loading"
-    >
-      <el-table-column type="index" label="序号" width="55" />
-      <el-table-column prop="station_code" label="场站编码" width="100" />
-      <el-table-column prop="station_name" label="场站名称" min-width="160" />
-      <el-table-column prop="management_domain" label="所属区域" min-width="140" />
-      <el-table-column label="创建时间" width="170">
-        <template #default="{ row }">
-          {{ formatTime(row.create_tm) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="table-container">
+      <el-table
+        :data="stationList"
+        stripe
+        style="width: 100%"
+        size="default"
+        v-loading="loading"
+        class="station-table"
+        :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
+      >
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column prop="station_code" label="场站编码" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag effect="plain" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; font-size: 14px; font-weight: 600;">{{ row.station_code }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="station_name" label="场站名称" min-width="180">
+          <template #default="{ row }">
+            <span class="station-name-cell">{{ row.station_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="management_domain" label="所属区域" min-width="150">
+          <template #default="{ row }">
+            <span v-if="row.management_domain" class="region-tag">{{ row.management_domain }}</span>
+            <span v-else class="no-data">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="180" align="center">
+          <template #default="{ row }">
+            <span class="time-cell">{{ formatTime(row.create_tm) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="handleEdit(row)" class="action-btn">
+              <el-icon style="margin-right: 2px;"><Edit /></el-icon>编辑
+            </el-button>
+            <el-divider direction="vertical" />
+            <el-popconfirm
+              :title="`确认删除场站「${row.station_code}」？`"
+              confirm-button-text="删除"
+              cancel-button-text="取消"
+              @confirm="handleDelete(row)"
+            >
+              <template #reference>
+                <el-button link type="danger" size="small" class="action-btn">
+                  <el-icon style="margin-right: 2px;"><Delete /></el-icon>删除
+                </el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
 
-    <el-empty v-if="!loading && stationList.length === 0" description="暂无场站数据" />
+      <el-empty v-if="!loading && stationList.length === 0" description="暂无场站数据">
+        <template #image>
+          <div class="empty-icon">🏗️</div>
+        </template>
+        <el-button type="primary" @click="addDialogVisible = true">新增首个场站</el-button>
+      </el-empty>
 
-    <!-- 分页 -->
-    <div v-if="total > 0" class="pagination-wrapper">
-      <el-pagination
-        v-model:current-page="pageNum"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        size="small"
-        @current-change="loadStationList"
-        @size-change="loadStationList"
-      />
+      <!-- 分页 -->
+      <div v-if="total > 0" class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pageNum"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @current-change="loadStationList"
+          @size-change="loadStationList"
+        />
+      </div>
     </div>
 
     <!-- 新增/编辑对话框 -->
@@ -159,7 +241,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
+import { Search, Plus, DocumentAdd, Download, Delete, Edit } from '@element-plus/icons-vue';
 import * as XLSX from 'xlsx';
 import * as stationService from '@/services/station';
 import type { StationItem } from '@/services/station';
@@ -262,18 +345,11 @@ async function confirmSubmit() {
 // ========== 删除 ==========
 async function handleDelete(row: StationItem) {
   try {
-    await ElMessageBox.confirm(
-      `确认删除场站「${row.station_code} ${row.station_name}」？`,
-      '删除确认',
-      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' },
-    );
     await stationService.deleteStation(row.station_id);
     ElMessage.success('删除成功');
     loadStationList();
   } catch (err: any) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '删除失败');
-    }
+    ElMessage.error(err.message || '删除失败');
   }
 }
 
@@ -384,38 +460,287 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ==================== 全局 ==================== */
 .station-tab {
-  padding: 8px 0;
+  padding: 0;
+  animation: fadeIn 0.3s ease;
 }
 
-.tab-header {
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== 顶部横幅 ==================== */
+.station-hero {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #1a3a8a 0%, #2563eb 50%, #3b82f6 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25);
+  position: relative;
+  overflow: hidden;
 }
 
-.header-actions {
+.station-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.station-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: 10%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.hero-icon {
+  font-size: 36px;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.hero-text {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.hero-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 4px;
+}
+
+.hero-stats {
+  position: relative;
+  z-index: 1;
+}
+
+.stat-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-num {
+  font-size: 26px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ==================== 工具栏卡片 ==================== */
+.toolbar-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
+}
+
+.toolbar-left {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.search-bar {
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 6px;
 }
 
+.search-input {
+  width: 280px;
+}
+
+.search-input :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.search-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #3b82f6 inset;
+}
+
+.search-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px #3b82f6 inset;
+}
+
+/* ==================== 统计小卡片 ==================== */
+.stats-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f0f0f0;
+  flex: 1;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.stat-card-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d1d1d;
+  line-height: 1.2;
+}
+
+.stat-card-label {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.stat-card-total { border-left: 3px solid #3b82f6; }
+.stat-card-page { border-left: 3px solid #10b981; }
+.stat-card-search { border-left: 3px solid #f59e0b; }
+
+/* ==================== 表格容器 ==================== */
+.table-container {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f0f0f0;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.station-table {
+  border: none !important;
+}
+
+.station-table :deep(.el-table__inner-wrapper) {
+  border: none !important;
+}
+
+.station-table :deep(.el-table__body tr) {
+  transition: background 0.2s ease;
+}
+
+.station-table :deep(.el-table__body tr:hover) {
+  background: #f0f7ff !important;
+}
+
+.station-table :deep(.el-table__cell) {
+  padding: 8px 0 !important;
+}
+
+.station-table :deep(.el-table__header-wrapper tr) {
+  border-top: none !important;
+}
+
+.station-name-cell {
+  font-weight: 500;
+  color: #1d1d1d;
+}
+
+.region-tag {
+  display: inline-block;
+  background: #f0fdf4;
+  color: #16a34a;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.no-data {
+  color: #d0d0d0;
+}
+
+.time-cell {
+  font-family: monospace;
+  font-size: 12px;
+  color: #666;
+}
+
+.action-btn {
+  font-size: 12px;
+}
+
+.action-btn:hover {
+  opacity: 0.8;
+}
+
+.empty-icon {
+  font-size: 48px;
+  line-height: 1;
+}
+
+/* ==================== 分页 ==================== */
 .pagination-wrapper {
-  margin-top: 12px;
+  padding: 14px 16px;
   display: flex;
   justify-content: flex-end;
+  border-top: 1px solid #f5f5f5;
 }
 
+/* ==================== 批量提示 ==================== */
 .batch-hint {
   font-size: 13px;
   color: #909399;
@@ -424,11 +749,12 @@ onMounted(() => {
 }
 
 .batch-hint code {
-  background: #f5f7fa;
-  padding: 1px 6px;
-  border-radius: 3px;
+  background: #f0f5ff;
+  padding: 1px 8px;
+  border-radius: 4px;
   font-size: 12px;
-  color: #409eff;
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 .batch-preview {
@@ -439,11 +765,43 @@ onMounted(() => {
   font-size: 13px;
   color: #606266;
   margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .batch-preview-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+/* ==================== 对话框美化 ==================== */
+:deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  padding: 20px 24px 0;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+:deep(.el-dialog__body) {
+  padding: 20px 24px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 0 24px 20px;
+  border: none;
+}
+
+/* ==================== 过渡动效 ==================== */
+.station-table :deep(.el-table__body tr) {
+  animation: rowIn 0.25s ease both;
+}
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 </style>

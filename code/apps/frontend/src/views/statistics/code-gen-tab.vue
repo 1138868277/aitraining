@@ -1,121 +1,182 @@
 <template>
   <div class="tab-content">
     <!-- 概览卡片 -->
-    <el-row :gutter="16" class="mb-16">
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">累计生成</div><div class="stat-value primary">{{ overview.totalCodes }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">今<span class="label-unit label-unit-success">日</span>生成</div><div class="stat-value success">{{ overview.todayCodes }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">本<span class="label-unit label-unit-hydro">周</span>生成</div><div class="stat-value hydro">{{ overview.thisWeekCodes }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">本<span class="label-unit label-unit-warning">月</span>生成</div><div class="stat-value warning">{{ overview.thisMonthCodes }}</div></div></el-card></el-col>
-    </el-row>
-
-    <!-- 类型维度 -->
-    <el-card class="mb-16">
-      <template #header><span class="section-title">类型维度</span></template>
-      <el-row :gutter="16">
-        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon wind"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><line x1="10" y1="9" x2="10" y2="17" stroke="#409EFF" stroke-width="1.6" stroke-linecap="round"/><path d="M10 9 L3 3 L10 6 L17 3 Z" fill="#409EFF"/><circle cx="10" cy="6" r="1.8" fill="#409EFF"/></svg>风电</div><div class="stat-value primary">{{ typeStats.windCount }}</div></div></el-card></el-col>
-        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon solar"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><circle cx="10" cy="10" r="3.5" fill="none" stroke="#67C23A" stroke-width="1.5"/><line x1="10" y1="2" x2="10" y2="4.5" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="10" y1="15.5" x2="10" y2="18" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="2" y1="10" x2="4.5" y2="10" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="15.5" y1="10" x2="18" y2="10" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="4.3" y1="4.3" x2="6.1" y2="6.1" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="13.9" y1="13.9" x2="15.7" y2="15.7" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="4.3" y1="15.7" x2="6.1" y2="13.9" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/><line x1="13.9" y1="6.1" x2="15.7" y2="4.3" stroke="#67C23A" stroke-width="1.3" stroke-linecap="round"/></svg>光伏</div><div class="stat-value success">{{ typeStats.solarCount }}</div></div></el-card></el-col>
-        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon hydro"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><path d="M10 2 C10 2 4 9.5 4 13 C4 16.3 6.7 19 10 19 C13.3 19 16 16.3 16 13 C16 9.5 10 2 10 2 Z" fill="none" stroke="#36CFC9" stroke-width="1.5"/></svg>水电</div><div class="stat-value hydro">{{ typeStats.hydroCount }}</div></div></el-card></el-col>
-        <el-col :span="6"><el-card shadow="hover"><div class="stat-card"><div class="stat-label type-icon other"><svg viewBox="0 0 20 20" width="15" height="15" class="type-icon-svg"><circle cx="10" cy="6" r="2" fill="none" stroke="#E6A23C" stroke-width="1.4"/><circle cx="6" cy="14" r="2" fill="none" stroke="#E6A23C" stroke-width="1.4"/><circle cx="14" cy="14" r="2" fill="none" stroke="#E6A23C" stroke-width="1.4"/></svg>不区分类型</div><div class="stat-value warning">{{ typeStats.otherCount }}</div></div></el-card></el-col>
-      </el-row>
-    </el-card>
-
-    <!-- 二级类码维度 + 场站维度（左右并排） -->
-    <el-row :gutter="16" class="mb-16">
-      <el-col :span="12">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span class="section-title">二级类码维度</span>
-              <el-radio-group v-model="secondClassType" size="small" @change="loadSecondClass">
-                <el-radio-button value="wind">风电</el-radio-button>
-                <el-radio-button value="solar">光伏</el-radio-button>
-                <el-radio-button value="hydro">水电</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
-          <div class="chart-container-h"><v-chart v-if="secondClassData" :option="secondClassData" autoresize /></div>
-        </el-card>
-      </el-col>
-      <el-col :span="12">
-        <el-card class="chart-card">
-          <template #header><span class="section-title">场站维度</span></template>
-          <div class="chart-container-h"><v-chart v-if="stationData" :option="stationData" autoresize /></div>
-        </el-card>
-      </el-col>
-    </el-row>
-  </div>
-
-  <!-- 编码生成列表 -->
-  <div class="list-section">
-    <div class="list-section-header">编码生成列表</div>
-
-    <div class="list-filter-bar">
-      <el-select v-model="listFilters.typeCode" placeholder="类型" filterable clearable style="width:150px" @change="onTypeChange" :teleported="false">
-        <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
-      </el-select>
-      <el-select v-model="listFilters.stationCode" placeholder="场站" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
-        <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
-      </el-select>
-      <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" filterable clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
-        <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
-      </el-select>
-      <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
-        <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
-      </el-select>
-      <el-button type="primary" @click="onListFilter">查询</el-button>
-      <el-button @click="onResetListFilter">重置</el-button>
-      <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中</el-button>
-      <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleDeleteSelected">删除选中</el-button>
+    <div class="overview-stats mb-16">
+      <div class="overview-stat-card stat-card-total">
+        <div class="os-left">
+          <div class="os-icon">📋</div>
+          <div class="os-label">累计生成</div>
+        </div>
+        <div class="os-value">{{ overview.totalCodes }}</div>
+      </div>
+      <div class="overview-stat-card stat-card-today">
+        <div class="os-left">
+          <div class="os-icon">📅</div>
+          <div class="os-label">今日生成</div>
+        </div>
+        <div class="os-value">{{ overview.todayCodes }}</div>
+      </div>
+      <div class="overview-stat-card stat-card-week">
+        <div class="os-left">
+          <div class="os-icon">📆</div>
+          <div class="os-label">本周生成</div>
+        </div>
+        <div class="os-value">{{ overview.thisWeekCodes }}</div>
+      </div>
+      <div class="overview-stat-card stat-card-month">
+        <div class="os-left">
+          <div class="os-icon">📊</div>
+          <div class="os-label">本月生成</div>
+        </div>
+        <div class="os-value">{{ overview.thisMonthCodes }}</div>
+      </div>
     </div>
 
-    <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand" :row-class-name="getExpandRowClass" @selection-change="onSelectionChange">
-      <el-table-column type="selection" width="45" fixed />
-      <el-table-column type="index" label="序号" width="60" fixed />
-      <el-table-column label="类型" width="90" prop="type_code" />
-      <el-table-column label="场站" min-width="150">
-        <template #default="{ row }">{{ row.station_name ? `${row.station_code} ${row.station_name}` : row.station_code }}</template>
-      </el-table-column>
-      <el-table-column label="二级类码" min-width="150">
-        <template #default="{ row }">{{ row.second_class_name ? `${row.second_class_code} ${row.second_class_name}` : row.second_class_code }}</template>
-      </el-table-column>
-      <el-table-column label="三级类码" min-width="150">
-        <template #default="{ row }">{{ row.third_class_name ? `${row.third_class_code} ${row.third_class_name}` : row.third_class_code }}</template>
-      </el-table-column>
-      <el-table-column label="数据类码" min-width="90">
-        <template #default="{ row }">{{ row.data_type_name ? `${row.data_type_code} ${row.data_type_name}` : row.data_type_code }}</template>
-      </el-table-column>
-      <el-table-column label="数据码" min-width="120">
-        <template #default="{ row }">{{ row.data_name ? `${row.data_code} ${row.data_name}` : row.data_code }}</template>
-      </el-table-column>
-      <el-table-column label="操作" min-width="140">
-        <template #default="{ row }">
-          <span class="code-count">{{ row.code_count }}</span>
-          <el-button size="small" @click="toggleRowExpand(row)">{{ isRowExpanded(row) ? '收起' : '明细' }}</el-button>
-        </template>
-      </el-table-column>
-      <el-table-column type="expand">
-        <template #default="{ row }">
-          <div v-if="row._detailLoading" style="text-align:center;padding:12px">加载中...</div>
-          <el-table v-else :data="row._detailList" border stripe size="small" class="detail-table">
-            <el-table-column type="index" label="序号" width="60" />
-            <el-table-column label="测点编码" width="300" prop="code" />
-            <el-table-column label="测点名称" width="500" prop="name" />
-            <el-table-column label="生成时间" width="200" prop="create_date" />
-          </el-table>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- 类型分布 -->
+    <div class="card-default mb-16">
+      <div class="card-header">
+        <span class="card-header-title">类型分布</span>
+      </div>
+      <div class="card-body">
+        <div class="overview-stats">
+          <div class="overview-stat-card stat-card-wind">
+            <div class="os-left">
+              <div class="os-icon">🌀</div>
+              <div class="os-label">风电</div>
+            </div>
+            <div class="os-value">{{ typeStats.windCount }}</div>
+          </div>
+          <div class="overview-stat-card stat-card-solar">
+            <div class="os-left">
+              <div class="os-icon">☀️</div>
+              <div class="os-label">光伏</div>
+            </div>
+            <div class="os-value">{{ typeStats.solarCount }}</div>
+          </div>
+          <div class="overview-stat-card stat-card-hydro">
+            <div class="os-left">
+              <div class="os-icon">🌊</div>
+              <div class="os-label">水电</div>
+            </div>
+            <div class="os-value">{{ typeStats.hydroCount }}</div>
+          </div>
+          <div class="overview-stat-card stat-card-other">
+            <div class="os-left">
+              <div class="os-icon">🔄</div>
+              <div class="os-label">不区分类型</div>
+            </div>
+            <div class="os-value">{{ typeStats.otherCount }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <div class="list-pagination">
-      <el-pagination
-        v-model:current-page="listPageNum"
-        v-model:page-size="listPageSize"
-        :total="listTotal"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="loadCodeList"
-        @size-change="loadCodeList"
-      />
+    <!-- 二级类码分布 + 场站分布（左右并排） -->
+    <div class="chart-row mb-16">
+      <div class="chart-col">
+        <div class="card-default chart-section">
+          <div class="card-header">
+            <span class="card-header-title">二级类码分布</span>
+            <el-radio-group v-model="secondClassType" size="small" @change="loadSecondClass">
+              <el-radio-button value="wind">风电</el-radio-button>
+              <el-radio-button value="solar">光伏</el-radio-button>
+              <el-radio-button value="hydro">水电</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="card-body chart-body">
+            <div class="chart-container-h"><v-chart v-if="secondClassData" :option="secondClassData" autoresize /></div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-col">
+        <div class="card-default chart-section">
+          <div class="card-header">
+            <span class="card-header-title">场站分布</span>
+          </div>
+          <div class="card-body chart-body">
+            <div class="chart-container-h"><v-chart v-if="stationData" :option="stationData" autoresize /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 编码生成列表 -->
+    <div class="card-default">
+      <div class="card-header">
+        <span class="card-header-title">编码生成列表</span>
+      </div>
+      <div class="card-body">
+        <div class="filter-bar-card">
+          <el-select v-model="listFilters.typeCode" placeholder="类型" filterable clearable style="width:150px" @change="onTypeChange" :teleported="false">
+            <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
+          </el-select>
+          <el-select v-model="listFilters.stationCode" placeholder="场站" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
+            <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+          </el-select>
+          <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" filterable clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
+            <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+          </el-select>
+          <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
+            <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
+          </el-select>
+          <el-button type="primary" @click="onListFilter">查询</el-button>
+          <el-button @click="onResetListFilter">重置</el-button>
+          <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中</el-button>
+          <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleDeleteSelected">删除选中</el-button>
+        </div>
+
+        <div class="table-container-card">
+          <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand" :row-class-name="getExpandRowClass" @selection-change="onSelectionChange">
+            <el-table-column type="selection" width="45" fixed />
+            <el-table-column type="index" label="序号" width="60" fixed />
+            <el-table-column label="类型" width="90" prop="type_code" />
+            <el-table-column label="场站" min-width="150">
+              <template #default="{ row }">{{ row.station_name ? `${row.station_code} ${row.station_name}` : row.station_code }}</template>
+            </el-table-column>
+            <el-table-column label="二级类码" min-width="150">
+              <template #default="{ row }">{{ row.second_class_name ? `${row.second_class_code} ${row.second_class_name}` : row.second_class_code }}</template>
+            </el-table-column>
+            <el-table-column label="三级类码" min-width="150">
+              <template #default="{ row }">{{ row.third_class_name ? `${row.third_class_code} ${row.third_class_name}` : row.third_class_code }}</template>
+            </el-table-column>
+            <el-table-column label="数据类码" min-width="90">
+              <template #default="{ row }">{{ row.data_type_name ? `${row.data_type_code} ${row.data_type_name}` : row.data_type_code }}</template>
+            </el-table-column>
+            <el-table-column label="数据码" min-width="120">
+              <template #default="{ row }">{{ row.data_name ? `${row.data_code} ${row.data_name}` : row.data_code }}</template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="140">
+              <template #default="{ row }">
+                <span class="code-count">{{ row.code_count }}</span>
+                <el-button size="small" @click="toggleRowExpand(row)">{{ isRowExpanded(row) ? '收起' : '明细' }}</el-button>
+              </template>
+            </el-table-column>
+            <el-table-column type="expand">
+              <template #default="{ row }">
+                <div v-if="row._detailLoading" style="text-align:center;padding:12px">加载中...</div>
+                <el-table v-else :data="row._detailList" border stripe size="small" class="detail-table">
+                  <el-table-column type="index" label="序号" width="60" />
+                  <el-table-column label="测点编码" width="300" prop="code" />
+                  <el-table-column label="测点名称" width="500" prop="name" />
+                  <el-table-column label="生成时间" width="200" prop="create_date" />
+                </el-table>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-bar">
+            <el-pagination
+              v-model:current-page="listPageNum"
+              v-model:page-size="listPageSize"
+              :total="listTotal"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next"
+              @current-change="loadCodeList"
+              @size-change="loadCodeList"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -136,36 +197,60 @@ const stationItems = ref<Array<{ name: string; value: number; percentage: number
 
 const secondClassData = computed(() => {
   if (!secondClassItems.value.length) return null;
+  const items = [...secondClassItems.value].reverse();
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '8%', bottom: '3%', top: '3%', containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const p = params[0];
+        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+      },
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#e8e8e8',
+      borderWidth: 1,
+      textStyle: { fontSize: 12, color: '#303133' },
+    },
+    grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
       type: 'value',
-      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.06)' } },
+      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.05)' } },
       axisLabel: { fontSize: 10, color: '#909399' },
+      axisLine: { show: false },
+      axisTick: { show: false },
     },
     yAxis: {
       type: 'category',
-      data: secondClassItems.value.map(i => i.name).reverse(),
-      axisLabel: { fontSize: 11, fontWeight: 'bold', color: '#303133' },
+      data: items.map(i => i.name),
+      axisLabel: { fontSize: 11, fontWeight: 600, color: '#303133' },
       axisLine: { show: false },
       axisTick: { show: false },
     },
     series: [{
       type: 'bar',
-      data: secondClassItems.value.map(i => i.value).reverse(),
-      barMaxWidth: 24,
+      data: items.map(i => i.value),
+      barMaxWidth: 26,
+      barMinHeight: 8,
+      label: {
+        show: true,
+        position: 'right',
+        fontSize: 11,
+        fontWeight: 600,
+        color: '#303133',
+        formatter: (p: any) => `${p.value}`,
+      },
       itemStyle: {
-        borderRadius: [0, 4, 4, 0],
+        borderRadius: [0, 6, 6, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#4db8ff' },
-            { offset: 1, color: '#1a7bca' },
+            { offset: 0, color: '#7c9cf5' },
+            { offset: 0.5, color: '#5a7de8' },
+            { offset: 1, color: '#3b5fc9' },
           ],
         },
-        shadowBlur: 6,
-        shadowColor: 'rgba(26, 123, 202, 0.3)',
+        shadowBlur: 8,
+        shadowColor: 'rgba(59, 95, 201, 0.2)',
         shadowOffsetX: 2,
       },
     }],
@@ -174,36 +259,60 @@ const secondClassData = computed(() => {
 
 const stationData = computed(() => {
   if (!stationItems.value.length) return null;
+  const items = [...stationItems.value].reverse();
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '8%', bottom: '3%', top: '3%', containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const p = params[0];
+        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+      },
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#e8e8e8',
+      borderWidth: 1,
+      textStyle: { fontSize: 12, color: '#303133' },
+    },
+    grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
       type: 'value',
-      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.06)' } },
+      splitLine: { lineStyle: { type: 'dashed', color: 'rgba(0,0,0,0.05)' } },
       axisLabel: { fontSize: 10, color: '#909399' },
+      axisLine: { show: false },
+      axisTick: { show: false },
     },
     yAxis: {
       type: 'category',
-      data: stationItems.value.map(i => i.name).reverse(),
-      axisLabel: { fontSize: 11, fontWeight: 'bold', color: '#303133' },
+      data: items.map(i => i.name),
+      axisLabel: { fontSize: 11, fontWeight: 600, color: '#303133' },
       axisLine: { show: false },
       axisTick: { show: false },
     },
     series: [{
       type: 'bar',
-      data: stationItems.value.map(i => i.value).reverse(),
-      barMaxWidth: 24,
+      data: items.map(i => i.value),
+      barMaxWidth: 26,
+      barMinHeight: 8,
+      label: {
+        show: true,
+        position: 'right',
+        fontSize: 11,
+        fontWeight: 600,
+        color: '#303133',
+        formatter: (p: any) => `${p.value}`,
+      },
       itemStyle: {
-        borderRadius: [0, 4, 4, 0],
+        borderRadius: [0, 6, 6, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#67C23A' },
-            { offset: 1, color: '#40944f' },
+            { offset: 0, color: '#5ad8a6' },
+            { offset: 0.5, color: '#36c27d' },
+            { offset: 1, color: '#1fa86a' },
           ],
         },
-        shadowBlur: 6,
-        shadowColor: 'rgba(64, 148, 79, 0.3)',
+        shadowBlur: 8,
+        shadowColor: 'rgba(31, 168, 106, 0.2)',
         shadowOffsetX: 2,
       },
     }],
@@ -428,35 +537,118 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 </script>
 
 <style scoped>
-.tab-content { min-height: 400px; }
+.tab-content { min-height: 400px; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .mb-16 { margin-bottom: 16px; }
-.stat-card { text-align: center; padding: 8px 0; }
-.stat-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
-.label-unit { display: inline-block; padding: 0 5px; border-radius: 3px; background: #f0f0f0; color: #606266; font-weight: 600; font-size: 13px; line-height: 1.6; }
-.label-unit-success { background: #f0f9eb; color: #67C23A; }
-.label-unit-hydro { background: #e6f9f8; color: #36CFC9; }
-.label-unit-warning { background: #fdf6ec; color: #E6A23C; }
-.stat-value { font-size: 28px; font-weight: 700; color: #303133; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; letter-spacing: 1px; }
-.stat-value.primary { color: #409EFF; }
-.stat-value.success { color: #67C23A; }
-.stat-value.hydro { color: #36CFC9; }
-.stat-value.warning { color: #E6A23C; }
-.chart-container { height: 320px; width: 100%; }
+
+/* ==================== 概览统计卡片 ==================== */
+.overview-stats { display: flex; gap: 12px; }
+.overview-stat-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 12px;
+  background: #fafbff;
+  border-radius: 8px;
+  border: 1px solid #eef0f6;
+  transition: all 0.25s ease;
+}
+.overview-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.os-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.os-icon { font-size: 24px; line-height: 1; }
+.os-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.os-label { font-size: 12px; color: #909399; white-space: nowrap; }
+.os-icon { font-size: 24px; line-height: 1; }
+.os-body { flex: 1; }
+.os-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
+.os-label { font-size: 12px; color: #909399; margin-top: 2px; }
+
+/* ==================== 通用卡片 ==================== */
+.card-default {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.card-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 12px;
+}
+.card-header-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: #409eff;
+}
+.card-body { padding: 16px; }
+.chart-body { padding: 8px 16px 16px; }
+
+/* ==================== 图表区域 ==================== */
+.chart-row { display: flex; gap: 16px; }
+.chart-col { flex: 1; min-width: 0; }
+.chart-section { height: 100%; }
 .chart-container-h { height: 360px; width: 100%; }
-.chart-card { height: 100%; }
-.section-title { font-weight: 600; font-size: 15px; }
-.type-icon { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.type-icon-svg { flex-shrink: 0; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.type-icon.wind .dot { background: #409EFF; }
-.type-icon.solar .dot { background: #67C23A; }
-.type-icon.hydro .dot { background: #36CFC9; }
-.type-icon.other .dot { background: #E6A23C; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.list-section { margin-top: 32px; border-top: 1px solid #e4e7ed; padding-top: 24px; }
-.list-section-header { font-weight: 600; font-size: 16px; margin-bottom: 16px; }
-.list-filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-.list-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+/* ==================== 筛选栏 ==================== */
+.filter-bar-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #fafbff;
+  border-radius: 8px;
+  border: 1px solid #eef0f6;
+}
+
+/* ==================== 表格容器 ==================== */
+.table-container-card {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+}
+.pagination-bar {
+  padding: 14px 16px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #f5f5f5;
+}
+
+/* ==================== 表格行动画 ==================== */
+:deep(.el-table__body tr:hover) { background: #f0f7ff !important; }
+:deep(.el-table__body tr) { animation: rowIn 0.25s ease both; }
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ==================== 展开行相关 ==================== */
 :deep(.el-table__expand-column) { display: none; }
 .code-count { display: inline-block; min-width: 28px; font-weight: 700; color: #409EFF; margin-right: 4px; }
 :deep(.row-expanded-active) { background-color: #f0f9ff; }

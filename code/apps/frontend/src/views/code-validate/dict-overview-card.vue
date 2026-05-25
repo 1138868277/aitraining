@@ -1,25 +1,61 @@
 <template>
-  <el-card class="mb-16">
-    <template #header>
-      <div class="dict-stats-header">
-        <span class="section-title">字典概览</span>
+  <div class="overview-section">
+    <div class="overview-header">
+      <div class="overview-header-left">
+        <span class="overview-title">📊 字典概览</span>
         <el-radio-group v-model="typeFilter" size="small">
           <el-radio-button value="wind">风电</el-radio-button>
           <el-radio-button value="solar">光伏</el-radio-button>
           <el-radio-button value="hydro">水电</el-radio-button>
         </el-radio-group>
-        <span v-if="lastRefreshTime" class="refresh-time">上次刷新：{{ lastRefreshTime }}</span>
-        <el-button size="small" text class="refresh-btn" @click="refreshData" :loading="refreshing">刷新</el-button>
       </div>
-    </template>
-    <el-row :gutter="16">
-      <el-col :span="5"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">一级类码</div><div class="stat-value" :class="typeFilter === 'wind' ? 'primary' : 'success'">{{ data.firstClassCount }}</div></div></el-card></el-col>
-      <el-col :span="5"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">二级类码</div><div class="stat-value" :class="typeFilter === 'wind' ? 'primary' : 'success'">{{ data.secondClassCount }}</div></div></el-card></el-col>
-      <el-col :span="5"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">三级类码</div><div class="stat-value" :class="typeFilter === 'wind' ? 'primary' : 'success'">{{ data.thirdClassCount }}</div></div></el-card></el-col>
-      <el-col :span="4"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">数据类码</div><div class="stat-value" :class="typeFilter === 'wind' ? 'primary' : 'success'">{{ data.dataCategoryCount }}</div></div></el-card></el-col>
-      <el-col :span="5"><el-card shadow="hover"><div class="stat-card"><div class="stat-label">数据码</div><div class="stat-split"><span class="split-item"><span class="split-label">集团统一</span><span class="split-value group">{{ data.dataCodeGroup }}</span></span><span class="split-divider" /><span class="split-item"><span class="split-label">手动添加</span><span class="split-value manual">{{ data.dataCodeManual }}</span></span></div></div></el-card></el-col>
-    </el-row>
-  </el-card>
+      <div class="overview-header-right">
+        <span v-if="lastRefreshTime" class="refresh-time">上次刷新：{{ lastRefreshTime }}</span>
+        <el-button size="small" text @click="refreshData" :loading="refreshing">🔄 刷新</el-button>
+      </div>
+    </div>
+    <div class="overview-stats">
+      <div class="overview-stat-card">
+        <div class="os-icon">📂</div>
+        <div class="os-body">
+          <div class="os-value" :style="{ color: typeFilter === 'wind' ? '#3b82f6' : '#10b981' }">{{ data.firstClassCount }}</div>
+          <div class="os-label">一级类码</div>
+        </div>
+      </div>
+      <div class="overview-stat-card">
+        <div class="os-icon">📁</div>
+        <div class="os-body">
+          <div class="os-value" :style="{ color: typeFilter === 'wind' ? '#3b82f6' : '#10b981' }">{{ data.secondClassCount }}</div>
+          <div class="os-label">二级类码</div>
+        </div>
+      </div>
+      <div class="overview-stat-card">
+        <div class="os-icon">🗂️</div>
+        <div class="os-body">
+          <div class="os-value" :style="{ color: typeFilter === 'wind' ? '#3b82f6' : '#10b981' }">{{ data.thirdClassCount }}</div>
+          <div class="os-label">三级类码</div>
+        </div>
+      </div>
+      <div class="overview-stat-card">
+        <div class="os-icon">📋</div>
+        <div class="os-body">
+          <div class="os-value" :style="{ color: typeFilter === 'wind' ? '#3b82f6' : '#10b981' }">{{ data.dataCategoryCount }}</div>
+          <div class="os-label">数据类码</div>
+        </div>
+      </div>
+      <div class="overview-stat-card">
+        <div class="os-icon">🏷️</div>
+        <div class="os-body">
+          <div class="os-split">
+            <span class="os-split-item"><span class="oss-label">集团统一</span><span class="oss-value" style="color: #3b82f6;">{{ data.dataCodeGroup }}</span></span>
+            <span class="os-split-divider"></span>
+            <span class="os-split-item"><span class="oss-label">手动添加</span><span class="oss-value" style="color: #e6a23c;">{{ data.dataCodeManual }}</span></span>
+          </div>
+          <div class="os-label">数据码</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -83,21 +119,106 @@ onMounted(loadFromCache);
 </script>
 
 <style scoped>
-.mb-16 { margin-bottom: 16px; }
-.dict-stats-header { display: flex; align-items: center; gap: 12px; }
-.refresh-btn { margin-left: auto; }
-.section-title { font-weight: 600; font-size: 15px; }
-.refresh-time { font-size: 12px; color: #909399; white-space: nowrap; }
-.stat-card { text-align: center; padding: 8px 0; }
-.stat-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
-.stat-value { font-size: 28px; font-weight: 700; color: #303133; }
-.stat-value.primary { color: #409EFF; }
-.stat-value.success { color: #67C23A; }
-.stat-split { display: flex; align-items: center; justify-content: center; gap: 0; }
-.split-item { flex: 1; text-align: center; }
-.split-label { display: block; font-size: 11px; color: #909399; margin-bottom: 2px; }
-.split-value { font-size: 22px; font-weight: 700; }
-.split-value.group { color: #409EFF; }
-.split-value.manual { color: #E6A23C; }
-.split-divider { width: 1px; height: 32px; background: #e4e7ed; }
+.overview-section {
+  margin-bottom: 16px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.overview-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.overview-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.overview-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.refresh-time {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+.overview-stats {
+  display: flex;
+  padding: 16px;
+  gap: 12px;
+}
+
+.overview-stat-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fafbff;
+  border-radius: 8px;
+  border: 1px solid #eef0f6;
+  transition: all 0.25s ease;
+}
+
+.overview-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+.os-icon { font-size: 24px; line-height: 1; }
+
+.os-body { flex: 1; }
+
+.os-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.os-label {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.os-split {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.os-split-item { flex: 1; text-align: left; }
+
+.oss-label {
+  display: block;
+  font-size: 10px;
+  color: #909399;
+  margin-bottom: 1px;
+}
+
+.oss-value { font-size: 18px; font-weight: 700; }
+
+.os-split-divider {
+  width: 1px;
+  height: 28px;
+  background: #e4e7ed;
+  margin: 0 8px;
+}
 </style>
