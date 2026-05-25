@@ -3,7 +3,7 @@ import * as datasourceService from './datasource-service.js';
 import { success, error } from '../../common/response.js';
 import { ErrorCode } from '@cec/contracts';
 
-const router = Router();
+const router: Router = Router();
 
 /** 获取当前数据源配置 */
 router.get('/api/datasource/config', async (_req: Request, res: Response) => {

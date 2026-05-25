@@ -18,12 +18,12 @@ const mockConditions: GenerateCodeRequest = {
 
 describe('generateCodeFromConditions', () => {
   it('generates 31-character code', () => {
-    const code = generateCodeFromConditions(mockConditions);
+    const code = generateCodeFromConditions(mockConditions) as string;
     expect(code).toHaveLength(31);
   });
 
   it('generates correct segments', () => {
-    const code = generateCodeFromConditions(mockConditions);
+    const code = generateCodeFromConditions(mockConditions) as string;
     expect(code.substring(0, 4)).toBe('YN01');
     expect(code.substring(4, 6)).toBe('01');
     expect(code.substring(6, 9)).toBe('001');
@@ -49,7 +49,7 @@ describe('isValidCodeFormat', () => {
 
 describe('parseCode', () => {
   it('parses valid code into 11 segments', () => {
-    const code = generateCodeFromConditions(mockConditions);
+    const code = generateCodeFromConditions(mockConditions) as string;
     const segments = parseCode(code);
     expect(segments).toHaveLength(11);
     expect(segments[0]).toBe('YN01');

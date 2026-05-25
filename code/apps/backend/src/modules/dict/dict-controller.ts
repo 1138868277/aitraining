@@ -4,7 +4,7 @@ import * as validateService from '../code-validation/validate-service.js';
 import { success, error } from '../../common/response.js';
 import { ErrorCode } from '@cec/contracts';
 
-const router = Router();
+const router: Router = Router();
 
 /** 编码解析：解析31位编码的各段信息 */
 router.post('/api/dict/parse-code', async (req: Request, res: Response) => {

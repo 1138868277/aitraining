@@ -39,7 +39,7 @@ export async function getDictItems(dictType: string): Promise<DictItemResponse[]
   return handler();
 }
 
-export async function getCascadedDictItems(parentCode: string, typeCode?: string, search?: string): Promise<DictItemResponse[]> {
+export async function getCascadedDictItems(parentCode?: string, typeCode?: string, search?: string): Promise<DictItemResponse[]> {
   return dictDomain.getCodeDictByParent(parentCode, typeCode);
 }
 

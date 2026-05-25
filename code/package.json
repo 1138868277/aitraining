@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write .",
-    "check-types": "tsc --noEmit -p tsconfig.json",
+    "check-types": "node apps/backend/node_modules/typescript/bin/tsc --noEmit -p tsconfig.check.json",
     "test": "vitest run",
     "dev:backend": "pnpm --filter @cec/backend dev",
     "dev:frontend": "pnpm --filter @cec/frontend dev",

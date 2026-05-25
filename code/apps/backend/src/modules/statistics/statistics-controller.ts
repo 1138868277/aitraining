@@ -10,7 +10,7 @@ const upload = multer({
   limits: { fileSize: config.file.maxMeasurementFileSizeMB * 1024 * 1024 },
 });
 
-const router = Router();
+const router: Router = Router();
 
 // ========== 1. 编码生成统计 ==========
 
@@ -54,7 +54,7 @@ router.get('/api/statistics/code-gen/by-type', async (_req: Request, res: Respon
 router.get('/api/statistics/code-gen/by-second-class', async (req: Request, res: Response) => {
   try {
     const type = req.query.type as string;
-    const typeFilter = type === 'wind' || type === 'solar' || type === 'hydro' ? type : undefined;
+    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
     const data = await statisticsService.getCodeGenBySecondClass(typeFilter);
     success(res, data);
   } catch (err) {
@@ -263,7 +263,7 @@ router.get('/api/statistics/measurement/drill-down', async (req: Request, res: R
 router.get('/api/statistics/measurement/by-second-class', async (req: Request, res: Response) => {
   try {
     const type = req.query.type as string;
-    const typeFilter = type === 'wind' || type === 'solar' || type === 'hydro' ? type : undefined;
+    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
     const data = await statisticsService.getMeasureBySecondClass(typeFilter);
     success(res, data);
   } catch (err) {

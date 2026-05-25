@@ -1669,8 +1669,6 @@ async function handleGenerate() {
         allResults.push(...result);
       } else if (result && typeof result === 'object') {
         allResults.push(result);
-      } else if (result && result.codes && Array.isArray(result.codes)) {
-        allResults.push(...result.codes);
       }
     }
 

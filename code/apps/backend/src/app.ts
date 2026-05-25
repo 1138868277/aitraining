@@ -9,7 +9,7 @@ import statisticsRouter from './modules/statistics/statistics-controller.js';
 import stationRouter from './modules/station/station-controller.js';
 import datasourceRouter from './modules/datasource/datasource-controller.js';
 
-export function createApp() {
+export function createApp(): import('express').Express {
   const app = express();
 
   // CORS 配置

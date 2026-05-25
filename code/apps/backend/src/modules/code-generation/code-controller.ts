@@ -10,7 +10,7 @@ import * as codeService from './code-service.js';
 import { success, error, paginated } from '../../common/response.js';
 import { AppError } from '../../common/errors.js';
 
-const router = Router();
+const router: Router = Router();
 
 /** 获取或创建会话ID */
 function getSessionId(req: Request): string {

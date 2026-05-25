@@ -3,7 +3,7 @@ import * as stationService from './station-service.js';
 import { success, error, paginated } from '../../common/response.js';
 import { ErrorCode } from '@cec/contracts';
 
-const router = Router();
+const router: Router = Router();
 
 /** 分页查询场站列表 */
 router.get('/api/station/list', async (req: Request, res: Response) => {

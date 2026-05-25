@@ -21,14 +21,8 @@ export const ErrorCode = {
   EXPORT_FAILED: 'EXPORT_FAILED',
 
   // 编码校验模块 (20xxx)
-  VALIDATE_LIST_EMPTY: 'VALIDATE_LIST_EMPTY',
   VALIDATE_LIMIT_EXCEEDED: 'VALIDATE_LIMIT_EXCEEDED',
   FILE_FORMAT_ERROR: 'FILE_FORMAT_ERROR',
-  FILE_SIZE_EXCEEDED: 'FILE_SIZE_EXCEEDED',
-  VALIDATE_SERVICE_ERROR: 'VALIDATE_SERVICE_ERROR',
-  CORRECTION_NO_MATCH: 'CORRECTION_NO_MATCH',
-  BATCH_CORRECT_FAILED: 'BATCH_CORRECT_FAILED',
-  RESULT_EXPORT_FAILED: 'RESULT_EXPORT_FAILED',
 
   // 统计分析模块 (30xxx)
   IMPORT_FILE_FORMAT_ERROR: 'IMPORT_FILE_FORMAT_ERROR',
@@ -67,14 +61,8 @@ export const ErrorMessage: Record<ErrorCode, string> = {
   [ErrorCode.DRAFT_SAVE_FAILED]: '保存至临时区失败，请重试',
   [ErrorCode.EXPORT_FAILED]: '导出失败，请检查权限或重试',
 
-  [ErrorCode.VALIDATE_LIST_EMPTY]: '请先输入待校验的编码',
   [ErrorCode.VALIDATE_LIMIT_EXCEEDED]: '单次校验数量超出限制（上限1000条），请分批校验',
   [ErrorCode.FILE_FORMAT_ERROR]: '文件格式不合法，请上传.xlsx或.xls文件',
-  [ErrorCode.FILE_SIZE_EXCEEDED]: '文件大小超出限制（上限10MB）',
-  [ErrorCode.VALIDATE_SERVICE_ERROR]: '校验服务异常，请稍后重试',
-  [ErrorCode.CORRECTION_NO_MATCH]: '未找到匹配的纠错建议，请手动修改',
-  [ErrorCode.BATCH_CORRECT_FAILED]: '批量纠错失败，请重试',
-  [ErrorCode.RESULT_EXPORT_FAILED]: '导出失败，请重试',
 
   [ErrorCode.IMPORT_FILE_FORMAT_ERROR]: '文件格式不合法，请上传.xlsx或.xls文件',
   [ErrorCode.IMPORT_FILE_SIZE_EXCEEDED]: '文件大小超出限制（上限10MB）',
