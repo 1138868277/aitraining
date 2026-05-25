@@ -22,6 +22,26 @@ router.post('/api/dict/parse-code', async (req: Request, res: Response) => {
   }
 });
 
+/** 批量解析编码 */
+router.post('/api/dict/batch-parse-code', async (req: Request, res: Response) => {
+  try {
+    const { codes } = req.body;
+    if (!codes || !Array.isArray(codes) || codes.length === 0) {
+      error(res, ErrorCode.MISSING_PARAMETER, '请提供待解析的编码列表', 400);
+      return;
+    }
+    if (codes.length > 1000) {
+      error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次解析数量超出限制（上限1000条）', 400);
+      return;
+    }
+    const results = await dictService.batchParseCodes(codes.map((c: any) => String(c).trim()));
+    success(res, results);
+  } catch (err) {
+    console.error('Failed to batch parse codes:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '批量解析失败，请重试', 500);
+  }
+});
+
 /** 快捷搜索：根据数据码名称模糊匹配（必须在 :dictType 通配路由之前注册） */
 router.get('/api/dict/quick-search', async (req: Request, res: Response) => {
   try {

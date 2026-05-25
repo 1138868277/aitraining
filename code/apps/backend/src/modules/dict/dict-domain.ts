@@ -544,6 +544,16 @@ export async function parseCode(code: string): Promise<{
   return result;
 }
 
+/** 批量解析编码 */
+export async function batchParseCodes(codes: string[]): Promise<Array<{
+  rawCode: string;
+  segments: Array<{ label: string; code: string; name: string }>;
+  isValid: boolean;
+  errorMessage?: string;
+}>> {
+  return Promise.all(codes.map(code => parseCode(code)));
+}
+
 /** 根据类型代码和二级类码获取数据类码 */
 export async function getDataTypeBySecondClass(typeCode: string, secondClassCode: string): Promise<DictItem[]> {
   const typeDomainCode = getTypeDomainCode(typeCode);

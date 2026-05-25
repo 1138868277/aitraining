@@ -127,6 +127,11 @@ export async function parseCode(code: string): Promise<CodeParseResult> {
   return dictDomain.parseCode(code);
 }
 
+/** 批量解析编码 */
+export async function batchParseCodes(codes: string[]): Promise<CodeParseResult[]> {
+  return dictDomain.batchParseCodes(codes);
+}
+
 /** 检查数据码是否已存在 */
 export async function checkExistingDataCodes(
   secondClassCode: string,

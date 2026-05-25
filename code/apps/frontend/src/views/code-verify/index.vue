@@ -4,85 +4,192 @@
       <el-tabs v-model="activeTab" class="main-tabs">
         <!-- Tab 1: 编码解析 -->
         <el-tab-pane label="编码解析" name="parse">
-          <div class="parse-container">
-            <div class="parse-input-section">
-              <el-input
-                v-model="parseCodeInput"
-                type="textarea"
-                :rows="3"
-                placeholder="请输入31位编码"
-                clearable
-                class="parse-code-input"
-                maxlength="31"
-                @input="onParseInput"
-              />
-              <div class="parse-code-length">
-                已输入 {{ parseCodeInput.length }} / 31 位
-                <span v-if="parseCodeInput.length > 0 && parseCodeInput.length !== 31" class="parse-length-warning">编码必须为31位</span>
+          <el-tabs v-model="parseMode" class="parse-mode-tabs">
+            <!-- 单个解析 -->
+            <el-tab-pane label="单个解析" name="single">
+              <div class="parse-container">
+                <div class="parse-input-section">
+                  <el-input
+                    v-model="parseCodeInput"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="请输入31位编码"
+                    clearable
+                    class="parse-code-input"
+                    maxlength="31"
+                    @input="onParseInput"
+                  />
+                  <div class="parse-code-length">
+                    已输入 {{ parseCodeInput.length }} / 31 位
+                    <span v-if="parseCodeInput.length > 0 && parseCodeInput.length !== 31" class="parse-length-warning">编码必须为31位</span>
+                  </div>
+                  <el-button
+                    type="primary"
+                    :disabled="parseCodeInput.length !== 31 || parsingCode"
+                    @click="handleParseCode"
+                    class="parse-btn"
+                  >{{ parsingCode ? '解析中...' : '解析' }}</el-button>
+                </div>
+
+                <div v-if="parseResult" class="parse-result-section">
+                  <el-card shadow="never" class="parse-result-card">
+                    <template #header>
+                      <div class="parse-result-header">
+                        <span class="parse-result-title">解析结果</span>
+                        <el-tag v-if="parseResult.isValid" type="success" effect="dark">全部识别</el-tag>
+                        <el-tag v-else type="danger" effect="dark">部分未识别</el-tag>
+                      </div>
+                    </template>
+
+                    <div class="code-segments-display">
+                      <div
+                        v-for="(seg, index) in parseResult.segments"
+                        :key="index"
+                        class="segment-block"
+                        :class="{ 'segment-unrecognized': seg.name === '未识别' }"
+                      >
+                        <div class="segment-label">{{ seg.label }}</div>
+                        <div class="segment-code">{{ seg.code }}</div>
+                        <div class="segment-name" :class="{ 'name-error': seg.name === '未识别' }">{{ seg.name }}</div>
+                      </div>
+                    </div>
+
+                    <div class="code-visualization">
+                      <div class="viz-title">编码结构</div>
+                      <div class="viz-code">
+                        <span
+                          v-for="(seg, index) in parseResult.segments"
+                          :key="index"
+                          class="viz-segment"
+                          :class="'viz-color-' + (index % 5)"
+                          :title="seg.label + ': ' + seg.code"
+                        >{{ seg.code }}</span>
+                      </div>
+                      <div class="viz-labels">
+                        <span
+                          v-for="(seg, index) in parseResult.segments"
+                          :key="index"
+                          class="viz-label"
+                          :class="'viz-color-' + (index % 5)"
+                        >{{ seg.label }}</span>
+                      </div>
+                    </div>
+
+                    <el-alert
+                      v-if="!parseResult.isValid && parseResult.errorMessage"
+                      :title="parseResult.errorMessage"
+                      type="warning"
+                      show-icon
+                      :closable="false"
+                      class="parse-error-alert"
+                    />
+                  </el-card>
+                </div>
               </div>
-              <el-button
-                type="primary"
-                :disabled="parseCodeInput.length !== 31 || parsingCode"
-                @click="handleParseCode"
-                class="parse-btn"
-              >{{ parsingCode ? '解析中...' : '解析' }}</el-button>
-            </div>
+            </el-tab-pane>
 
-            <div v-if="parseResult" class="parse-result-section">
-              <el-card shadow="never" class="parse-result-card">
-                <template #header>
-                  <div class="parse-result-header">
-                    <span class="parse-result-title">解析结果</span>
-                    <el-tag v-if="parseResult.isValid" type="success" effect="dark">全部识别</el-tag>
-                    <el-tag v-else type="danger" effect="dark">部分未识别</el-tag>
+            <!-- 批量解析 -->
+            <el-tab-pane label="批量解析" name="batch">
+              <div class="parse-batch-container">
+                <div class="parse-batch-input-section">
+                  <el-input
+                    v-model="batchParseInput"
+                    type="textarea"
+                    :rows="8"
+                    placeholder="请输入编码列表，每行一条31位编码"
+                    clearable
+                    class="parse-batch-textarea"
+                  />
+                  <div class="parse-batch-hint">已解析 {{ batchParseCodeList.length }} 条编码</div>
+                  <div class="parse-batch-actions">
+                    <el-button
+                      type="primary"
+                      :disabled="batchParseCodeList.length === 0 || batchParsing"
+                      @click="handleBatchParse"
+                    >{{ batchParsing ? '解析中...' : '开始解析' }}</el-button>
+                    <el-button :disabled="batchParseCodeList.length === 0" @click="clearBatchParse">清空</el-button>
                   </div>
-                </template>
+                </div>
 
-                <div class="code-segments-display">
-                  <div
-                    v-for="(seg, index) in parseResult.segments"
-                    :key="index"
-                    class="segment-block"
-                    :class="{ 'segment-unrecognized': seg.name === '未识别' }"
+                <div v-if="batchParseResults.length > 0" class="parse-batch-result-section">
+                  <div class="parse-batch-result-header">
+                    <span>解析结果（共 {{ batchParseResults.length }} 条）</span>
+                    <el-tag type="success" effect="plain">{{ recognizedCount }} 条已识别</el-tag>
+                    <el-tag type="danger" effect="plain">{{ unrecognizedCount }} 条未识别</el-tag>
+                    <el-button
+                      v-if="!allExpanded"
+                      link
+                      type="primary"
+                      size="small"
+                      @click="toggleAllRows"
+                    >一键展开</el-button>
+                    <el-button
+                      v-else
+                      link
+                      type="primary"
+                      size="small"
+                      @click="toggleAllRows"
+                    >一键收起</el-button>
+                  </div>
+                  <el-table
+                    ref="batchParseTableRef"
+                    :data="batchParseResults"
+                    :expand-row-keys="expandedRowKeys"
+                    row-key="rawCode"
+                    border
+                    stripe
+                    style="width: 100%"
+                    max-height="600"
                   >
-                    <div class="segment-label">{{ seg.label }}</div>
-                    <div class="segment-code">{{ seg.code }}</div>
-                    <div class="segment-name" :class="{ 'name-error': seg.name === '未识别' }">{{ seg.name }}</div>
-                  </div>
+                    <el-table-column type="expand">
+                      <template #default="{ row }">
+                        <div class="batch-expand-detail">
+                          <div class="code-segments-display">
+                            <div
+                              v-for="(seg, index) in row.segments"
+                              :key="index"
+                              class="segment-block"
+                              :class="{ 'segment-unrecognized': seg.name === '未识别' }"
+                            >
+                              <div class="segment-label">{{ seg.label }}</div>
+                              <div class="segment-code">{{ seg.code }}</div>
+                              <div class="segment-name" :class="{ 'name-error': seg.name === '未识别' }">{{ seg.name }}</div>
+                            </div>
+                          </div>
+                          <el-alert
+                            v-if="!row.isValid && row.errorMessage"
+                            :title="row.errorMessage"
+                            type="warning"
+                            show-icon
+                            :closable="false"
+                            class="parse-error-alert"
+                          />
+                        </div>
+                      </template>
+                    </el-table-column>
+                    <el-table-column type="index" label="序号" width="60" />
+                    <el-table-column prop="rawCode" label="编码" min-width="320">
+                      <template #default="{ row }">
+                        <span class="code-font">{{ row.rawCode }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="状态" width="140">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.isValid" type="success" size="small">全部识别</el-tag>
+                        <el-tag v-else type="danger" size="small">部分未识别</el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="错误信息" min-width="200">
+                      <template #default="{ row }">
+                        <span v-if="row.errorMessage" class="parse-error-text">{{ row.errorMessage }}</span>
+                        <span v-else class="parse-ok-text">—</span>
+                      </template>
+                    </el-table-column>
+                  </el-table>
                 </div>
-
-                <div class="code-visualization">
-                  <div class="viz-title">编码结构</div>
-                  <div class="viz-code">
-                    <span
-                      v-for="(seg, index) in parseResult.segments"
-                      :key="index"
-                      class="viz-segment"
-                      :class="'viz-color-' + (index % 5)"
-                      :title="seg.label + ': ' + seg.code"
-                    >{{ seg.code }}</span>
-                  </div>
-                  <div class="viz-labels">
-                    <span
-                      v-for="(seg, index) in parseResult.segments"
-                      :key="index"
-                      class="viz-label"
-                      :class="'viz-color-' + (index % 5)"
-                    >{{ seg.label }}</span>
-                  </div>
-                </div>
-
-                <el-alert
-                  v-if="!parseResult.isValid && parseResult.errorMessage"
-                  :title="parseResult.errorMessage"
-                  type="warning"
-                  show-icon
-                  :closable="false"
-                  class="parse-error-alert"
-                />
-              </el-card>
-            </div>
-          </div>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
         </el-tab-pane>
 
         <!-- Tab 3: 重复编码稽核 -->
@@ -296,6 +403,65 @@ async function handleParseCode() {
   } finally {
     parsingCode.value = false;
   }
+}
+
+// ========== 编码解析 - 批量 ==========
+const parseMode = ref('single');
+const batchParseTableRef = ref<any>(null);
+const allExpanded = ref(false);
+const expandedRowKeys = ref<string[]>([]);
+const batchParseInput = ref('');
+const batchParsing = ref(false);
+const batchParseResults = ref<Array<{
+  rawCode: string;
+  segments: Array<{ label: string; code: string; name: string }>;
+  isValid: boolean;
+  errorMessage?: string;
+}>>([]);
+
+const batchParseCodeList = computed(() => {
+  return batchParseInput.value
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(item => item.length > 0);
+});
+
+const recognizedCount = computed(() => batchParseResults.value.filter(r => r.isValid).length);
+const unrecognizedCount = computed(() => batchParseResults.value.filter(r => !r.isValid).length);
+
+async function handleBatchParse() {
+  if (batchParseCodeList.value.length === 0) return;
+  if (batchParseCodeList.value.length > 1000) {
+    ElMessage.warning('单次解析数量超出限制（上限1000条）');
+    return;
+  }
+  batchParsing.value = true;
+  try {
+    batchParseResults.value = await dictService.batchParseCodes(batchParseCodeList.value);
+    allExpanded.value = false;
+    expandedRowKeys.value = [];
+  } catch (err: any) {
+    ElMessage.error(err.message || '批量解析失败');
+  } finally {
+    batchParsing.value = false;
+  }
+}
+
+function toggleAllRows() {
+  allExpanded.value = !allExpanded.value;
+  if (allExpanded.value) {
+    expandedRowKeys.value = batchParseResults.value.map(r => r.rawCode);
+  } else {
+    expandedRowKeys.value = [];
+  }
+}
+
+function clearBatchParse() {
+  batchParseInput.value = '';
+  batchParseResults.value = [];
+  allExpanded.value = false;
+  expandedRowKeys.value = [];
 }
 
 function handleUploadExceed() {
@@ -589,6 +755,34 @@ function exportCorrectResults() {
 .viz-color-3 { background: #9b59b6; }
 .viz-color-4 { background: #f56c6c; }
 .parse-error-alert { margin-top: 12px; }
+
+/* 批量解析 */
+.parse-mode-tabs { margin-top: -8px; }
+.parse-batch-container { padding: 8px 0; }
+.parse-batch-input-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 700px;
+}
+.parse-batch-textarea { width: 100%; }
+.parse-batch-hint { font-size: 13px; color: #909399; }
+.parse-batch-actions { display: flex; gap: 12px; margin-top: 4px; }
+.parse-batch-result-section { margin-top: 20px; }
+.parse-batch-result-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+}
+.batch-expand-detail { padding: 16px 24px; }
+.code-font { font-family: monospace; font-size: 14px; letter-spacing: 0.5px; }
+.parse-error-text { color: #f56c6c; font-size: 13px; }
+.parse-ok-text { color: #909399; }
 
 /* 重复编码稽核 */
 .audit-container { padding: 8px 0; }

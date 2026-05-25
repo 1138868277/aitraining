@@ -84,14 +84,22 @@ export async function getMaxDataCategoryCode(secondClassCode: string, typeCode: 
   return res.data.maxDataCategoryCode;
 }
 
-/** 编码解析：解析31位编码的各段信息 */
-export async function parseCode(code: string): Promise<{
+export interface ParseCodeResult {
   rawCode: string;
   segments: Array<{ label: string; code: string; name: string }>;
   isValid: boolean;
   errorMessage?: string;
-}> {
+}
+
+/** 编码解析：解析31位编码的各段信息 */
+export async function parseCode(code: string): Promise<ParseCodeResult> {
   const res = await api.post('/dict/parse-code', { code });
+  return res.data;
+}
+
+/** 批量解析编码 */
+export async function batchParseCodes(codes: string[]): Promise<ParseCodeResult[]> {
+  const res = await api.post('/dict/batch-parse-code', { codes });
   return res.data;
 }
 
