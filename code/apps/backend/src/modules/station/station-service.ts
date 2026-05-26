@@ -27,12 +27,6 @@ export async function batchCreateStation(
   }>,
   creator: string,
 ) {
-  const codes = entries.map(e => e.stationCode);
-  const existing = await stationDomain.findExistingCodes(codes);
-  if (existing.length > 0) {
-    const dupCodes = existing.map(e => e.stationCode).join('、');
-    throw new AppError(ErrorCode.DUPLICATE_SUBMISSION, `以下场站编码已存在：${dupCodes}`);
-  }
   return stationDomain.batchCreateStation(entries, creator);
 }
 

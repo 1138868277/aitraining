@@ -133,7 +133,13 @@ export async function batchCreateStation(
   await query(
     `INSERT INTO ${getSchema()}.cec_new_energy_station_dict
      (station_code, station_name, management_domain, creator, modifier, create_tm, modify_tm)
-     VALUES ${valuePlaceholders.join(', ')}`,
+     VALUES ${valuePlaceholders.join(', ')}
+     ON CONFLICT (station_code) DO UPDATE SET
+       station_name = EXCLUDED.station_name,
+       management_domain = EXCLUDED.management_domain,
+       if_delete = '0',
+       modifier = EXCLUDED.modifier,
+       modify_tm = NOW()`,
     params,
   );
 
@@ -199,10 +205,10 @@ export async function deleteAllStation(modifier: string): Promise<number> {
   return (result as any).rowCount || 0;
 }
 
-/** 检查场站编码是否已存在 */
+/** 检查场站编码是否已存在（含软删除，因唯一约束全局生效） */
 export async function existsByCode(code: string, excludeId?: number): Promise<boolean> {
   let sql = `SELECT COUNT(*) AS cnt FROM ${getSchema()}.cec_new_energy_station_dict
-    WHERE if_delete = '0' AND station_code = $1`;
+    WHERE station_code = $1`;
   const params: (string | null)[] = [code];
   if (excludeId) {
     sql += ` AND station_id != $2`;
@@ -217,13 +223,13 @@ export interface StationCodeName {
   stationName: string;
 }
 
-/** 检查哪些场站编码已存在（批量导入时使用） */
+/** 检查哪些场站编码已存在（含软删除，因唯一约束全局生效） */
 export async function findExistingCodes(codes: string[]): Promise<StationCodeName[]> {
   if (codes.length === 0) return [];
   const placeholders = codes.map((_, i) => `$${i + 1}`);
   const rows = await query<{ station_code: string; station_name: string }>(
     `SELECT station_code, station_name FROM ${getSchema()}.cec_new_energy_station_dict
-     WHERE if_delete = '0' AND station_code IN (${placeholders.join(',')})`,
+     WHERE station_code IN (${placeholders.join(',')})`,
     codes,
   );
   return rows.map(r => ({ stationCode: r.station_code, stationName: r.station_name }));
