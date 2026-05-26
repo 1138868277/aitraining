@@ -12,16 +12,41 @@
           </div>
           <DatasourceTab />
         </el-tab-pane>
+        <el-tab-pane v-if="isAdmin" label="用户管理" name="userMgmt">
+          <div class="subpage-hero">
+            <div class="hero-icon">👤</div>
+            <div class="hero-text">
+              <div class="hero-title">用户管理</div>
+              <div class="hero-subtitle">管理系统用户账号，支持新增、编辑和删除操作，修改后即时生效</div>
+            </div>
+          </div>
+          <UserMgmtTab />
+        </el-tab-pane>
       </el-tabs>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 import DatasourceTab from './datasource-tab.vue';
+import UserMgmtTab from './user-mgmt-tab.vue';
 
-const activeTab = ref('datasource');
+const route = useRoute();
+const router = useRouter();
+const auth = useAuthStore();
+const isAdmin = computed(() => auth.user?.username === 'admin');
+const activeTab = ref(
+  !isAdmin.value && (route.query.tab as string) === 'userMgmt'
+    ? 'datasource'
+    : (route.query.tab as string) || 'datasource'
+);
+
+watch(activeTab, (tab) => {
+  router.replace({ query: { ...route.query, tab } });
+});
 </script>
 
 <style scoped>

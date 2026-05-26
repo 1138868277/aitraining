@@ -1,5 +1,5 @@
 <template>
-  <el-container class="app-container">
+  <el-container v-if="!isLoginPage" class="app-container">
     <el-header class="app-header">
       <div class="header-title">
         <img src="/logo.png" class="header-logo" alt="logo">
@@ -17,7 +17,27 @@
         <el-menu-item index="/statistics">编码看板</el-menu-item>
         <el-menu-item index="/system-settings">系统配置</el-menu-item>
       </el-menu>
-      <div class="header-time">{{ currentTime }}</div>
+      <div class="header-right">
+        <div class="header-time">{{ currentTime }}</div>
+        <el-dropdown trigger="click" @command="handleCommand">
+          <div class="user-info">
+            <el-avatar :size="32" :icon="UserFilled" class="user-avatar" />
+            <span class="user-name">{{ auth.user?.displayName || auth.user?.username }}</span>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item disabled>
+                <el-icon><InfoFilled /></el-icon>
+                {{ auth.user?.region }}
+              </el-dropdown-item>
+              <el-dropdown-item divided command="logout">
+                <el-icon><SwitchButton /></el-icon>
+                退出登录
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
     </el-header>
     <el-main class="app-main">
       <router-view v-slot="{ Component }">
@@ -27,13 +47,20 @@
       </router-view>
     </el-main>
   </el-container>
+  <router-view v-else />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import { UserFilled, InfoFilled, SwitchButton } from '@element-plus/icons-vue';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
+const router = useRouter();
+const auth = useAuthStore();
+
+const isLoginPage = computed(() => route.path === '/login');
 const currentRoute = computed(() => route.path);
 
 const currentTime = ref('');
@@ -45,7 +72,18 @@ function updateTime() {
   currentTime.value = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 周${days[now.getDay()]} ${now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
 }
 
-onMounted(() => { updateTime(); timer = setInterval(updateTime, 1000); });
+function handleCommand(command: string) {
+  if (command === 'logout') {
+    auth.logout();
+    router.replace('/login');
+  }
+}
+
+onMounted(() => {
+  updateTime();
+  timer = setInterval(updateTime, 1000);
+  auth.initDefaultUsers();
+});
 onUnmounted(() => clearInterval(timer));
 </script>
 
@@ -141,15 +179,47 @@ body {
   display: none;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+  padding-left: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .header-time {
   color: rgba(255, 255, 255, 0.6);
   font-size: 13px;
   white-space: nowrap;
-  margin-left: auto;
-  padding-left: 20px;
   letter-spacing: 0.3px;
   font-variant-numeric: tabular-nums;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.user-info:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-avatar {
+  background: rgba(165, 180, 252, 0.3);
+  color: #a5b4fc;
+  flex-shrink: 0;
+}
+
+.user-name {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .app-main {

@@ -70,11 +70,11 @@
         </el-tab-pane>
 
         <!-- Tab 2: 新增字典记录 -->
-        <el-tab-pane label="字典新增" name="statistics">
+        <el-tab-pane label="数据码管理" name="statistics">
           <div class="subpage-hero">
             <div class="hero-icon">📝</div>
             <div class="hero-text">
-              <div class="hero-title">数据码新增</div>
+              <div class="hero-title">数据码管理</div>
               <div class="hero-subtitle">手动添加数据码词典，录入新增的数据类码及其对应的数据码，支持批量操作和Excel导出</div>
             </div>
           </div>
