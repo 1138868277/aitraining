@@ -9,13 +9,13 @@ const routes = [
     path: '/code-generate',
     name: 'CodeGenerate',
     component: () => import('@/views/code-generate/index.vue'),
-    meta: { title: '编码生成' },
+    meta: { title: '编码创建' },
   },
   {
     path: '/code-verify',
     name: 'CodeVerify',
     component: () => import('@/views/code-verify/index.vue'),
-    meta: { title: '编码修正' },
+    meta: { title: '编码维护' },
   },
   {
     path: '/code-validate',
@@ -27,13 +27,13 @@ const routes = [
     path: '/statistics',
     name: 'Statistics',
     component: () => import('@/views/statistics/index.vue'),
-    meta: { title: '统计分析' },
+    meta: { title: '编码看板' },
   },
   {
     path: '/system-settings',
     name: 'SystemSettings',
     component: () => import('@/views/system-settings/index.vue'),
-    meta: { title: '系统设置' },
+    meta: { title: '系统配置' },
   },
 ];
 

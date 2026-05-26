@@ -4,7 +4,7 @@
     <div class="page-hero">
       <div class="hero-icon">⚙️</div>
       <div class="hero-text">
-        <div class="hero-title">编码生成</div>
+        <div class="hero-title">编码创建</div>
         <div class="hero-subtitle">根据规则批量生成测点编码，支持导出和修正</div>
       </div>
       <div class="hero-stats">

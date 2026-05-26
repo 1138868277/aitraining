@@ -1,18 +1,21 @@
 <template>
   <el-container class="app-container">
     <el-header class="app-header">
-      <div class="header-title">华电新能源编码管理平台</div>
+      <div class="header-title">
+        <img src="/logo.png" class="header-logo" alt="logo">
+        华电新能源编码管理平台
+      </div>
       <el-menu
         :default-active="currentRoute"
         mode="horizontal"
         router
         class="header-menu"
       >
-        <el-menu-item index="/code-generate">编码生成</el-menu-item>
-        <el-menu-item index="/code-verify">编码修正</el-menu-item>
+        <el-menu-item index="/code-generate">编码创建</el-menu-item>
+        <el-menu-item index="/code-verify">编码维护</el-menu-item>
         <el-menu-item index="/code-validate">字典管理</el-menu-item>
-        <el-menu-item index="/statistics">统计分析</el-menu-item>
-        <el-menu-item index="/system-settings">系统设置</el-menu-item>
+        <el-menu-item index="/statistics">编码看板</el-menu-item>
+        <el-menu-item index="/system-settings">系统配置</el-menu-item>
       </el-menu>
       <div class="header-time">{{ currentTime }}</div>
     </el-header>
@@ -61,72 +64,92 @@ body {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  background: linear-gradient(rgba(29, 107, 192, 0.82), rgba(64, 158, 255, 0.78)), url(https://images.unsplash.com/photo-1466611653917-950a37dd0b51?w=1920&q=80) center / cover;
-  padding: 0 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #0f1d3a 0%, #1a3a6b 50%, #1e4d8c 100%);
+  padding: 0 28px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  position: relative;
+  z-index: 100;
 }
 
 .header-title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: #ffffff;
   white-space: nowrap;
-  margin-right: 48px;
+  margin-right: 40px;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.header-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.header-title::after {
+  content: '';
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .header-menu {
   flex: 1;
   border-bottom: none !important;
   background: transparent !important;
+  margin-left: 20px;
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
 
 .header-menu .el-menu-item {
-  color: rgba(255, 255, 255, 0.75) !important;
-  font-size: 15px;
+  color: rgba(255, 255, 255, 0.65) !important;
+  font-size: 14px;
   font-weight: 500;
-  margin: 0 4px;
-  padding: 0 20px;
-  border-radius: 6px 6px 0 0;
+  margin: 0 2px;
+  padding: 0 18px;
+  border-radius: 8px;
   transition: all 0.25s ease;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  height: 36px !important;
+  line-height: 36px !important;
 }
 
 .header-menu .el-menu-item:hover {
   color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 .header-menu .el-menu-item.is-active {
   color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
   font-weight: 600;
 }
 
 .header-menu .el-menu-item::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 3px;
-  background: #ffffff;
-  border-radius: 3px 3px 0 0;
-  transition: width 0.25s ease;
-}
-
-.header-menu .el-menu-item.is-active::after {
-  width: 60%;
+  display: none;
 }
 
 .header-time {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
   white-space: nowrap;
   margin-left: auto;
-  letter-spacing: 0.5px;
+  padding-left: 20px;
+  letter-spacing: 0.3px;
   font-variant-numeric: tabular-nums;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .app-main {
