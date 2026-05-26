@@ -232,9 +232,10 @@ router.post('/api/statistics/measurement/import', upload.single('file'), async (
 });
 
 /** 获取导入状态 */
-router.get('/api/statistics/measurement/import-status', async (_req: Request, res: Response) => {
+router.get('/api/statistics/measurement/import-status', async (req: Request, res: Response) => {
   try {
-    const data = statisticsService.getImportStatus();
+    const { tenantId } = resolveTenantFromRequest(req);
+    const data = statisticsService.getImportStatus(tenantId);
     success(res, data);
   } catch (err) {
     console.error('Failed to get import status:', err);
@@ -243,9 +244,10 @@ router.get('/api/statistics/measurement/import-status', async (_req: Request, re
 });
 
 /** 终止导入 */
-router.post('/api/statistics/measurement/cancel-import', async (_req: Request, res: Response) => {
+router.post('/api/statistics/measurement/cancel-import', async (req: Request, res: Response) => {
   try {
-    statisticsService.cancelImport();
+    const { tenantId } = resolveTenantFromRequest(req);
+    statisticsService.cancelImport(tenantId);
     success(res, { message: '已请求终止' });
   } catch (err) {
     console.error('Failed to cancel import:', err);
@@ -343,9 +345,10 @@ router.get('/api/statistics/measurement/filter-options', async (_req: Request, r
 });
 
 /** 清理测点数据 */
-router.delete('/api/statistics/measurement/clear', async (_req: Request, res: Response) => {
+router.delete('/api/statistics/measurement/clear', async (req: Request, res: Response) => {
   try {
-    await statisticsService.clearMeasurementData();
+    const { schema, tenantId } = resolveTenantFromRequest(req);
+    await statisticsService.clearMeasurementData(schema, tenantId);
     success(res, { message: '清理成功' });
   } catch (err) {
     console.error('Failed to clear measurement data:', err);

@@ -550,18 +550,24 @@ export interface ImportTask {
   cancelRequested?: boolean;
 }
 
-const importStore: ImportTask = {
-  importing: false, batchId: null,
-  totalRows: 0, importedRows: 0, validRows: 0,
-  status: 'IDLE',
-};
+const importStores = new Map<string, ImportTask>();
 
-export function getImportStatus(): ImportTask {
-  return { ...importStore, cancelRequested: false };
+function getStore(tenantId: string): ImportTask {
+  let store = importStores.get(tenantId);
+  if (!store) {
+    store = { importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE' };
+    importStores.set(tenantId, store);
+  }
+  return store;
 }
 
-export function cancelImport(): void {
-  importStore.cancelRequested = true;
+export function getImportStatus(tenantId: string): ImportTask {
+  const s = getStore(tenantId);
+  return { ...s, cancelRequested: false };
+}
+
+export function cancelImport(tenantId: string): void {
+  getStore(tenantId).cancelRequested = true;
 }
 
 /** 解析31位编码各段 */
@@ -610,22 +616,23 @@ async function batchInsertPoints(
 export async function importMeasurementFile(
   fileBuffer: Buffer, fileName: string, schema: string, tenantId: string,
 ): Promise<{ batchId: string }> {
-  if (importStore.importing) {
+  if (getStore(tenantId).importing) {
     throw new Error('IMPORT_BUSY');
   }
 
   const XLSX = await import('xlsx');
-  importStore.importing = true;
-  importStore.status = 'PROCESSING';
-  importStore.batchId = `batch_${Date.now()}`;
-  importStore.totalRows = 0;
-  importStore.importedRows = 0;
-  importStore.validRows = 0;
-  importStore.startTime = Date.now();
-  importStore.cancelRequested = false;
-  importStore.message = '正在解析文件...';
+  const store = getStore(tenantId);
+  store.importing = true;
+  store.status = 'PROCESSING';
+  store.batchId = `batch_${Date.now()}`;
+  store.totalRows = 0;
+  store.importedRows = 0;
+  store.validRows = 0;
+  store.startTime = Date.now();
+  store.cancelRequested = false;
+  store.message = '正在解析文件...';
 
-  const batchId = importStore.batchId;
+  const batchId = store.batchId;
 
   // 确保测点表存在
   await queryAsTenant(tenantId, `CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
@@ -665,8 +672,8 @@ export async function importMeasurementFile(
       const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
       totalRows += rows.length;
     }
-    importStore.totalRows = totalRows;
-    importStore.message = `共读取 ${totalRows} 行（${sheetNames.length} 个Sheet），正在解析...`;
+    store.totalRows = totalRows;
+    store.message = `共读取 ${totalRows} 行（${sheetNames.length} 个Sheet），正在解析...`;
 
     // 识别测点编码列（从第一个非空sheet获取列名）
     let codeCol = '';
@@ -688,13 +695,13 @@ export async function importMeasurementFile(
     let validCount = 0;
 
     for (const name of sheetNames) {
-      if (importStore.cancelRequested) break;
+      if (store.cancelRequested) break;
       const ws = wb.Sheets[name];
       if (!ws['!ref']) continue;
       const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
 
       for (let i = 0; i < rows.length; i++) {
-        if (importStore.cancelRequested) break;
+        if (store.cancelRequested) break;
         const raw = String(rows[i][codeCol] || '').trim();
         const seg = parseCodeSegments(raw);
         if (seg) {
@@ -704,36 +711,36 @@ export async function importMeasurementFile(
 
         if (batch.length >= 500) {
           await batchInsertPoints(batchId, batch, schema, tenantId);
-          importStore.importedRows += batch.length;
+          store.importedRows += batch.length;
           batch.length = 0;
-          importStore.message = `已导入 ${importStore.importedRows}/${importStore.totalRows} 行...`;
+          store.message = `已导入 ${store.importedRows}/${store.totalRows} 行...`;
         }
       }
     }
 
     if (batch.length > 0) {
       await batchInsertPoints(batchId, batch, schema, tenantId);
-      importStore.importedRows += batch.length;
+      store.importedRows += batch.length;
     }
 
-    if (importStore.cancelRequested) {
-      importStore.validRows = validCount;
-      importStore.importing = false;
-      importStore.status = 'CANCELLED';
-      importStore.message = `已终止，已导入 ${importStore.importedRows} 行（有效编码 ${validCount} 条）`;
+    if (store.cancelRequested) {
+      store.validRows = validCount;
+      store.importing = false;
+      store.status = 'CANCELLED';
+      store.message = `已终止，已导入 ${store.importedRows} 行（有效编码 ${validCount} 条）`;
       return { batchId };
     }
 
-    importStore.validRows = validCount;
-    importStore.importing = false;
-    importStore.status = 'COMPLETED';
-    importStore.message = `导入完成，有效编码 ${validCount} 条（${sheetNames.length} 个Sheet）`;
+    store.validRows = validCount;
+    store.importing = false;
+    store.status = 'COMPLETED';
+    store.message = `导入完成，有效编码 ${validCount} 条（${sheetNames.length} 个Sheet）`;
 
     return { batchId };
   } catch (err: any) {
-    importStore.importing = false;
-    importStore.status = 'FAILED';
-    importStore.message = err.message || '导入失败';
+    store.importing = false;
+    store.status = 'FAILED';
+    store.message = err.message || '导入失败';
     throw err;
   }
 }
@@ -1047,15 +1054,16 @@ export async function getMeasureFilterOptions(): Promise<{
   };
 }
 
-export async function clearMeasurementData(): Promise<void> {
-  await query(`DELETE FROM ${getSchema()}.cec_new_energy_measurement_points`);
-  importStore.importing = false;
-  importStore.batchId = null;
-  importStore.totalRows = 0;
-  importStore.importedRows = 0;
-  importStore.validRows = 0;
-  importStore.status = 'IDLE';
-  importStore.message = undefined;
+export async function clearMeasurementData(schema: string, tenantId: string): Promise<void> {
+  await queryAsTenant(tenantId, `DELETE FROM ${schema}.cec_new_energy_measurement_points`);
+  const s = getStore(tenantId);
+  s.importing = false;
+  s.batchId = null;
+  s.totalRows = 0;
+  s.importedRows = 0;
+  s.validRows = 0;
+  s.status = 'IDLE';
+  s.message = undefined;
 }
 
 /** 批量校验编码是否重复（同时校验数据库重复和输入内重复） */
