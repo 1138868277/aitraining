@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from './config/index.js';
-import { requestIdMiddleware, requestLogger, globalErrorHandler } from './common/middleware.js';
+import { requestIdMiddleware, requestLogger, globalErrorHandler, tenantContextMiddleware } from './common/middleware.js';
+import { initTenantPools } from './db/index.js';
 import authRouter from './modules/auth/auth-controller.js';
 import { initUserTable } from './modules/auth/auth-service.js';
 import dictRouter from './modules/dict/dict-controller.js';
@@ -29,6 +30,9 @@ export function createApp(): import('express').Express {
   // 通用中间件
   app.use(requestIdMiddleware);
   app.use(requestLogger);
+
+  // 租户上下文中间件（在路由之前）
+  app.use(tenantContextMiddleware);
 
   // 健康检查
   app.get('/api/health', (_req, res) => {
@@ -74,4 +78,10 @@ export function createApp(): import('express').Express {
   app.use(globalErrorHandler);
 
   return app;
+}
+
+/** 启动时初始化多租户连接池 */
+export async function bootstrap(): Promise<void> {
+  console.log('🔌 正在初始化多租户连接池...');
+  await initTenantPools();
 }

@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { tenantStorage, type TenantContext } from '../db/tenant-context.js';
+import { getTenantById } from '../config/tenants.js';
+import crypto from 'crypto';
 
 /** 请求追踪ID中间件 */
 export function requestIdMiddleware(req: Request, _res: Response, next: NextFunction) {
@@ -32,4 +35,58 @@ export function globalErrorHandler(err: Error, _req: Request, res: Response, _ne
     data: null,
     timestamp: Date.now(),
   });
+}
+
+// ====== Token 验证（简单实现，避免与 auth-service 循环依赖） ======
+const TOKEN_SECRET = 'cec-2024-token-secret-dev-only';
+
+interface TokenPayload {
+  username: string;
+  tenant: string;
+  displayName: string;
+  region: string;
+  exp: number;
+}
+
+function verifySimpleToken(token: string): TokenPayload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [header, body, signature] = parts;
+    const expectedSig = crypto.createHmac('sha256', TOKEN_SECRET).update(`${header}.${body}`).digest('base64url');
+    if (signature !== expectedSig) return null;
+    const payload: TokenPayload = JSON.parse(Buffer.from(body, 'base64url').toString('utf-8'));
+    if (payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/** 租户上下文中间件：从 token 解析租户，设置 AsyncLocalStorage */
+export function tenantContextMiddleware(req: Request, _res: Response, next: NextFunction) {
+  // 登录接口和健康检查不需要租户上下文
+  const skipPaths = ['/api/auth/login', '/api/health', '/api/version'];
+  if (skipPaths.includes(req.path)) {
+    next();
+    return;
+  }
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const payload = verifySimpleToken(token);
+    if (payload) {
+      const tenant = getTenantById(payload.tenant);
+      const ctx: TenantContext = {
+        tenantId: payload.tenant,
+        schema: tenant ? tenant.datasource.schema : 'liuhaojun',
+      };
+      tenantStorage.run(ctx, next);
+      return;
+    }
+  }
+
+  // 无有效 token 时继续（controller 层会做 auth 校验）
+  next();
 }

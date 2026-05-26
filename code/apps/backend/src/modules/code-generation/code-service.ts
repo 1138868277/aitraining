@@ -1,10 +1,7 @@
 import type { GenerateCodeRequest, GenerateCodeResponse, DraftCodeItem } from '@cec/contracts';
 import { generateCodeFromConditions, generateCodeName } from './code-domain.js';
 import { formatDateTime } from '@cec/shared';
-import { query, queryOne } from '../../db/index.js';
-import { config } from '../../config/index.js';
-
-const dbc = config.db;
+import { query, queryOne, getSchema } from '../../db/index.js';
 
 /** 临时区存储（内存，页面刷新丢失） */
 const draftStore: Map<string, DraftCodeItem[]> = new Map();
@@ -17,21 +14,21 @@ async function lookupCodeNames(conditions: GenerateCodeRequest): Promise<Record<
     // 场站名称
     (async () => {
       if (!conditions.stationCode) return null;
-      const sql = `SELECT station_name AS name FROM ${dbc.schema}.cec_new_energy_station_dict WHERE station_code = $1 AND if_delete = '0' LIMIT 1`;
+      const sql = `SELECT station_name AS name FROM ${getSchema()}.cec_new_energy_station_dict WHERE station_code = $1 AND if_delete = '0' LIMIT 1`;
       const r = await query<{ name: string }>(sql, [conditions.stationCode]);
       return r.length > 0 ? r[0].name : null;
     })(),
     // 二级类码名称（按类型过滤）
     (async () => {
       if (!conditions.secondClassCode) return null;
-      const sql = `SELECT second_class_name AS name FROM ${dbc.schema}.cec_new_energy_second_class_type_dict WHERE second_class_code = $1 AND type_code = $2 AND if_delete = '0' LIMIT 1`;
+      const sql = `SELECT second_class_name AS name FROM ${getSchema()}.cec_new_energy_second_class_type_dict WHERE second_class_code = $1 AND type_code = $2 AND if_delete = '0' LIMIT 1`;
       const r = await query<{ name: string }>(sql, [conditions.secondClassCode, conditions.typeCode]);
       return r.length > 0 ? r[0].name : null;
     })(),
     // 三级类码名称（按二级类码和类型过滤）
     (async () => {
       if (!conditions.thirdClassCode) return null;
-      const sql = `SELECT third_class_name AS name FROM ${dbc.schema}.cec_new_energy_third_class_dict WHERE third_class_code = $1 AND second_class_code = $2 AND type_code = $3 AND if_delete = '0' LIMIT 1`;
+      const sql = `SELECT third_class_name AS name FROM ${getSchema()}.cec_new_energy_third_class_dict WHERE third_class_code = $1 AND second_class_code = $2 AND type_code = $3 AND if_delete = '0' LIMIT 1`;
       const r = await query<{ name: string }>(sql, [conditions.thirdClassCode, conditions.secondClassCode, conditions.typeCode]);
       return r.length > 0 ? r[0].name : null;
     })(),
@@ -46,7 +43,7 @@ async function lookupCodeNames(conditions: GenerateCodeRequest): Promise<Record<
           : null)
         : null;
       const params: any[] = [conditions.dataCode, conditions.dataTypeCode || '00', conditions.secondClassCode];
-      let sql = `SELECT data_name AS name FROM ${dbc.schema}.cec_new_energy_code_dict WHERE data_code = $1 AND data_category_code = $2 AND second_class_code = $3 AND if_delete = '0'`;
+      let sql = `SELECT data_name AS name FROM ${getSchema()}.cec_new_energy_code_dict WHERE data_code = $1 AND data_category_code = $2 AND second_class_code = $3 AND if_delete = '0'`;
       if (typeDomainCode) {
         sql += ` AND type_domain_code = $4`;
         params.push(typeDomainCode);
@@ -171,7 +168,7 @@ export async function saveCodeRecords(
 ): Promise<number> {
   let saved = 0;
   for (const c of codes) {
-    const sql = `INSERT INTO ${dbc.schema}.cec_new_energy_createcode
+    const sql = `INSERT INTO ${getSchema()}.cec_new_energy_createcode
       (code, name, type_code, second_class_code, data_type_code, station_code, third_class_code, creator, create_tm, modify_tm, if_delete)
       VALUES ($1, $2, $3, $4, $5, $6, $7, 'system', NOW(), NOW(), 0)`;
     await query(sql, [
@@ -205,7 +202,7 @@ function generateConditionSummary(conditions: Record<string, any>): string {
 /** 保存最近条件记录 */
 export async function saveRecentCondition(conditions: Record<string, any>): Promise<void> {
   const summary = generateConditionSummary(conditions);
-  const sql = `INSERT INTO ${dbc.schema}.cec_new_energy_recent_condition
+  const sql = `INSERT INTO ${getSchema()}.cec_new_energy_recent_condition
     (condition_data, condition_summary, creator, create_tm, modify_tm, if_delete)
     VALUES ($1, $2, 'system', NOW(), NOW(), '0')`;
   await query(sql, [JSON.stringify(conditions), summary]);
@@ -215,7 +212,7 @@ export async function saveRecentCondition(conditions: Record<string, any>): Prom
 export async function getRecentConditions(): Promise<any[]> {
   const sql = `SELECT id, condition_data, condition_summary,
     TO_CHAR(create_tm, 'YYYY-MM-DD HH24:MI:SS') AS generate_time
-    FROM ${dbc.schema}.cec_new_energy_recent_condition
+    FROM ${getSchema()}.cec_new_energy_recent_condition
     WHERE if_delete = '0'
     ORDER BY create_tm DESC
     LIMIT 10`;
@@ -245,7 +242,7 @@ export async function queryCodeHistory(
 
   const whereClause = conditions.join(' AND ');
 
-  const countSql = `SELECT COUNT(*) AS total FROM ${dbc.schema}.cec_new_energy_createcode WHERE ${whereClause}`;
+  const countSql = `SELECT COUNT(*) AS total FROM ${getSchema()}.cec_new_energy_createcode WHERE ${whereClause}`;
   const countResult = await queryOne<{ total: number }>(countSql, params);
   const total = countResult?.total || 0;
 
@@ -253,7 +250,7 @@ export async function queryCodeHistory(
   const listSql = `SELECT id, code, name,
     type_code, second_class_code, data_type_code, station_code, third_class_code,
     TO_CHAR(create_tm, 'YYYY-MM-DD HH24:MI:SS') AS generate_time, creator
-    FROM ${dbc.schema}.cec_new_energy_createcode
+    FROM ${getSchema()}.cec_new_energy_createcode
     WHERE ${whereClause}
     ORDER BY create_tm DESC
     LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
@@ -270,7 +267,7 @@ export async function queryCodeHistory(
 
 /** 删除单条编码生成记录 */
 export async function deleteCodeRecord(id: number): Promise<boolean> {
-  const sql = `UPDATE ${dbc.schema}.cec_new_energy_createcode
+  const sql = `UPDATE ${getSchema()}.cec_new_energy_createcode
     SET if_delete = '1', modify_tm = NOW()
     WHERE id = $1 AND if_delete = '0'`;
   const result = await query(sql, [id]);
@@ -281,7 +278,7 @@ export async function deleteCodeRecord(id: number): Promise<boolean> {
 export async function batchDeleteCodeRecords(ids: number[]): Promise<number> {
   if (ids.length === 0) return 0;
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-  const sql = `UPDATE ${dbc.schema}.cec_new_energy_createcode
+  const sql = `UPDATE ${getSchema()}.cec_new_energy_createcode
     SET if_delete = '1', modify_tm = NOW()
     WHERE id IN (${placeholders}) AND if_delete = '0'`;
   const result = await query(sql, ids);

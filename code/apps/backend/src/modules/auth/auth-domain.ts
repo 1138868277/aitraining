@@ -1,7 +1,9 @@
-import { query, queryOne } from '../../db/index.js';
-import { config } from '../../config/index.js';
+import { queryAsTenant, queryOneAsTenant } from '../../db/index.js';
+import { TENANTS } from '../../config/tenants.js';
 
-const dbc = config.db;
+/** 用户管理始终使用集团侧（admin 租户） */
+const ADMIN_TENANT = 'admin';
+const ADMIN_SCHEMA = TENANTS.find(t => t.id === ADMIN_TENANT)!.datasource.schema;
 
 export interface UserRow {
   id: number;
@@ -16,8 +18,9 @@ export interface UserRow {
 
 /** 初始化用户表，若表为空则插入默认用户 */
 export async function initUserTable(): Promise<void> {
-  await query(
-    `CREATE TABLE IF NOT EXISTS ${dbc.schema}.cec_sys_user (
+  await queryAsTenant(
+    ADMIN_TENANT,
+    `CREATE TABLE IF NOT EXISTS ${ADMIN_SCHEMA}.cec_sys_user (
       id BIGSERIAL PRIMARY KEY,
       username VARCHAR(100) NOT NULL UNIQUE,
       display_name VARCHAR(200) NOT NULL,
@@ -29,8 +32,9 @@ export async function initUserTable(): Promise<void> {
     )`,
   );
 
-  const existing = await queryOne<{ cnt: number }>(
-    `SELECT COUNT(*) AS cnt FROM ${dbc.schema}.cec_sys_user`,
+  const existing = await queryOneAsTenant<{ cnt: number }>(
+    ADMIN_TENANT,
+    `SELECT COUNT(*) AS cnt FROM ${ADMIN_SCHEMA}.cec_sys_user`,
   );
   if (existing && Number(existing.cnt) === 0) {
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
@@ -40,8 +44,9 @@ export async function initUserTable(): Promise<void> {
       { username: 'fujian',    display_name: '福建区域',    region: '福建省', tenant: 'fujian', password: 'fujian' },
     ];
     for (const u of defaultUsers) {
-      await query(
-        `INSERT INTO ${dbc.schema}.cec_sys_user (username, display_name, region, tenant, password, create_tm, update_tm)
+      await queryAsTenant(
+        ADMIN_TENANT,
+        `INSERT INTO ${ADMIN_SCHEMA}.cec_sys_user (username, display_name, region, tenant, password, create_tm, update_tm)
          VALUES ($1, $2, $3, $4, $5, $6, $6)`,
         [u.username, u.display_name, u.region, u.tenant, u.password, now],
       );
@@ -54,8 +59,9 @@ export async function findUserByCredentials(
   username: string,
   password: string,
 ): Promise<UserRow | null> {
-  return queryOne<UserRow>(
-    `SELECT * FROM ${dbc.schema}.cec_sys_user
+  return queryOneAsTenant<UserRow>(
+    ADMIN_TENANT,
+    `SELECT * FROM ${ADMIN_SCHEMA}.cec_sys_user
      WHERE username = $1 AND password = $2`,
     [username, password],
   );
@@ -63,16 +69,18 @@ export async function findUserByCredentials(
 
 /** 根据用户名查找用户 */
 export async function findUserByUsername(username: string): Promise<UserRow | null> {
-  return queryOne<UserRow>(
-    `SELECT * FROM ${dbc.schema}.cec_sys_user WHERE username = $1`,
+  return queryOneAsTenant<UserRow>(
+    ADMIN_TENANT,
+    `SELECT * FROM ${ADMIN_SCHEMA}.cec_sys_user WHERE username = $1`,
     [username],
   );
 }
 
 /** 获取所有用户列表 */
 export async function listUsers(): Promise<UserRow[]> {
-  return query<UserRow>(
-    `SELECT * FROM ${dbc.schema}.cec_sys_user ORDER BY id`,
+  return queryAsTenant<UserRow>(
+    ADMIN_TENANT,
+    `SELECT * FROM ${ADMIN_SCHEMA}.cec_sys_user ORDER BY id`,
   );
 }
 
@@ -85,8 +93,9 @@ export async function insertUser(u: {
   password: string;
 }): Promise<void> {
   const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  await query(
-    `INSERT INTO ${dbc.schema}.cec_sys_user (username, display_name, region, tenant, password, create_tm, update_tm)
+  await queryAsTenant(
+    ADMIN_TENANT,
+    `INSERT INTO ${ADMIN_SCHEMA}.cec_sys_user (username, display_name, region, tenant, password, create_tm, update_tm)
      VALUES ($1, $2, $3, $4, $5, $6, $6)`,
     [u.username, u.display_name, u.region, u.tenant, u.password, now],
   );
@@ -127,8 +136,9 @@ export async function updateUser(
   params.push(now);
 
   params.push(username);
-  await query(
-    `UPDATE ${dbc.schema}.cec_sys_user SET ${fields.join(', ')} WHERE username = $${idx}`,
+  await queryAsTenant(
+    ADMIN_TENANT,
+    `UPDATE ${ADMIN_SCHEMA}.cec_sys_user SET ${fields.join(', ')} WHERE username = $${idx}`,
     params,
   );
   return true;
@@ -139,8 +149,9 @@ export async function deleteUser(username: string): Promise<boolean> {
   const existing = await findUserByUsername(username);
   if (!existing) return false;
 
-  await query(
-    `DELETE FROM ${dbc.schema}.cec_sys_user WHERE username = $1`,
+  await queryAsTenant(
+    ADMIN_TENANT,
+    `DELETE FROM ${ADMIN_SCHEMA}.cec_sys_user WHERE username = $1`,
     [username],
   );
   return true;

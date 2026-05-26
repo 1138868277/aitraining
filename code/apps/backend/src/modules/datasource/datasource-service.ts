@@ -24,7 +24,7 @@ export async function saveAndSwitch(input: DatasourceConfig): Promise<{ ok: bool
     return testResult;
   }
 
-  // 更新运行时 config.db（所有 domain 文件通过 dbc = config.db 引用了同一个对象）
+  // 更新运行时 config.db（影响默认连接池，即集团侧）
   Object.assign(config.db, {
     host: input.host,
     port: input.port,

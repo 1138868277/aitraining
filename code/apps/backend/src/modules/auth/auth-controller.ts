@@ -4,6 +4,28 @@ import { success, error } from '../../common/response.js';
 
 const router: Router = Router();
 
+// ====== Helper: 从请求中提取 token payload ======
+function getTokenPayload(req: Request): authService.TokenPayload | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7);
+  return authService.verifyToken(token);
+}
+
+/** 检查当前用户是否为 admin（租户管理权限） */
+function requireAdmin(req: Request, res: Response): boolean {
+  const payload = getTokenPayload(req);
+  if (!payload) {
+    error(res, 'AUTH_REQUIRED', '未登录或 token 已过期', 401);
+    return false;
+  }
+  if (payload.tenant !== 'admin') {
+    error(res, 'FORBIDDEN', '仅集团管理员可执行此操作', 403);
+    return false;
+  }
+  return true;
+}
+
 // ====== 登录 ======
 router.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
@@ -32,16 +54,9 @@ router.post('/api/auth/login', async (req: Request, res: Response) => {
 // ====== 获取当前用户信息（根据 token） ======
 router.get('/api/auth/me', async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      error(res, 'AUTH_REQUIRED', '未登录或 token 已过期', 401);
-      return;
-    }
-
-    const token = authHeader.slice(7);
-    const payload = authService.verifyToken(token);
+    const payload = getTokenPayload(req);
     if (!payload) {
-      error(res, 'AUTH_REQUIRED', 'Token 无效或已过期', 401);
+      error(res, 'AUTH_REQUIRED', '未登录或 token 已过期', 401);
       return;
     }
 
@@ -57,20 +72,10 @@ router.get('/api/auth/me', async (req: Request, res: Response) => {
   }
 });
 
-// ====== 用户列表 ======
+// ====== 用户列表（仅 admin） ======
 router.get('/api/auth/users', async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      error(res, 'AUTH_REQUIRED', '未登录', 401);
-      return;
-    }
-    const token = authHeader.slice(7);
-    const payload = authService.verifyToken(token);
-    if (!payload) {
-      error(res, 'AUTH_REQUIRED', 'Token 无效或已过期', 401);
-      return;
-    }
+    if (!requireAdmin(req, res)) return;
 
     const users = await authService.getUsers();
     success(res, users);
@@ -80,14 +85,10 @@ router.get('/api/auth/users', async (req: Request, res: Response) => {
   }
 });
 
-// ====== 新增用户 ======
+// ====== 新增用户（仅 admin） ======
 router.post('/api/auth/users', async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      error(res, 'AUTH_REQUIRED', '未登录', 401);
-      return;
-    }
+    if (!requireAdmin(req, res)) return;
 
     const { username, displayName, region, password, tenant } = req.body;
     if (!username || !displayName || !region || !password) {
@@ -108,14 +109,10 @@ router.post('/api/auth/users', async (req: Request, res: Response) => {
   }
 });
 
-// ====== 更新用户 ======
+// ====== 更新用户（仅 admin） ======
 router.put('/api/auth/users/:username', async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      error(res, 'AUTH_REQUIRED', '未登录', 401);
-      return;
-    }
+    if (!requireAdmin(req, res)) return;
 
     const { username } = req.params;
     const { displayName, region, password, tenant } = req.body;
@@ -133,14 +130,10 @@ router.put('/api/auth/users/:username', async (req: Request, res: Response) => {
   }
 });
 
-// ====== 删除用户 ======
+// ====== 删除用户（仅 admin） ======
 router.delete('/api/auth/users/:username', async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      error(res, 'AUTH_REQUIRED', '未登录', 401);
-      return;
-    }
+    if (!requireAdmin(req, res)) return;
 
     const { username } = req.params;
     const ok = await authService.deleteUser(username);
