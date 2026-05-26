@@ -82,7 +82,6 @@ function handleCommand(command: string) {
 onMounted(() => {
   updateTime();
   timer = setInterval(updateTime, 1000);
-  auth.initDefaultUsers();
 });
 onUnmounted(() => clearInterval(timer));
 </script>

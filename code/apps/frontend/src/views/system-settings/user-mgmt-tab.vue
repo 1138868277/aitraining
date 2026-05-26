@@ -174,15 +174,15 @@ const formRules: FormRules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 };
 
-function loadUsers() {
-  users.value = auth.getUsers();
+async function loadUsers() {
+  users.value = await auth.getUsers();
 }
 
 function openAddDialog() {
   isEditing.value = false;
   showPwd.value = false;
   form.displayName = '';
-  form.region = '集团区域';
+  form.region = '集团';
   form.username = '';
   form.password = '';
   dialogVisible.value = true;
@@ -206,7 +206,7 @@ async function handleSave() {
   saving.value = true;
   try {
     if (isEditing.value) {
-      const ok = auth.updateUser(editingUsername.value, {
+      const ok = await auth.updateUser(editingUsername.value, {
         displayName: form.displayName,
         region: form.region,
         username: form.username,
@@ -227,7 +227,7 @@ async function handleSave() {
         return;
       }
     } else {
-      const ok = auth.addUser({
+      const ok = await auth.addUser({
         username: form.username,
         displayName: form.displayName,
         region: form.region,
@@ -253,9 +253,9 @@ async function handleDelete(row: UserInfo) {
       '确认删除',
       { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
     );
-    const ok = auth.deleteUser(row.username);
+    const ok = await auth.deleteUser(row.username);
     if (!ok) {
-      ElMessage.warning('删除失败，不能删除当前登录用户');
+      ElMessage.warning('删除失败');
       return;
     }
     ElMessage.success('用户已删除');

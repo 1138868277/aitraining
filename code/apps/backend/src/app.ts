@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config/index.js';
 import { requestIdMiddleware, requestLogger, globalErrorHandler } from './common/middleware.js';
+import authRouter from './modules/auth/auth-controller.js';
+import { initUserTable } from './modules/auth/auth-service.js';
 import dictRouter from './modules/dict/dict-controller.js';
 import codeRouter from './modules/code-generation/code-controller.js';
 import validateRouter from './modules/code-validation/validate-controller.js';
@@ -54,7 +56,13 @@ export function createApp(): import('express').Express {
     });
   });
 
-  // 路由注册
+  // 认证路由
+  app.use(authRouter);
+
+  // 初始化用户表（建表 + 默认用户）
+  initUserTable().catch(err => console.error('Failed to init user table:', err));
+
+  // 业务路由注册
   app.use(dictRouter);
   app.use(codeRouter);
   app.use(validateRouter);

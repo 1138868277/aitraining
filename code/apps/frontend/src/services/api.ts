@@ -12,6 +12,15 @@ const api = axios.create({
   },
 });
 
+// 自动携带登录 token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (response) => {
     const { data } = response;
