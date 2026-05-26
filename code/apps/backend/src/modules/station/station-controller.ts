@@ -27,8 +27,8 @@ router.post('/api/station', async (req: Request, res: Response) => {
       error(res, ErrorCode.MISSING_PARAMETER, '场站编码和名称不能为空', 400);
       return;
     }
-    if (!/^\d{4}$/.test(stationCode)) {
-      error(res, ErrorCode.PARAM_FORMAT_ERROR, '场站编码必须为4位数字', 400);
+    if (!/^[A-Za-z0-9]{4}$/.test(stationCode)) {
+      error(res, ErrorCode.PARAM_FORMAT_ERROR, '场站编码必须为4位数字或字母', 400);
       return;
     }
     const creator = req.headers['x-session-id'] as string || 'system';
@@ -57,8 +57,8 @@ router.post('/api/station/batch', async (req: Request, res: Response) => {
         error(res, ErrorCode.MISSING_PARAMETER, '每条记录的场站编码和名称不能为空', 400);
         return;
       }
-      if (!/^\d{4}$/.test(entry.stationCode)) {
-        error(res, ErrorCode.PARAM_FORMAT_ERROR, `场站编码 ${entry.stationCode} 必须为4位数字`, 400);
+      if (!/^[A-Za-z0-9]{4}$/.test(entry.stationCode)) {
+        error(res, ErrorCode.PARAM_FORMAT_ERROR, `场站编码 ${entry.stationCode} 必须为4位数字或字母`, 400);
         return;
       }
     }

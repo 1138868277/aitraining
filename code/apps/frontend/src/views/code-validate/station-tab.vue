@@ -169,13 +169,13 @@
           label="场站编码"
           :rules="[
             { required: true, message: '请输入场站编码', trigger: 'blur' },
-            { pattern: /^\d{4}$/, message: '场站编码必须为4位数字', trigger: 'blur' },
+            { pattern: /^[A-Za-z0-9]{4}$/, message: '场站编码必须为4位数字或字母', trigger: 'blur' },
           ]"
           prop="stationCode"
         >
           <el-input
             v-model="form.stationCode"
-            placeholder="4位数字编码"
+            placeholder="4位数字或字母"
             maxlength="4"
             :disabled="isEditing"
             style="width: 160px"
@@ -407,8 +407,8 @@ async function confirmBatch() {
     return;
   }
   for (const entry of parsedBatchEntries.value) {
-    if (!/^\d{4}$/.test(entry.stationCode)) {
-      ElMessage.warning(`场站编码 ${entry.stationCode} 必须为4位数字，请检查后重试`);
+    if (!/^[A-Za-z0-9]{4}$/.test(entry.stationCode)) {
+      ElMessage.warning(`场站编码 ${entry.stationCode} 必须为4位数字或字母，请检查后重试`);
       return;
     }
   }
