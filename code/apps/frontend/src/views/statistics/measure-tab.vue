@@ -12,6 +12,7 @@
       <el-button v-if="importing" type="warning" size="small" @click="onCancelImport" style="margin-left:4px">终止</el-button>
       <span v-if="importStatus.message" class="import-status-text" :class="importStatus.status.toLowerCase()">{{ importStatus.message }}</span>
       <span class="import-time">业务数据时间：{{ overview.lastImportTime ? formatTime(overview.lastImportTime) : '-' }}</span>
+      <el-button :icon="Refresh" circle size="small" title="刷新数据" @click="handleRefresh" />
     </div>
 
     <!-- 概览 -->
@@ -90,6 +91,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Refresh } from '@element-plus/icons-vue';
 import * as statsService from '@/services/statistics';
 import VChart from 'vue-echarts';
 import 'echarts';
@@ -361,6 +363,12 @@ async function clearData() {
     importStatus.value = { importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE', message: '' };
     ElMessage.success('已清空');
   } catch {}
+}
+
+function handleRefresh() {
+  loadMeasureOverview();
+  loadMeasureSecondClass();
+  loadMeasureStation();
 }
 
 onMounted(async () => {
