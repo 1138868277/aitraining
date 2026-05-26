@@ -97,6 +97,18 @@ router.put('/api/station/:id', async (req: Request, res: Response) => {
   }
 });
 
+/** 一键删除所有场站 */
+router.delete('/api/station/all', async (req: Request, res: Response) => {
+  try {
+    const modifier = req.headers['x-session-id'] as string || 'system';
+    const count = await stationService.deleteAllStation(modifier);
+    success(res, { deletedCount: count });
+  } catch (err) {
+    console.error('Failed to delete all stations:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '删除失败', 500);
+  }
+});
+
 /** 删除场站 */
 router.delete('/api/station/:id', async (req: Request, res: Response) => {
   try {
@@ -115,18 +127,6 @@ router.delete('/api/station/:id', async (req: Request, res: Response) => {
     }
     console.error('Failed to delete station:', err);
     error(res, ErrorCode.SYSTEM_ERROR, '删除场站失败', 500);
-  }
-});
-
-/** 一键删除所有场站 */
-router.delete('/api/station/all', async (req: Request, res: Response) => {
-  try {
-    const modifier = req.headers['x-session-id'] as string || 'system';
-    const count = await stationService.deleteAllStation(modifier);
-    success(res, { deletedCount: count });
-  } catch (err) {
-    console.error('Failed to delete all stations:', err);
-    error(res, ErrorCode.SYSTEM_ERROR, '删除失败', 500);
   }
 });
 
