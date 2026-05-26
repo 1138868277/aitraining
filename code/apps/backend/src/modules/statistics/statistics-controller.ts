@@ -4,6 +4,7 @@ import { ErrorCode } from '@cec/contracts';
 import * as statisticsService from './statistics-service.js';
 import { success, error } from '../../common/response.js';
 import { config } from '../../config/index.js';
+import { getCurrentSchema } from '../../db/tenant-context.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -188,7 +189,8 @@ router.post('/api/statistics/measurement/import', upload.single('file'), async (
     if (ext !== 'xlsx' && ext !== 'xls') {
       return error(res, ErrorCode.IMPORT_FILE_FORMAT_ERROR, '文件格式不合法，请上传.xlsx或.xls文件');
     }
-    const result = await statisticsService.importMeasurementFile(req.file.buffer, req.file.originalname);
+    const schema = getCurrentSchema();
+    const result = await statisticsService.importMeasurementFile(req.file.buffer, req.file.originalname, schema);
     success(res, result);
   } catch (err: any) {
     if (err.message === 'IMPORT_BUSY') {

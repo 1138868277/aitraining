@@ -289,11 +289,16 @@ async function handleFile(e: Event) {
   try {
     await statsService.importMeasurementFile(file);
   } catch (err: any) {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    importing.value = false;
-    importStatus.value.status = 'FAILED';
-    importStatus.value.message = err.response?.data?.message || '导入失败';
-    ElMessage.error(importStatus.value.message);
+    // 超时错误不停止轮询（后端仍在处理）
+    if (err.message !== '请求超时，请重试') {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      importing.value = false;
+      importStatus.value.status = 'FAILED';
+      importStatus.value.message = err.response?.data?.message || '导入失败';
+      ElMessage.error(importStatus.value.message);
+    } else {
+      importStatus.value.message = '导入任务仍在处理中，请等待...';
+    }
   }
   input.value = '';
 }

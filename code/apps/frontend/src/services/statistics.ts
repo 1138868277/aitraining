@@ -138,7 +138,7 @@ export async function importMeasurementFile(file: File): Promise<{ batchId: stri
   formData.append('file', file);
   const res = await api.post('/statistics/measurement/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 600000,
+    timeout: 1800000,
   });
   return res.data;
 }

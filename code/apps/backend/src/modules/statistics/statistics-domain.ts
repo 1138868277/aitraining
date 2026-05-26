@@ -584,7 +584,7 @@ function parseCodeSegments(code: string): Record<string, string> | null {
 
 /** 批量插入测点数据 */
 async function batchInsertPoints(
-  batchId: string, rows: Array<{ code: string; seg: Record<string, string> }>,
+  batchId: string, rows: Array<{ code: string; seg: Record<string, string> }>, schema: string,
 ): Promise<void> {
   if (rows.length === 0) return;
   const values: string[] = [];
@@ -597,7 +597,7 @@ async function batchInsertPoints(
       seg.second_ext_code, seg.third_class_code, seg.third_ext_code,
       seg.data_category_code, seg.data_code, batchId);
   }
-  const sql = `INSERT INTO ${getSchema()}.cec_new_energy_measurement_points
+  const sql = `INSERT INTO ${schema}.cec_new_energy_measurement_points
     (code, station_code, type_code, project_line_code, prefix_no,
      first_class_code, second_class_code, second_ext_code,
      third_class_code, third_ext_code, data_category_code, data_code,
@@ -608,7 +608,7 @@ async function batchInsertPoints(
 
 /** 导入测点Excel */
 export async function importMeasurementFile(
-  fileBuffer: Buffer, fileName: string,
+  fileBuffer: Buffer, fileName: string, schema: string,
 ): Promise<{ batchId: string }> {
   if (importStore.importing) {
     throw new Error('IMPORT_BUSY');
@@ -627,8 +627,30 @@ export async function importMeasurementFile(
 
   const batchId = importStore.batchId;
 
+  // 确保测点表存在
+  await query(`CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(31) NOT NULL,
+    station_code VARCHAR(4),
+    type_code VARCHAR(2),
+    project_line_code VARCHAR(3),
+    prefix_no VARCHAR(1),
+    first_class_code VARCHAR(2),
+    second_class_code VARCHAR(3),
+    second_ext_code VARCHAR(4),
+    third_class_code VARCHAR(3),
+    third_ext_code VARCHAR(4),
+    data_category_code VARCHAR(2),
+    data_code VARCHAR(3),
+    import_batch_id VARCHAR(50),
+    creator VARCHAR(50) DEFAULT 'system',
+    create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    if_delete CHAR(1) DEFAULT '0'
+  )`);
+
   // 先清空所有旧数据
-  await query(`DELETE FROM ${getSchema()}.cec_new_energy_measurement_points`);
+  await query(`DELETE FROM ${schema}.cec_new_energy_measurement_points`);
 
   try {
     const wb = XLSX.read(fileBuffer, { type: 'buffer' });
@@ -681,7 +703,7 @@ export async function importMeasurementFile(
         }
 
         if (batch.length >= 500) {
-          await batchInsertPoints(batchId, batch);
+          await batchInsertPoints(batchId, batch, schema);
           importStore.importedRows += batch.length;
           batch.length = 0;
           importStore.message = `已导入 ${importStore.importedRows}/${importStore.totalRows} 行...`;
@@ -690,7 +712,7 @@ export async function importMeasurementFile(
     }
 
     if (batch.length > 0) {
-      await batchInsertPoints(batchId, batch);
+      await batchInsertPoints(batchId, batch, schema);
       importStore.importedRows += batch.length;
     }
 
@@ -720,6 +742,17 @@ export async function importMeasurementFile(
 export async function getMeasureOverview(): Promise<{
   totalPoints: number; windCount: number; solarCount: number; otherCount: number; lastImportTime: string | null;
 }> {
+  const schema = getSchema();
+  await query(`CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
+    id BIGSERIAL PRIMARY KEY, code VARCHAR(31) NOT NULL,
+    station_code VARCHAR(4), type_code VARCHAR(2), project_line_code VARCHAR(3),
+    prefix_no VARCHAR(1), first_class_code VARCHAR(2), second_class_code VARCHAR(3),
+    second_ext_code VARCHAR(4), third_class_code VARCHAR(3), third_ext_code VARCHAR(4),
+    data_category_code VARCHAR(2), data_code VARCHAR(3),
+    import_batch_id VARCHAR(50), creator VARCHAR(50) DEFAULT 'system',
+    create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP, modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    if_delete CHAR(1) DEFAULT '0'
+  )`);
   const sql = `SELECT
       COUNT(*) AS total,
       COUNT(CASE WHEN type_code LIKE 'F%' OR type_code = '01' THEN 1 END) AS wind,
@@ -727,7 +760,7 @@ export async function getMeasureOverview(): Promise<{
       COUNT(CASE WHEN type_code NOT LIKE 'F%' AND type_code NOT LIKE 'G%'
              AND type_code != '01' AND type_code != '02' THEN 1 END) AS other,
       MAX(create_tm) AS last_import_time
-    FROM ${getSchema()}.cec_new_energy_measurement_points
+    FROM ${schema}.cec_new_energy_measurement_points
     WHERE if_delete = '0'`;
   const r = await query<{ total: string; wind: string; solar: string; other: string; last_import_time: string }>(sql);
   return {
