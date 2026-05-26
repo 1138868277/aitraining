@@ -1,4 +1,4 @@
-import { query, queryOne, getSchema } from '../../db/index.js';
+import { query, queryOne, getSchema, queryAsTenant } from '../../db/index.js';
 
 // ========== 编码生成统计 ==========
 
@@ -584,7 +584,7 @@ function parseCodeSegments(code: string): Record<string, string> | null {
 
 /** 批量插入测点数据 */
 async function batchInsertPoints(
-  batchId: string, rows: Array<{ code: string; seg: Record<string, string> }>, schema: string,
+  batchId: string, rows: Array<{ code: string; seg: Record<string, string> }>, schema: string, tenantId: string,
 ): Promise<void> {
   if (rows.length === 0) return;
   const values: string[] = [];
@@ -603,12 +603,12 @@ async function batchInsertPoints(
      third_class_code, third_ext_code, data_category_code, data_code,
      import_batch_id, creator, create_tm, modify_tm, if_delete)
     VALUES ${values.join(',')}`;
-  await query(sql, params);
+  await queryAsTenant(tenantId, sql, params);
 }
 
 /** 导入测点Excel */
 export async function importMeasurementFile(
-  fileBuffer: Buffer, fileName: string, schema: string,
+  fileBuffer: Buffer, fileName: string, schema: string, tenantId: string,
 ): Promise<{ batchId: string }> {
   if (importStore.importing) {
     throw new Error('IMPORT_BUSY');
@@ -627,10 +627,8 @@ export async function importMeasurementFile(
 
   const batchId = importStore.batchId;
 
-  console.log(`[IMPORT_DEBUG] schema=${schema}, batchId=${batchId}`);
-
   // 确保测点表存在
-  await query(`CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
+  await queryAsTenant(tenantId, `CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
     id BIGSERIAL PRIMARY KEY,
     code VARCHAR(31) NOT NULL,
     station_code VARCHAR(4),
@@ -652,12 +650,9 @@ export async function importMeasurementFile(
   )`);
 
   // 先清空所有旧数据
-  console.log(`[IMPORT_DEBUG] DELETE from ${schema}.cec_new_energy_measurement_points`);
-  await query(`DELETE FROM ${schema}.cec_new_energy_measurement_points`);
-  console.log(`[IMPORT_DEBUG] DELETE done, start parsing Excel`);
+  await queryAsTenant(tenantId, `DELETE FROM ${schema}.cec_new_energy_measurement_points`);
 
   try {
-    console.log(`[IMPORT_DEBUG] parsing XLSX, fileSize=${fileBuffer.length}`);
     const wb = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetNames = wb.SheetNames;
     if (!sheetNames.length) throw new Error('IMPORT_DATA_EMPTY');
@@ -708,14 +703,7 @@ export async function importMeasurementFile(
         }
 
         if (batch.length >= 500) {
-          console.log(`[IMPORT_DEBUG] batchInsert start, batchSize=${batch.length}, imported=${importStore.importedRows}/${importStore.totalRows}`);
-          try {
-            await batchInsertPoints(batchId, batch, schema);
-          } catch (err) {
-            console.error(`[IMPORT_DEBUG] batchInsert failed:`, err);
-            throw err;
-          }
-          console.log(`[IMPORT_DEBUG] batchInsert done`);
+          await batchInsertPoints(batchId, batch, schema, tenantId);
           importStore.importedRows += batch.length;
           batch.length = 0;
           importStore.message = `已导入 ${importStore.importedRows}/${importStore.totalRows} 行...`;
@@ -724,7 +712,7 @@ export async function importMeasurementFile(
     }
 
     if (batch.length > 0) {
-      await batchInsertPoints(batchId, batch, schema);
+      await batchInsertPoints(batchId, batch, schema, tenantId);
       importStore.importedRows += batch.length;
     }
 
