@@ -627,6 +627,8 @@ export async function importMeasurementFile(
 
   const batchId = importStore.batchId;
 
+  console.log(`[IMPORT_DEBUG] schema=${schema}, batchId=${batchId}`);
+
   // 确保测点表存在
   await query(`CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
     id BIGSERIAL PRIMARY KEY,
@@ -650,9 +652,12 @@ export async function importMeasurementFile(
   )`);
 
   // 先清空所有旧数据
+  console.log(`[IMPORT_DEBUG] DELETE from ${schema}.cec_new_energy_measurement_points`);
   await query(`DELETE FROM ${schema}.cec_new_energy_measurement_points`);
+  console.log(`[IMPORT_DEBUG] DELETE done, start parsing Excel`);
 
   try {
+    console.log(`[IMPORT_DEBUG] parsing XLSX, fileSize=${fileBuffer.length}`);
     const wb = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetNames = wb.SheetNames;
     if (!sheetNames.length) throw new Error('IMPORT_DATA_EMPTY');
@@ -703,7 +708,14 @@ export async function importMeasurementFile(
         }
 
         if (batch.length >= 500) {
-          await batchInsertPoints(batchId, batch, schema);
+          console.log(`[IMPORT_DEBUG] batchInsert start, batchSize=${batch.length}, imported=${importStore.importedRows}/${importStore.totalRows}`);
+          try {
+            await batchInsertPoints(batchId, batch, schema);
+          } catch (err) {
+            console.error(`[IMPORT_DEBUG] batchInsert failed:`, err);
+            throw err;
+          }
+          console.log(`[IMPORT_DEBUG] batchInsert done`);
           importStore.importedRows += batch.length;
           batch.length = 0;
           importStore.message = `已导入 ${importStore.importedRows}/${importStore.totalRows} 行...`;
