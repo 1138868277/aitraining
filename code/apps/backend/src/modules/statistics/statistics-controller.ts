@@ -1,10 +1,37 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
+import crypto from 'crypto';
 import { ErrorCode } from '@cec/contracts';
 import * as statisticsService from './statistics-service.js';
 import { success, error } from '../../common/response.js';
 import { config } from '../../config/index.js';
-import { getCurrentSchema, getCurrentTenantId } from '../../db/tenant-context.js';
+import { getTenantById } from '../../config/tenants.js';
+
+const TOKEN_SECRET = 'cec-2024-token-secret-dev-only';
+
+/** 从请求中解析租户信息（直接解析 token，不依赖 AsyncLocalStorage） */
+function resolveTenantFromRequest(req: Request): { schema: string; tenantId: string } {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.slice(7);
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const [header, body, signature] = parts;
+        const expectedSig = crypto.createHmac('sha256', TOKEN_SECRET).update(`${header}.${body}`).digest('base64url');
+        if (signature !== expectedSig) return { schema: 'liuhaojun', tenantId: 'admin' };
+        const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf-8'));
+        if (payload.tenant) {
+          const tenant = getTenantById(payload.tenant);
+          if (tenant) {
+            return { schema: tenant.datasource.schema, tenantId: tenant.id };
+          }
+        }
+      }
+    } catch { /* ignore parse errors */ }
+  }
+  return { schema: 'liuhaojun', tenantId: 'admin' };
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -189,8 +216,7 @@ router.post('/api/statistics/measurement/import', upload.single('file'), async (
     if (ext !== 'xlsx' && ext !== 'xls') {
       return error(res, ErrorCode.IMPORT_FILE_FORMAT_ERROR, '文件格式不合法，请上传.xlsx或.xls文件');
     }
-    const schema = getCurrentSchema();
-    const tenantId = getCurrentTenantId() || 'admin';
+    const { schema, tenantId } = resolveTenantFromRequest(req);
     const result = await statisticsService.importMeasurementFile(req.file.buffer, req.file.originalname, schema, tenantId);
     success(res, result);
   } catch (err: any) {
