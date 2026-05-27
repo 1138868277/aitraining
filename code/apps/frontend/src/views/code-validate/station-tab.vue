@@ -92,23 +92,23 @@
         :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
       >
         <el-table-column type="index" label="序号" width="60" align="center" />
-        <el-table-column prop="station_code" label="场站编码" width="110" align="center">
+        <el-table-column prop="station_code" label="场站编码" align="center">
           <template #default="{ row }">
             <el-tag effect="plain" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; font-size: 14px; font-weight: 600;">{{ row.station_code }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="station_name" label="场站名称" min-width="180">
+        <el-table-column prop="station_name" label="场站名称">
           <template #default="{ row }">
             <span class="station-name-cell">{{ row.station_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="management_domain" label="所属区域" min-width="150">
+        <el-table-column prop="management_domain" label="所属区域">
           <template #default="{ row }">
             <span v-if="row.management_domain" class="region-tag">{{ row.management_domain }}</span>
             <span v-else class="no-data">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="180" align="center">
+        <el-table-column label="创建时间" align="center">
           <template #default="{ row }">
             <span class="time-cell">{{ formatTime(row.create_tm) }}</span>
           </template>
@@ -674,6 +674,11 @@ onMounted(() => {
 .station-table {
   border: none !important;
 }
+.station-table :deep(table) {
+  table-layout: fixed;
+}
+.station-table :deep(colgroup col:nth-child(1)) { width: 60px; }
+.station-table :deep(colgroup col:nth-child(6)) { width: 160px; }
 
 .station-table :deep(.el-table__inner-wrapper) {
   border: none !important;
@@ -689,6 +694,9 @@ onMounted(() => {
 
 .station-table :deep(.el-table__cell) {
   padding: 8px 0 !important;
+}
+.station-table :deep(.cell) {
+  text-align: center;
 }
 
 .station-table :deep(.el-table__header-wrapper tr) {

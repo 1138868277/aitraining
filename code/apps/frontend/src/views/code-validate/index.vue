@@ -78,11 +78,10 @@
               <div class="hero-subtitle">手动添加数据码词典，录入新增的数据类码及其对应的数据码，支持批量操作和Excel导出</div>
             </div>
           </div>
-          <div class="statistics-header-card">
-            <div class="header-left">
-              <span class="section-label">新增数据码记录</span>
-            </div>
-            <div class="header-right">
+          <div class="list-header">
+            <span class="list-header-title">新增数据码记录</span>
+            <div class="list-header-actions">
+              <el-button @click="resetTable">一键重置</el-button>
               <el-button @click="loadManualStats">刷新</el-button>
               <el-button
                 v-if="manualStats.length > 0"
@@ -91,84 +90,62 @@
               >导出Excel</el-button>
             </div>
           </div>
-          <div class="filter-bar-card">
-            <el-select
-              v-model="statsTypeFilter"
-              placeholder="类型筛选"
-              clearable
-              style="width: 200px"
-              @change="onStatsTypeFilterChange"
-            >
-              <el-option
-                v-for="item in typeOptions"
-                :key="item.code"
-                :label="item.code + ' ' + item.name"
-                :value="item.code"
-              />
-            </el-select>
-            <el-select
-              v-model="statsSecondClassFilter"
-              placeholder="二级类码筛选"
-              clearable
-              style="width: 200px"
-              @change="onStatsFilterChange"
-            >
-              <el-option
-                v-for="item in secondClassOptions"
-                :key="item.code"
-                :label="item.code + ' ' + item.name"
-                :value="item.code"
-              />
-            </el-select>
-          </div>
-          <div class="table-container-card">
+          <div class="data-mgmt-section">
             <el-table
+              ref="statsTableRef"
               :data="manualStats"
               stripe
               style="width: 100%"
               class="styled-table"
               v-loading="loadingStats"
-              :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
+              :header-cell-style="{ background: '#f5f7fa', color: '#303133', fontWeight: 600 }"
+              :header-cell-class-name="headerCellClass"
+              @sort-change="onSortChange"
+              @filter-change="onFilterChange"
             >
-              <el-table-column type="index" label="序号" width="60" align="center" />
-              <el-table-column label="类型" width="100" align="center">
+              <el-table-column label="序号" type="index" width="70" align="center">
+                <template #default="{ $index }">
+                  {{ ($index + 1) + (statsPageNum - 1) * statsPageSize }}
+                </template>
+              </el-table-column>
+              <el-table-column label="类型" width="270" align="center" column-key="typeCode" :filters="typeFilterOptions" filter-placement="bottom">
                 <template #default="{ row }">
-                  <el-tag v-if="row.typeCode" size="small" color="#e8f4fd" style="color: #1677ff; border: none;">{{ row.typeCode.charAt(0) === 'F' ? '风电' : row.typeCode.charAt(0) === 'G' ? '光伏' : row.typeCode.charAt(0) === 'S' ? '水电' : '其他' }}</el-tag>
+                  <el-tag v-if="row.typeCode" :type="statsTypeTagType(row.typeCode)" size="small" effect="plain">{{ statsTypeLabel(row.typeCode) }}</el-tag>
                   <el-tag v-else size="small" type="danger">未识别</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="二级类码" min-width="180">
+              <el-table-column label="二级类码" prop="secondClassCode" column-key="secondClassCode" :filters="secondClassFilterOptions" filter-placement="bottom">
                 <template #default="{ row }">
-                  <span class="code-second-class">{{ row.secondClassCode }}</span>
-                  <span class="name-muted ml-1">{{ row.secondClassName }}</span>
+                  <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.secondClassCode }}</el-tag>
+                  <span class="cell-name-tag">{{ row.secondClassName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="数据类码" min-width="180">
+              <el-table-column label="数据类码" prop="dataCategoryCode" sortable="custom">
                 <template #default="{ row }">
-                  <span class="code-data-category">{{ row.dataCategoryCode }}</span>
-                  <span class="name-muted ml-1">{{ row.dataCategoryName }}</span>
+                  <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCategoryCode }}</el-tag>
+                  <span class="cell-name-tag">{{ row.dataCategoryName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="数据码" min-width="180">
+              <el-table-column label="数据码" prop="dataCode" sortable="custom">
                 <template #default="{ row }">
-                  <el-tag effect="plain" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace;">{{ row.dataCode }}</el-tag>
-                  <span class="name-muted ml-1">{{ row.dataName }}</span>
+                  <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCode }}</el-tag>
+                  <span class="cell-name-tag">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="增加时间" width="180" align="center">
+              <el-table-column label="增加时间" prop="createTm" width="170" align="center" sortable="custom">
                 <template #default="{ row }">
                   <span class="time-cell">{{ formatTime(row.createTm) }}</span>
                 </template>
               </el-table-column>
             </el-table>
             <el-empty v-if="!loadingStats && manualStats.length === 0" description="暂无手动添加记录" />
-            <div v-if="statsTotal > 0" class="pagination-bar">
+            <div v-if="statsTotal > 0" class="data-mgmt-pagination">
               <el-pagination
                 v-model:current-page="statsPageNum"
                 v-model:page-size="statsPageSize"
                 :total="statsTotal"
                 :page-sizes="[10, 20, 50, 100]"
-                layout="total, sizes, prev, pager, next, jumper"
+                layout="total, sizes, prev, pager, next"
                 background
                 @current-change="loadManualStats"
                 @size-change="loadManualStats"
@@ -187,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx';
@@ -316,15 +293,86 @@ const statsSecondClassFilter = ref('');
 const typeOptions = ref<Array<{ code: string; name: string }>>([]);
 const secondClassOptions = ref<Array<{ code: string; name: string }>>([]);
 
+/** 表头筛选：类型选项 */
+const typeFilterOptions = computed(() => {
+  return typeOptions.value.map(t => ({
+    text: `${t.code} ${t.name}`,
+    value: t.code,
+  }));
+});
+
+/** 表头筛选：二级类码选项 */
+const secondClassFilterOptions = computed(() => {
+  const seen = new Set<string>();
+  return secondClassOptions.value.filter(s => {
+    const key = `${s.code}|${s.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(s => ({
+    text: `${s.code} ${s.name}`,
+    value: `${s.code}|${s.name}`,
+  }));
+});
+
+/** 表格引用，用于控制排序指示器 */
+const statsTableRef = ref<any>(null);
+
+/** 表头筛选变化 → 触发服务端筛选 */
+function onFilterChange(filters: Record<string, any[]>) {
+  // @filter-change 只包含发生变化的列，需用 in 判断
+  if ('typeCode' in filters) {
+    const typeVal = filters.typeCode || [];
+    statsTypeFilter.value = typeVal.length > 0 ? typeVal[0] : '';
+    // 类型切换时清除二级类码筛选，因为不同类型下二级类码不同
+    statsSecondClassFilter.value = '';
+  }
+  if ('secondClassCode' in filters) {
+    const scVal = filters.secondClassCode || [];
+    statsSecondClassFilter.value = scVal.length > 0 ? scVal[0] : '';
+  }
+  statsPageNum.value = 1;
+  loadManualStats();
+}
+
+/** 排序状态（多列联动排序，最后点击的优先级最高） */
+const sortStates = ref<Array<{ prop: string; order: 'ascending' | 'descending' }>>([]);
+
+/** 表头排序变化 → 触发服务端排序 */
+function onSortChange(sortInfo: { prop?: string; order?: 'ascending' | 'descending' | null }) {
+  if (!sortInfo.prop || !sortInfo.order) {
+    // 取消该列的排序
+    sortStates.value = sortStates.value.filter(s => s.prop !== sortInfo.prop);
+  } else {
+    const existing = sortStates.value.find(s => s.prop === sortInfo.prop);
+    if (existing) {
+      existing.order = sortInfo.order;
+    } else {
+      sortStates.value.push({ prop: sortInfo.prop, order: sortInfo.order });
+    }
+  }
+  statsPageNum.value = 1;
+  loadManualStats();
+}
+
+/** 给排序列的表头添加标识类名 */
+function headerCellClass({ column }: { column: any }): string {
+  const found = sortStates.value.find(s => s.prop === column.property);
+  if (found) {
+    return `sorted-column sorted-${found.order}`;
+  }
+  return '';
+}
+
 async function loadManualStats() {
   loadingStats.value = true;
   try {
     const scFilter = statsSecondClassFilter.value || undefined;
     const tFilter = statsTypeFilter.value || undefined;
-    console.log('DEBUG loadManualStats params:', { scFilter, tFilter });
-    const result = await validateService.getManualStatistics(statsPageNum.value, statsPageSize.value, scFilter, tFilter);
-    console.log('DEBUG loadManualStats result keys:', Object.keys(result));
-    console.log('DEBUG secondClassOptions:', JSON.stringify(result.secondClassOptions));
+    // 多列排序：以逗号分隔传递（最后添加的优先级最高）
+    const sBy = sortStates.value.length > 0 ? sortStates.value.map(s => s.prop).join(',') : undefined;
+    const sOrder = sortStates.value.length > 0 ? sortStates.value.map(s => s.order).join(',') : undefined;
+    const result = await validateService.getManualStatistics(statsPageNum.value, statsPageSize.value, scFilter, tFilter, sBy, sOrder);
     manualStats.value = result.items;
     statsTotal.value = result.total;
     secondClassOptions.value = result.secondClassOptions || [];
@@ -336,17 +384,33 @@ async function loadManualStats() {
   }
 }
 
-/** 类型筛选变化：重置二级类码和分页 */
-function onStatsTypeFilterChange() {
+/** 一键重置：清除所有筛选、排序、分页，恢复表格初始状态 */
+function resetTable() {
+  statsTypeFilter.value = '';
   statsSecondClassFilter.value = '';
+  sortStates.value = [];
   statsPageNum.value = 1;
+  // 清除 Element Plus 表格的筛选高亮状态
+  statsTableRef.value?.clearFilter();
   loadManualStats();
 }
 
-/** 二级类码筛选变化：重置分页 */
-function onStatsFilterChange() {
-  statsPageNum.value = 1;
-  loadManualStats();
+function statsTypeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' {
+  if (!code) return 'info';
+  const first = code.charAt(0).toUpperCase();
+  if (first === 'F') return 'primary';
+  if (first === 'G') return 'success';
+  if (first === 'S') return 'info';
+  return 'warning';
+}
+
+function statsTypeLabel(code: string): string {
+  if (!code) return '其他';
+  const first = code.charAt(0).toUpperCase();
+  if (first === 'F') return '风电';
+  if (first === 'G') return '光伏';
+  if (first === 'S') return '水电';
+  return '其他';
 }
 
 async function handleExportStats() {
@@ -499,8 +563,8 @@ onMounted(() => {
 .source-tag { font-size: 11px; }
 .child-count { font-size: 12px; color: #909399; }
 
-/* ==================== Tab 2: 新增字典记录 ==================== */
-.statistics-header-card {
+/* ==================== Tab 2: 数据码管理 ==================== */
+.list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -510,16 +574,14 @@ onMounted(() => {
   border-radius: 8px;
   border: 1px solid #f0f0f0;
 }
-
-.section-label {
+.list-header-title {
   font-size: 15px;
   font-weight: 600;
   color: #303133;
   position: relative;
   padding-left: 12px;
 }
-
-.section-label::before {
+.list-header-title::before {
   content: '';
   position: absolute;
   left: 0;
@@ -529,52 +591,61 @@ onMounted(() => {
   border-radius: 2px;
   background: #409eff;
 }
-
-.filter-bar-card {
+.list-header-actions {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-  background: #fafbff;
-  border-radius: 8px;
-  border: 1px solid #eef0f6;
+  gap: 8px;
 }
 
-.table-container-card {
+.data-mgmt-section {
   background: #ffffff;
   border-radius: 8px;
   border: 1px solid #f0f0f0;
   overflow: hidden;
 }
-
-.styled-table :deep(.el-table__body tr:hover) {
-  background: #f0f7ff !important;
+.data-mgmt-pagination {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: flex-end;
+  background: #fafbff;
+  border-top: 1px solid #eef0f6;
 }
 
-.styled-table :deep(.el-table__body tr) {
-  animation: rowIn 0.25s ease both;
+/* 排序列标识：隐藏原生箭头，使用自定义伪元素箭头 */
+.styled-table :deep(.sorted-column .caret-wrapper) {
+  display: none;
+}
+.styled-table :deep(.sorted-column .cell) {
+  color: #409eff !important;
+}
+.styled-table :deep(.sorted-column.sorted-ascending .cell)::after {
+  content: '▲';
+  font-size: 10px;
+  color: #409eff;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.styled-table :deep(.sorted-column.sorted-descending .cell)::after {
+  content: '▼';
+  font-size: 10px;
+  color: #409eff;
+  vertical-align: middle;
+  margin-left: 6px;
 }
 
-@keyframes rowIn {
-  from { opacity: 0; transform: translateX(-4px); }
-  to { opacity: 1; transform: translateX(0); }
-}
+.styled-table :deep(.el-table__header-wrapper th) { padding: 8px 0 !important; }
+.styled-table :deep(.el-table__body tr:hover) { background: #eef5ff !important; }
+.styled-table :deep(.el-table__body tr.el-table__row--striped:hover) { background: #e8f0fe !important; }
+.styled-table :deep(.el-table--border) { border-color: #ebeef5; }
 
-.name-muted { color: #909399; font-size: 13px; }
-.ml-1 { margin-left: 4px; }
+.cell-name-tag {
+  color: #909399;
+  font-size: 12px;
+}
 
 .time-cell {
   font-family: monospace;
   font-size: 12px;
-  color: #666;
-}
-
-.pagination-bar {
-  padding: 14px 16px;
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid #f5f5f5;
+  color: #909399;
 }
 
 /* ==================== 子页面功能介绍卡片 ==================== */
@@ -599,5 +670,125 @@ onMounted(() => {
   height: 300px;
   background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
   border-radius: 50%;
+}
+
+</style>
+
+<style>
+/* ==================== 表头筛选：科技风格（全局样式穿透弹窗） ==================== */
+.styled-table .el-table__column-filter-trigger {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  background: rgba(64, 158, 255, 0.06);
+  border: 1px solid rgba(64, 158, 255, 0.15);
+  position: relative;
+  top: -1px;
+}
+.styled-table .el-table__column-filter-trigger:hover {
+  background: rgba(64, 158, 255, 0.12);
+  border-color: rgba(64, 158, 255, 0.3);
+  box-shadow: 0 0 10px rgba(64, 158, 255, 0.15);
+}
+.styled-table .el-table__column-filter-trigger .el-icon {
+  font-size: 14px;
+  color: #7c9cf5;
+  transition: all 0.3s ease;
+  line-height: 1;
+}
+.styled-table .el-table__column-filter-trigger:hover .el-icon {
+  color: #409eff;
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 4px rgba(64, 158, 255, 0.5));
+}
+.styled-table .el-table__column-filter-trigger.is-active {
+  background: rgba(64, 158, 255, 0.15);
+  border-color: #409eff;
+  box-shadow: 0 0 12px rgba(64, 158, 255, 0.25);
+}
+.styled-table .el-table__column-filter-trigger.is-active .el-icon {
+  color: #409eff;
+  filter: drop-shadow(0 0 6px rgba(64, 158, 255, 0.7));
+}
+/* 表头单元格内容垂直居中 */
+.styled-table .el-table__header-wrapper .cell {
+  display: inline-flex;
+  align-items: center;
+}
+.el-table-filter {
+  background: rgba(20, 28, 52, 0.95) !important;
+  border: 1px solid rgba(64, 158, 255, 0.3) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 0 20px rgba(64, 158, 255, 0.15),
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(64, 158, 255, 0.1) !important;
+  backdrop-filter: blur(20px) !important;
+  padding: 8px !important;
+  overflow: hidden;
+}
+.el-table-filter__list {
+  padding: 4px !important;
+}
+.el-table-filter__list-item {
+  padding: 0 !important;
+  margin: 2px 0 !important;
+}
+.el-table-filter__list-item .el-checkbox {
+  display: flex !important;
+  align-items: center;
+  padding: 8px 14px !important;
+  border-radius: 8px !important;
+  transition: all 0.25s ease !important;
+}
+.el-table-filter__list-item .el-checkbox:hover {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.12), rgba(64, 158, 255, 0.05)) !important;
+}
+.el-table-filter__list-item.is-checked .el-checkbox {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.2), rgba(64, 158, 255, 0.08)) !important;
+}
+.el-table-filter__list-item .el-checkbox__label {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.5px;
+}
+.el-table-filter__list-item.is-checked .el-checkbox__label {
+  color: #66b1ff !important;
+  text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
+}
+.el-table-filter__list-item .el-checkbox__inner {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(64, 158, 255, 0.4) !important;
+  border-radius: 4px !important;
+  transition: all 0.25s ease !important;
+}
+.el-table-filter__list-item .el-checkbox__inner::after {
+  border-color: #409eff !important;
+}
+.el-table-filter__list-item .el-checkbox.is-checked .el-checkbox__inner {
+  background: rgba(64, 158, 255, 0.3) !important;
+  border-color: #409eff !important;
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.4) !important;
+}
+.el-table-filter__bottom {
+  border-top: 1px solid rgba(64, 158, 255, 0.15) !important;
+  padding: 8px 14px !important;
+  margin-top: 4px !important;
+}
+.el-table-filter__bottom button {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 12px !important;
+  transition: all 0.25s ease !important;
+}
+.el-table-filter__bottom button:hover {
+  color: #66b1ff !important;
+  text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
 }
 </style>

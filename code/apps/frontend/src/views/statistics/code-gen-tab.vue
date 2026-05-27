@@ -105,76 +105,122 @@
       <div class="card-header">
         <span class="card-header-title">编码生成列表</span>
       </div>
-      <div class="card-body">
-        <div class="filter-bar-card">
-          <el-select v-model="listFilters.typeCode" placeholder="类型" filterable clearable style="width:150px" @change="onTypeChange" :teleported="false">
-            <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
-          </el-select>
-          <el-select v-model="listFilters.stationCode" placeholder="场站" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
-            <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
-          </el-select>
-          <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" filterable clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
-            <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
-          </el-select>
-          <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
-            <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
-          </el-select>
-          <el-button type="primary" @click="onListFilter">查询</el-button>
-          <el-button @click="onResetListFilter">重置</el-button>
-          <el-button type="success" :disabled="selectedRows.length === 0" @click="handleExport">导出选中</el-button>
-          <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleDeleteSelected">删除选中</el-button>
+      <div class="list-section">
+        <div class="list-filter-bar">
+          <div class="filter-group">
+            <el-select v-model="listFilters.typeCode" placeholder="类型" filterable clearable style="width:150px" @change="onTypeChange" :teleported="false">
+              <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
+            </el-select>
+            <el-select v-model="listFilters.stationCode" placeholder="场站" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
+              <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+            </el-select>
+            <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" filterable clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
+              <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
+            </el-select>
+            <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
+              <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
+            </el-select>
+          </div>
+          <div class="filter-actions">
+            <el-button type="primary" @click="onListFilter">查询</el-button>
+            <el-button @click="onResetListFilter">重置</el-button>
+            <span class="filter-divider" />
+            <el-button :disabled="selectedRows.length === 0" @click="handleExport">
+              <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></template>
+              导出选中
+            </el-button>
+            <el-button :disabled="selectedRows.length === 0" @click="handleDeleteSelected">
+              <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></template>
+              删除选中
+            </el-button>
+          </div>
         </div>
 
-        <div class="table-container-card">
-          <el-table ref="mainTableRef" :data="codeList" row-key="rowKey" :expand-row-keys="expandedRowKeys" border stripe v-loading="listLoading" style="width:100%" max-height="520" @expand-change="onGroupExpand" :row-class-name="getExpandRowClass" @selection-change="onSelectionChange">
-            <el-table-column type="selection" width="45" fixed />
-            <el-table-column type="index" label="序号" width="60" fixed />
-            <el-table-column label="类型" width="90" prop="type_code" />
-            <el-table-column label="场站" min-width="150">
-              <template #default="{ row }">{{ row.station_name ? `${row.station_code} ${row.station_name}` : row.station_code }}</template>
-            </el-table-column>
-            <el-table-column label="二级类码" min-width="150">
-              <template #default="{ row }">{{ row.second_class_name ? `${row.second_class_code} ${row.second_class_name}` : row.second_class_code }}</template>
-            </el-table-column>
-            <el-table-column label="三级类码" min-width="150">
-              <template #default="{ row }">{{ row.third_class_name ? `${row.third_class_code} ${row.third_class_name}` : row.third_class_code }}</template>
-            </el-table-column>
-            <el-table-column label="数据类码" min-width="90">
-              <template #default="{ row }">{{ row.data_type_name ? `${row.data_type_code} ${row.data_type_name}` : row.data_type_code }}</template>
-            </el-table-column>
-            <el-table-column label="数据码" min-width="120">
-              <template #default="{ row }">{{ row.data_name ? `${row.data_code} ${row.data_name}` : row.data_code }}</template>
-            </el-table-column>
-            <el-table-column label="操作" min-width="140">
-              <template #default="{ row }">
-                <span class="code-count">{{ row.code_count }}</span>
-                <el-button size="small" @click="toggleRowExpand(row)">{{ isRowExpanded(row) ? '收起' : '明细' }}</el-button>
-              </template>
-            </el-table-column>
-            <el-table-column type="expand">
-              <template #default="{ row }">
-                <div v-if="row._detailLoading" style="text-align:center;padding:12px">加载中...</div>
-                <el-table v-else :data="row._detailList" border stripe size="small" class="detail-table">
-                  <el-table-column type="index" label="序号" width="60" />
-                  <el-table-column label="测点编码" width="300" prop="code" />
-                  <el-table-column label="测点名称" width="500" prop="name" />
-                  <el-table-column label="生成时间" width="200" prop="create_date" />
-                </el-table>
-              </template>
-            </el-table-column>
-          </el-table>
+        <el-table
+          ref="mainTableRef"
+          :data="codeList"
+          row-key="rowKey"
+          :expand-row-keys="expandedRowKeys"
+          border
+          stripe
+          v-loading="listLoading"
+          style="width:100%"
+          max-height="520"
+          @expand-change="onGroupExpand"
+          :row-class-name="getExpandRowClass"
+          @selection-change="onSelectionChange"
+          :header-cell-style="{ background: '#f5f7fa', color: '#303133', fontWeight: 600 }"
+        >
+          <el-table-column type="selection" width="45" fixed />
+          <el-table-column type="index" label="序号" width="60" fixed />
+          <el-table-column label="类型" width="90">
+            <template #default="{ row }">
+              <el-tag :type="typeTagType(row.type_code)" size="small" effect="plain">{{ row.type_code }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="场站" min-width="150">
+            <template #default="{ row }">
+              <span class="cell-code">{{ row.station_code }}</span>
+              <span v-if="row.station_name" class="cell-name"> {{ row.station_name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="二级类码" min-width="150">
+            <template #default="{ row }">
+              <span class="cell-code">{{ row.second_class_code }}</span>
+              <span v-if="row.second_class_name" class="cell-name"> {{ row.second_class_name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="三级类码" min-width="150">
+            <template #default="{ row }">
+              <span class="cell-code">{{ row.third_class_code }}</span>
+              <span v-if="row.third_class_name" class="cell-name"> {{ row.third_class_name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="数据类码" min-width="90">
+            <template #default="{ row }">
+              <span class="cell-code">{{ row.data_type_code }}</span>
+              <span v-if="row.data_type_name" class="cell-name"> {{ row.data_type_name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="数据码" min-width="120">
+            <template #default="{ row }">
+              <span class="cell-code">{{ row.data_code }}</span>
+              <span v-if="row.data_name" class="cell-name"> {{ row.data_name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" min-width="140">
+            <template #default="{ row }">
+              <el-tag size="small" round type="primary" class="code-count-tag">{{ row.code_count }}</el-tag>
+              <el-button link type="primary" size="small" @click="toggleRowExpand(row)">
+                <template #icon><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline :points="isRowExpanded(row) ? '18 15 12 9 6 15' : '6 9 12 15 18 9'"/></svg></template>
+                {{ isRowExpanded(row) ? '收起' : '明细' }}
+              </el-button>
+            </template>
+          </el-table-column>
+          <el-table-column type="expand">
+            <template #default="{ row }">
+              <div v-if="row._detailLoading" class="expand-loading">加载中...</div>
+              <el-table v-else :data="row._detailList" size="small" class="detail-table">
+                <el-table-column type="index" label="序号" width="60" />
+                <el-table-column label="测点编码" min-width="280" prop="code" />
+                <el-table-column label="测点名称" min-width="400" prop="name" />
+                <el-table-column label="生成时间" width="180" prop="create_date" />
+              </el-table>
+            </template>
+          </el-table-column>
+        </el-table>
 
-          <div class="pagination-bar">
-            <el-pagination
-              v-model:current-page="listPageNum"
-              v-model:page-size="listPageSize"
-              :total="listTotal"
-              :page-sizes="[10, 20, 50, 100]"
-              layout="total, sizes, prev, pager, next"
-              @current-change="loadCodeList"
-              @size-change="loadCodeList"
-            />
-          </div>
+        <div class="list-pagination">
+          <el-pagination
+            v-model:current-page="listPageNum"
+            v-model:page-size="listPageSize"
+            :total="listTotal"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next"
+            background
+            @current-change="loadCodeList"
+            @size-change="loadCodeList"
+          />
         </div>
       </div>
     </div>
@@ -428,6 +474,15 @@ async function onGroupExpand(row: any, expandedRows: any[]) {
   }
 }
 
+function typeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' | 'danger' {
+  if (!code) return 'info';
+  const first = code.charAt(0).toUpperCase();
+  if (first === 'F') return 'primary';
+  if (first === 'G') return 'success';
+  if (first === 'S') return 'info';
+  return 'warning';
+}
+
 function onTypeChange() {
   listFilters.secondClassCode = undefined;
   listFilters.dataTypeCode = undefined;
@@ -568,10 +623,6 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .os-icon { font-size: 24px; line-height: 1; }
 .os-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
 .os-label { font-size: 12px; color: #909399; white-space: nowrap; }
-.os-icon { font-size: 24px; line-height: 1; }
-.os-body { flex: 1; }
-.os-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
-.os-label { font-size: 12px; color: #909399; margin-top: 2px; }
 
 /* ==================== 通用卡片 ==================== */
 .card-default {
@@ -613,46 +664,75 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .chart-section { height: 100%; }
 .chart-container-h { height: 360px; width: 100%; }
 
-/* ==================== 筛选栏 ==================== */
-.filter-bar-card {
+/* ==================== 列表区域 ==================== */
+.list-section {
+  padding: 0;
+}
+.list-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fafbff;
+  border-bottom: 1px solid #eef0f6;
+}
+.filter-group {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-  background: #fafbff;
-  border-radius: 8px;
-  border: 1px solid #eef0f6;
 }
-
-/* ==================== 表格容器 ==================== */
-.table-container-card {
-  background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
-  overflow: hidden;
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.pagination-bar {
-  padding: 14px 16px;
+.filter-divider {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: #dcdfe6;
+  margin: 0 4px;
+}
+.list-pagination {
+  padding: 12px 16px;
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid #f5f5f5;
+  background: #fafbff;
+}
+.cell-code {
+  font-weight: 500;
+  color: #303133;
+}
+.cell-name {
+  color: #909399;
+  font-size: 12px;
+}
+.code-count-tag {
+  margin-right: 6px;
+}
+.expand-loading {
+  text-align: center;
+  padding: 16px;
+  color: #909399;
+  font-size: 13px;
 }
 
-/* ==================== 表格行动画 ==================== */
-:deep(.el-table__body tr:hover) { background: #f0f7ff !important; }
-:deep(.el-table__body tr) { animation: rowIn 0.25s ease both; }
-@keyframes rowIn {
-  from { opacity: 0; transform: translateX(-4px); }
-  to { opacity: 1; transform: translateX(0); }
-}
+/* ==================== 表格样式 ==================== */
+:deep(.el-table__header-wrapper th) { padding: 8px 0 !important; }
+:deep(.el-table__body tr:hover) { background: #eef5ff !important; }
+:deep(.el-table__body tr.el-table__row--striped:hover) { background: #e8f0fe !important; }
+:deep(.el-table--border) { border-color: #ebeef5; }
 
 /* ==================== 展开行相关 ==================== */
 :deep(.el-table__expand-column) { display: none; }
-.code-count { display: inline-block; min-width: 28px; font-weight: 700; color: #409EFF; margin-right: 4px; }
-:deep(.row-expanded-active) { background-color: #f0f9ff; }
-:deep(.row-expanded-active > td) { color: #409EFF; font-weight: 600; }
-:deep(.detail-table th),
-:deep(.detail-table td) { background-color: #f0f9ff !important; }
+:deep(.row-expanded-active) { background-color: #f0f9ff !important; }
+:deep(.row-expanded-active > td.el-table__cell) { border-bottom-color: #d0e3ff !important; }
+:deep(.el-table__expanded-cell) { padding: 8px 16px 8px 50px !important; background: #f8faff !important; }
+.detail-table { border: none !important; }
+:deep(.detail-table .el-table__inner-wrapper::before) { display: none; }
+:deep(.detail-table th) { background: #eef3ff !important; color: #303133; font-weight: 600; padding: 6px 0 !important; }
+:deep(.detail-table td) { background: #f8faff !important; padding: 6px 0 !important; }
 </style>

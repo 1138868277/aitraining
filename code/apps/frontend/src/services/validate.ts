@@ -25,6 +25,8 @@ export async function getManualStatistics(
   pageSize: number,
   secondClassCode?: string,
   typeCode?: string,
+  sortBy?: string,
+  sortOrder?: 'ascending' | 'descending',
 ): Promise<{
   items: ManualStatItem[];
   total: number;
@@ -34,6 +36,8 @@ export async function getManualStatistics(
   const params: any = { pageNum, pageSize };
   if (secondClassCode) params.secondClassCode = secondClassCode;
   if (typeCode) params.typeCode = typeCode;
+  if (sortBy) params.sortBy = sortBy;
+  if (sortOrder) params.sortOrder = sortOrder;
   const res = await api.get('/dict/manual-statistics', { params });
   return res.data;
 }

@@ -21,13 +21,15 @@ export async function getManualStatistics(
   pageSize: number,
   secondClassCode?: string,
   typeCode?: string,
+  sortBy?: string,
+  sortOrder?: string,
 ): Promise<{ items: ManualStatItem[]; total: number; secondClassOptions: any; typeOptions: any }> {
-  return validateDomain.getManualStatistics(pageNum, pageSize, secondClassCode, typeCode);
+  return validateDomain.getManualStatistics(pageNum, pageSize, secondClassCode, typeCode, sortBy, sortOrder);
 }
 
 /** 导出全部手动添加记录 */
-export async function exportManualStatistics(secondClassCode?: string, typeCode?: string): Promise<ManualStatItem[]> {
-  return validateDomain.getAllManualStatistics(secondClassCode, typeCode);
+export async function exportManualStatistics(secondClassCode?: string, typeCode?: string, sortBy?: string, sortOrder?: string): Promise<ManualStatItem[]> {
+  return validateDomain.getAllManualStatistics(secondClassCode, typeCode, sortBy, sortOrder);
 }
 
 /** 编码修正：批量修正编码 */

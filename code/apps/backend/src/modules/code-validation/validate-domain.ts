@@ -153,12 +153,22 @@ function typeCodeToDomain(typeCode: string): string | null {
   return null;
 }
 
+/** 排序字段白名单，防止 SQL 注入 */
+const SORT_COLUMNS: Record<string, string> = {
+  secondClassCode: 'd.second_class_code',
+  dataCategoryCode: 'd.data_category_code',
+  dataCode: 'd.data_code',
+  createTm: 'd.create_tm',
+};
+
 /** 分页查询手动添加的编码记录 */
 export async function getManualStatistics(
   pageNum: number,
   pageSize: number,
   secondClassCode?: string,
   typeCode?: string,
+  sortBy?: string,
+  sortOrder?: string,
 ): Promise<{
   items: ManualStatItem[];
   total: number;
@@ -166,38 +176,77 @@ export async function getManualStatistics(
   typeOptions: Array<{ code: string; name: string }>;
 }> {
   // 动态构建过滤条件
-  const conditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
+  // 数据过滤条件（含所有筛选）
+  const dataConditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
+  // 选项过滤条件（不含 secondClassCode，避免选中后选项列表只剩当前项）
+  const optConditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
   const params: any[] = [];
+  const optParams: any[] = [];
   let paramIdx = 1;
+  let optParamIdx = 1;
 
   if (secondClassCode) {
-    conditions.push(`d.second_class_code = $${paramIdx++}`);
-    params.push(secondClassCode);
+    // 支持 "code|name" 格式，同时匹配编码和名称
+    const parts = secondClassCode.split('|');
+    const scIdx = paramIdx++;
+    params.push(parts[0]);
+    dataConditions.push(`d.second_class_code = $${scIdx}`);
+    if (parts.length > 1) {
+      const snIdx = paramIdx++;
+      params.push(parts[1]);
+      dataConditions.push(`d.second_class_name = $${snIdx}`);
+    }
   }
   if (typeCode) {
     const domainCode = typeCodeToDomain(typeCode);
+
+    // 数据查询参数
     const tcIdx = paramIdx++;
     params.push(typeCode);
-    // 域级筛选（如 'F' 匹配 F1/F2/F3/F4）
+    // 选项查询参数（独立索引，不包含 secondClassCode）
+    const optTcIdx = optParamIdx++;
+    optParams.push(typeCode);
+
     if (domainCode) {
       const domIdx = paramIdx++;
       params.push(domainCode);
-      conditions.push(`(
+      const optDomIdx = optParamIdx++;
+      optParams.push(domainCode);
+
+      const dataFilter = `(
         d.type_code LIKE $${tcIdx} || '%'
         OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx})
-      )`);
+      )`;
+      dataConditions.push(dataFilter);
+
+      const optFilter = `(
+        d.type_code LIKE $${optTcIdx} || '%'
+        OR (d.type_code IS NULL AND d.type_domain_code = $${optDomIdx})
+      )`;
+      optConditions.push(optFilter);
     } else {
-      conditions.push(`(
+      const dataFilter = `(
         d.type_code = $${tcIdx}
         OR (d.type_code IS NULL AND d.second_class_code IN (
           SELECT second_class_code FROM ${getSchema()}.cec_new_energy_second_class_type_dict
           WHERE type_code = $${tcIdx} AND if_delete = '0'
         ))
-      )`);
+      )`;
+      dataConditions.push(dataFilter);
+
+      const optFilter = `(
+        d.type_code = $${optTcIdx}
+        OR (d.type_code IS NULL AND d.second_class_code IN (
+          SELECT second_class_code FROM ${getSchema()}.cec_new_energy_second_class_type_dict
+          WHERE type_code = $${optTcIdx} AND if_delete = '0'
+        ))
+      )`;
+      optConditions.push(optFilter);
     }
   }
 
-  const whereClause = conditions.join(' AND ');
+  const whereClause = dataConditions.join(' AND ');
+  const optionWhereClause = optConditions.join(' AND ');
 
   // 总数
   const countResult = await dbQuery<{ cnt: string }>(
@@ -206,12 +255,12 @@ export async function getManualStatistics(
   );
   const total = Number(countResult[0].cnt);
 
-  // 二级类码选项（受 typeCode 过滤）
+  // 二级类码选项（不含 secondClassCode 过滤，避免选中后选项只剩当前项）
   const optionRows = await dbQuery<{ code: string; name: string }>(
     `SELECT DISTINCT d.second_class_code AS code, d.second_class_name AS name
      FROM ${getSchema()}.cec_new_energy_code_dict d
-     WHERE ${whereClause} ORDER BY code`,
-    params,
+     WHERE ${optionWhereClause} ORDER BY code`,
+    optParams,
   );
 
   // 所有类型选项（按域级聚合: F/G）
@@ -226,6 +275,22 @@ export async function getManualStatistics(
      GROUP BY SUBSTRING(type_code, 1, 1)
      ORDER BY code`,
   );
+
+  // 排序（多列联动：sortBy="col1,col2" sortOrder="asc,desc"，最后添加的优先级最高）
+  let orderBy = 'd.create_tm DESC';
+  if (sortBy && sortOrder) {
+    const cols = sortBy.split(',');
+    const dirs = sortOrder.split(',');
+    const clauses: string[] = [];
+    // 反转：前端最后添加的优先级最高 → SQL 最左边的优先级最高
+    for (let i = cols.length - 1; i >= 0; i--) {
+      const col = SORT_COLUMNS[cols[i]];
+      if (col) {
+        clauses.push(`${col} ${dirs[i] === 'ascending' ? 'ASC' : 'DESC'}`);
+      }
+    }
+    if (clauses.length > 0) orderBy = clauses.join(', ');
+  }
 
   // 分页数据
   const offset = (pageNum - 1) * pageSize;
@@ -258,7 +323,7 @@ export async function getManualStatistics(
             ) AS "typeName"
      FROM ${getSchema()}.cec_new_energy_code_dict d
      WHERE ${whereClause}
-     ORDER BY d.create_tm DESC
+     ORDER BY ${orderBy}
      LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
     itemsParams,
   );
@@ -272,14 +337,20 @@ export async function getManualStatistics(
 }
 
 /** 获取所有手动添加记录（不分页，用于导出） */
-export async function getAllManualStatistics(secondClassCode?: string, typeCode?: string): Promise<ManualStatItem[]> {
+export async function getAllManualStatistics(secondClassCode?: string, typeCode?: string, sortBy?: string, sortOrder?: string): Promise<ManualStatItem[]> {
   const conditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
   const params: any[] = [];
   let paramIdx = 1;
 
   if (secondClassCode) {
+    // 支持 "code|name" 格式，同时匹配编码和名称
+    const parts = secondClassCode.split('|');
     conditions.push(`d.second_class_code = $${paramIdx++}`);
-    params.push(secondClassCode);
+    params.push(parts[0]);
+    if (parts.length > 1) {
+      conditions.push(`d.second_class_name = $${paramIdx++}`);
+      params.push(parts[1]);
+    }
   }
   if (typeCode) {
     const domainCode = typeCodeToDomain(typeCode);
@@ -301,6 +372,21 @@ export async function getAllManualStatistics(secondClassCode?: string, typeCode?
         ))
       )`);
     }
+  }
+
+  // 排序（多列联动，最后添加的优先级最高）
+  let orderBy = 'd.create_tm DESC';
+  if (sortBy && sortOrder) {
+    const cols = sortBy.split(',');
+    const dirs = sortOrder.split(',');
+    const clauses: string[] = [];
+    for (let i = cols.length - 1; i >= 0; i--) {
+      const col = SORT_COLUMNS[cols[i]];
+      if (col) {
+        clauses.push(`${col} ${dirs[i] === 'ascending' ? 'ASC' : 'DESC'}`);
+      }
+    }
+    if (clauses.length > 0) orderBy = clauses.join(', ');
   }
 
   const whereClause = conditions.join(' AND ');
@@ -333,7 +419,7 @@ export async function getAllManualStatistics(secondClassCode?: string, typeCode?
             ) AS "typeName"
      FROM ${getSchema()}.cec_new_energy_code_dict d
      WHERE ${whereClause}
-     ORDER BY d.create_tm DESC`,
+     ORDER BY ${orderBy}`,
     params,
   );
 }

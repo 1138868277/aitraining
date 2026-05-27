@@ -130,7 +130,9 @@ router.get('/api/dict/manual-statistics', async (req: Request, res: Response) =>
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
     const secondClassCode = (req.query.secondClassCode as string) || undefined;
     const typeCode = (req.query.typeCode as string) || undefined;
-    const result = await validateService.getManualStatistics(pageNum, pageSize, secondClassCode, typeCode);
+    const sortBy = (req.query.sortBy as string) || undefined;
+    const sortOrder = (req.query.sortOrder as string) || undefined;
+    const result = await validateService.getManualStatistics(pageNum, pageSize, secondClassCode, typeCode, sortBy, sortOrder);
     success(res, result);
   } catch (err) {
     console.error('Failed to get manual statistics:', err);
