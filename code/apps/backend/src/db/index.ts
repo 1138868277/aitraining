@@ -51,7 +51,8 @@ export async function initTenantPools(): Promise<void> {
 /** 获取当前租户的连接池 */
 function getCurrentPool(): pg.Pool {
   const tenantId = getCurrentTenantId();
-  if (tenantId && tenantPools.has(tenantId)) {
+  // admin（集团侧）始终走默认连接池，默认连接池由系统配置页面控制
+  if (tenantId && tenantId !== 'admin' && tenantPools.has(tenantId)) {
     return tenantPools.get(tenantId)!.pool;
   }
   return pool;
