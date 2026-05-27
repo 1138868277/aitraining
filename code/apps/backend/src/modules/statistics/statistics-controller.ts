@@ -82,7 +82,7 @@ router.get('/api/statistics/code-gen/by-type', async (_req: Request, res: Respon
 router.get('/api/statistics/code-gen/by-second-class', async (req: Request, res: Response) => {
   try {
     const type = req.query.type as string;
-    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
+    const typeFilter = type === 'wind' || type === 'solar' || type === 'hydro' ? type : undefined;
     const data = await statisticsService.getCodeGenBySecondClass(typeFilter);
     success(res, data);
   } catch (err) {
@@ -111,6 +111,7 @@ router.get('/api/statistics/code-gen/list', async (req: Request, res: Response) 
       typeCode: req.query.typeCode as string,
       stationCode: req.query.stationCode as string,
       secondClassCode: req.query.secondClassCode as string,
+      thirdClassCode: req.query.thirdClassCode as string,
       dataTypeCode: req.query.dataTypeCode as string,
     };
     const result = await statisticsService.getCodeGenList(pageNum, pageSize, filters);
@@ -294,7 +295,7 @@ router.get('/api/statistics/measurement/drill-down', async (req: Request, res: R
 router.get('/api/statistics/measurement/by-second-class', async (req: Request, res: Response) => {
   try {
     const type = req.query.type as string;
-    const typeFilter = type === 'wind' || type === 'solar' ? type : undefined;
+    const typeFilter = type === 'wind' || type === 'solar' || type === 'hydro' ? type : undefined;
     const data = await statisticsService.getMeasureBySecondClass(typeFilter);
     success(res, data);
   } catch (err) {

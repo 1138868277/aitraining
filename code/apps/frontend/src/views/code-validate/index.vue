@@ -98,7 +98,7 @@
               style="width: 100%"
               class="styled-table"
               v-loading="loadingStats"
-              :header-cell-style="{ background: '#f5f7fa', color: '#303133', fontWeight: 600 }"
+              :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
               :header-cell-class-name="headerCellClass"
               @sort-change="onSortChange"
               @filter-change="onFilterChange"
@@ -132,7 +132,7 @@
                   <span class="cell-name-tag">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="增加时间" prop="createTm" width="170" align="center" sortable="custom">
+              <el-table-column label="增加时间" prop="createTm" width="170" sortable="custom">
                 <template #default="{ row }">
                   <span class="time-cell">{{ formatTime(row.createTm) }}</span>
                 </template>
@@ -598,16 +598,17 @@ onMounted(() => {
 
 .data-mgmt-section {
   background: #ffffff;
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   border: 1px solid #f0f0f0;
+  padding: 4px;
   overflow: hidden;
 }
 .data-mgmt-pagination {
-  padding: 12px 16px;
+  padding: 14px 16px;
   display: flex;
   justify-content: flex-end;
-  background: #fafbff;
-  border-top: 1px solid #eef0f6;
+  border-top: 1px solid #f5f5f5;
 }
 
 /* 排序列标识：隐藏原生箭头，使用自定义伪元素箭头 */
@@ -632,9 +633,24 @@ onMounted(() => {
   margin-left: 6px;
 }
 
-.styled-table :deep(.el-table__header-wrapper th) { padding: 8px 0 !important; }
-.styled-table :deep(.el-table__body tr:hover) { background: #eef5ff !important; }
-.styled-table :deep(.el-table__body tr.el-table__row--striped:hover) { background: #e8f0fe !important; }
+.styled-table {
+  border: none !important;
+}
+.styled-table :deep(.el-table__inner-wrapper) {
+  border: none !important;
+}
+.styled-table :deep(.el-table__body tr) {
+  transition: background 0.2s ease;
+}
+.styled-table :deep(.el-table__body tr:hover) {
+  background: #f0f7ff !important;
+}
+.styled-table :deep(.el-table__body tr.el-table__row--striped:hover) {
+  background: #e8f0fe !important;
+}
+.styled-table :deep(.el-table__cell) {
+  padding: 8px 0 !important;
+}
 .styled-table :deep(.el-table--border) { border-color: #ebeef5; }
 
 .cell-name-tag {

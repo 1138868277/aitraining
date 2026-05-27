@@ -26,7 +26,7 @@ export async function getManualStatistics(
   secondClassCode?: string,
   typeCode?: string,
   sortBy?: string,
-  sortOrder?: 'ascending' | 'descending',
+  sortOrder?: string,
 ): Promise<{
   items: ManualStatItem[];
   total: number;

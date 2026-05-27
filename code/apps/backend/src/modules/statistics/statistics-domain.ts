@@ -168,6 +168,77 @@ export async function getCodeGenTrend(
   return { items: rows.map(r => ({ date: r.dt, count: Number(r.cnt) })) };
 }
 
+/** 筛选条件选项缓存（TTL 30秒） */
+const codeGenFilterCache = new Map<string, { data: any; expiresAt: number }>();
+const FILTER_CACHE_TTL_MS = 30_000;
+
+/** 聚合分组数据缓存（避免重复全表扫描） */
+const codeGenGroupedCache = new Map<string, { data: any; expiresAt: number }>();
+const GROUPED_CACHE_TTL_MS = 30_000;
+
+/** 字典数据缓存（TTL 5分钟） */
+const codeGenDictCache = new Map<string, { data: any; expiresAt: number }>();
+const DICT_CACHE_TTL_MS = 300_000;
+
+/** 加载字典数据到 Map 中（仅在首次或缓存过期时查询 DB） */
+async function getCodeGenDictMaps(schema: string): Promise<{
+  typeMap: Map<string, string>;
+  stationMap: Map<string, string>;
+  secondClassMap: Map<string, string>;
+  thirdClassMap: Map<string, string>;
+  dataCategoryMap: Map<string, string>;
+  dataCodeMap: Map<string, string>;
+}> {
+  const cacheKey = `${schema}:cgm`;
+  const cached = codeGenDictCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+
+  const [
+    typeRows,
+    stationRows,
+    secondClassRows,
+    thirdClassRows,
+    codeDictRows,
+  ] = await Promise.all([
+    query<{ code: string; name: string }>(
+      `SELECT type_code AS code, MIN(type_name) AS name FROM ${schema}.cec_new_energy_type_dict WHERE if_delete = '0' GROUP BY type_code`,
+    ),
+    query<{ code: string; name: string }>(
+      `SELECT station_code AS code, MIN(station_name) AS name FROM ${schema}.cec_new_energy_station_dict WHERE if_delete = '0' GROUP BY station_code`,
+    ),
+    query<{ code: string; tc: string; name: string }>(
+      `SELECT second_class_code AS code, type_code AS tc, MIN(second_class_name) AS name FROM ${schema}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code, type_code`,
+    ),
+    query<{ code: string; sc: string; tc: string; name: string }>(
+      `SELECT third_class_code AS code, second_class_code AS sc, type_code AS tc, MIN(third_class_name) AS name FROM ${schema}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL GROUP BY third_class_code, second_class_code, type_code`,
+    ),
+    query<{ dc: string; cc: string; td: string; sc: string; dn: string; cn: string }>(
+      `SELECT data_category_code AS dc, data_code AS cc, type_domain_code AS td, second_class_code AS sc,
+              MIN(data_category_name) AS dn, MIN(data_name) AS cn
+       FROM ${schema}.cec_new_energy_code_dict
+       WHERE if_delete = '0' AND data_category_code IS NOT NULL
+       GROUP BY data_category_code, data_code, type_domain_code, second_class_code`,
+    ),
+  ]);
+
+  const typeMap = new Map(typeRows.map(r => [r.code, r.name]));
+  const stationMap = new Map(stationRows.map(r => [r.code, r.name]));
+  const secondClassMap = new Map(secondClassRows.map(r => [`${r.tc}|${r.code}`, r.name]));
+  const thirdClassMap = new Map(thirdClassRows.map(r => [`${r.tc}|${r.sc}|${r.code}`, r.name]));
+  const dataCategoryMap = new Map<string, string>();
+  const dataCodeMap = new Map<string, string>();
+  for (const r of codeDictRows) {
+    const dcKey = `${r.dc}|${r.td || ''}`;
+    if (!dataCategoryMap.has(dcKey)) dataCategoryMap.set(dcKey, r.dn || '');
+    const ccKey = `${r.dc}|${r.cc || ''}|${r.sc || ''}|${r.td || ''}`;
+    if (r.cc && r.cn && !dataCodeMap.has(ccKey)) dataCodeMap.set(ccKey, r.cn);
+  }
+
+  const result = { typeMap, stationMap, secondClassMap, thirdClassMap, dataCategoryMap, dataCodeMap };
+  codeGenDictCache.set(cacheKey, { data: result, expiresAt: Date.now() + DICT_CACHE_TTL_MS });
+  return result;
+}
+
 /** 查询编码生成分组列表（按维度分组统计数量） */
 export async function getCodeGenList(
   pageNum: number,
@@ -176,6 +247,7 @@ export async function getCodeGenList(
     typeCode?: string;
     stationCode?: string;
     secondClassCode?: string;
+    thirdClassCode?: string;
     dataTypeCode?: string;
   },
 ): Promise<{
@@ -202,130 +274,129 @@ export async function getCodeGenList(
     typeCodes: Array<{ code: string; name: string }>;
     stationCodes: Array<{ code: string; name: string }>;
     secondClassCodes: Array<{ code: string; name: string }>;
+    thirdClassCodes: Array<{ code: string; name: string }>;
     dataTypeCodes: Array<{ code: string; name: string }>;
   };
 }> {
-  const conditions: string[] = [`c.if_delete = '0'`];
-  const params: string[] = [];
-  let paramIdx = 1;
+  const schema = getSchema();
+  const filterKey = `${filters.typeCode || ''}|${filters.stationCode || ''}|${filters.secondClassCode || ''}|${filters.thirdClassCode || ''}|${filters.dataTypeCode || ''}`;
 
-  if (filters.typeCode) {
-    conditions.push(`SUBSTRING(c.code, 5, 2) = $${paramIdx++}`);
-    params.push(filters.typeCode);
-  }
-  if (filters.stationCode) {
-    conditions.push(`SUBSTRING(c.code, 1, 4) = $${paramIdx++}`);
-    params.push(filters.stationCode);
-  }
-  if (filters.secondClassCode) {
-    conditions.push(`SUBSTRING(c.code, 13, 3) = $${paramIdx++}`);
-    params.push(filters.secondClassCode);
-  }
-  if (filters.dataTypeCode) {
-    conditions.push(`SUBSTRING(c.code, 27, 2) = $${paramIdx++}`);
-    params.push(filters.dataTypeCode);
-  }
+  // ---- 聚合分组数据缓存 ----
+  const groupedCacheKey = schema + ':cgg:' + filterKey;
+  const groupedCached = codeGenGroupedCache.get(groupedCacheKey);
+  let groupedRows;
 
-  const whereClause = conditions.join(' AND ');
+  if (groupedCached && Date.now() < groupedCached.expiresAt) {
+    groupedRows = groupedCached.data;
+  } else {
+    const conditions = [`c.if_delete = '0'`];
+    const params = [];
+    let paramIdx = 1;
 
-  // 优化：CTE 预计算段码 → 纯 GROUP BY（无 JOIN）→ 分页 → 最后查字典名称
-  // 避免在 GROUP BY 之前做 6 个 LEFT JOIN，字典查询只作用于分页后的少量数据
-  const ctePrefix = `
-    WITH segments AS (
-      SELECT
-        SUBSTRING(c.code, 5, 2) AS type_code,
-        SUBSTRING(c.code, 1, 4) AS station_code,
-        SUBSTRING(c.code, 13, 3) AS second_class_code,
-        SUBSTRING(c.code, 20, 3) AS third_class_code,
-        SUBSTRING(c.code, 27, 2) AS data_type_code,
-        SUBSTRING(c.code, 29, 3) AS data_code,
-        c.create_tm
-      FROM ${getSchema()}.cec_new_energy_createcode c
-      WHERE ${whereClause}
-    ),
-    grouped AS (
+    if (filters.typeCode) { conditions.push(`SUBSTRING(c.code, 5, 2) = $${paramIdx++}`); params.push(filters.typeCode); }
+    if (filters.stationCode) { conditions.push(`SUBSTRING(c.code, 1, 4) = $${paramIdx++}`); params.push(filters.stationCode); }
+    if (filters.secondClassCode) { conditions.push(`SUBSTRING(c.code, 13, 3) = $${paramIdx++}`); params.push(filters.secondClassCode); }
+    if (filters.thirdClassCode) { conditions.push(`SUBSTRING(c.code, 20, 3) = $${paramIdx++}`); params.push(filters.thirdClassCode); }
+    if (filters.dataTypeCode) { conditions.push(`SUBSTRING(c.code, 27, 2) = $${paramIdx++}`); params.push(filters.dataTypeCode); }
+
+    const whereClause = conditions.join(' AND ');
+
+    const groupedSql = `
+      WITH segments AS (
+        SELECT
+          SUBSTRING(c.code, 5, 2) AS type_code,
+          SUBSTRING(c.code, 1, 4) AS station_code,
+          SUBSTRING(c.code, 13, 3) AS second_class_code,
+          SUBSTRING(c.code, 20, 3) AS third_class_code,
+          SUBSTRING(c.code, 27, 2) AS data_type_code,
+          SUBSTRING(c.code, 29, 3) AS data_code,
+          c.create_tm
+        FROM ${schema}.cec_new_energy_createcode c
+        WHERE ${whereClause}
+      )
       SELECT
         type_code, station_code, second_class_code,
         third_class_code, data_type_code, data_code,
         COUNT(*) AS code_count,
-        MAX(create_tm) AS max_create_tm
+        TO_CHAR(MAX(create_tm), 'YYYY-MM-DD HH24:MI:SS') AS max_create_tm
       FROM segments
       GROUP BY type_code, station_code, second_class_code,
-               third_class_code, data_type_code, data_code
-    )`;
+               third_class_code, data_type_code, data_code`;
+    groupedRows = await query(groupedSql, params);
+    codeGenGroupedCache.set(groupedCacheKey, {
+      data: groupedRows,
+      expiresAt: Date.now() + GROUPED_CACHE_TTL_MS,
+    });
+  }
 
-  const countSql = `${ctePrefix}
-    SELECT COUNT(*) AS total FROM grouped`;
-  const countResult = await queryOne<{ total: string }>(countSql, params);
-  const total = Number(countResult?.total || 0);
+  const total = groupedRows.length;
 
   if (total === 0) {
     return {
       list: [], total: 0, pageNum, pageSize, pages: 0,
-      filterOptions: { typeCodes: [], stationCodes: [], secondClassCodes: [], dataTypeCodes: [] },
+      filterOptions: { typeCodes: [], stationCodes: [], secondClassCodes: [], thirdClassCodes: [], dataTypeCodes: [] },
     };
   }
 
+  // ---- JS 端分页 ----
   const offset = (pageNum - 1) * pageSize;
-  const listSql = `${ctePrefix},
-    paged AS (
-      SELECT * FROM grouped
-      ORDER BY max_create_tm DESC
-      LIMIT $${paramIdx++} OFFSET $${paramIdx++}
-    )
-    SELECT
-      p.type_code, p.station_code, p.second_class_code,
-      p.third_class_code, p.data_type_code, p.data_code,
-      COALESCE(t.type_name, '') AS type_name,
-      COALESCE(s.station_name, '') AS station_name,
-      COALESCE(sc.second_class_name, '') AS second_class_name,
-      COALESCE(tc.third_class_name, '') AS third_class_name,
-      COALESCE(dtd_type.data_type_name, '') AS data_type_name,
-      COALESCE(dtd_code.data_name, '') AS data_name,
-      p.code_count, p.max_create_tm
-    FROM paged p
-    LEFT JOIN (SELECT type_code, MIN(type_name) AS type_name FROM ${getSchema()}.cec_new_energy_type_dict WHERE if_delete = '0' GROUP BY type_code) t ON p.type_code = t.type_code
-    LEFT JOIN (SELECT station_code, MIN(station_name) AS station_name FROM ${getSchema()}.cec_new_energy_station_dict WHERE if_delete = '0' GROUP BY station_code) s ON p.station_code = s.station_code
-    LEFT JOIN (SELECT second_class_code, type_code, MIN(second_class_name) AS second_class_name FROM ${getSchema()}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL GROUP BY second_class_code, type_code) sc ON p.second_class_code = sc.second_class_code AND p.type_code = sc.type_code
-    LEFT JOIN (SELECT third_class_code, second_class_code, type_code, MIN(third_class_name) AS third_class_name FROM ${getSchema()}.cec_new_energy_third_class_dict WHERE if_delete = '0' AND third_class_code IS NOT NULL GROUP BY third_class_code, second_class_code, type_code) tc ON p.third_class_code = tc.third_class_code AND p.second_class_code = tc.second_class_code AND p.type_code = tc.type_code
-    LEFT JOIN (SELECT data_category_code, type_domain_code, MIN(data_category_name) AS data_type_name FROM ${getSchema()}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL GROUP BY data_category_code, type_domain_code) dtd_type ON p.data_type_code = dtd_type.data_category_code AND SUBSTRING(p.type_code, 1, 1) = dtd_type.type_domain_code
-    LEFT JOIN (SELECT data_category_code, data_code, type_domain_code, second_class_code, MIN(data_name) AS data_name FROM ${getSchema()}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_code IS NOT NULL AND data_name IS NOT NULL GROUP BY data_category_code, data_code, type_domain_code, second_class_code) dtd_code ON p.data_type_code = dtd_code.data_category_code AND p.data_code = dtd_code.data_code AND p.second_class_code = dtd_code.second_class_code AND SUBSTRING(p.type_code, 1, 1) = dtd_code.type_domain_code
-    ORDER BY p.max_create_tm DESC`;
-  const listParams = [...params, pageSize, offset];
-  const list = await query(listSql, listParams);
+  groupedRows.sort((a: any, b: any) => (b.max_create_tm || '').localeCompare(a.max_create_tm || ''));
+  const paged = groupedRows.slice(offset, offset + pageSize);
 
-  // 筛选条件选项（联动过滤：类型→二级类码→数据类码）
-  const [typeOptions, stationOptions, secondClassOptions, dataTypeOptions] = await Promise.all([
-    query<{ code: string; name: string }>(
-      `SELECT type_code AS code, type_name AS name FROM ${getSchema()}.cec_new_energy_type_dict WHERE if_delete = '0' ORDER BY type_code`),
+  // ---- 字典名称查询 ----
+  const dicts = await getCodeGenDictMaps(schema);
+  const list = paged.map((r: any) => ({
+    type_code: r.type_code,
+    station_code: r.station_code,
+    second_class_code: r.second_class_code,
+    third_class_code: r.third_class_code,
+    data_type_code: r.data_type_code,
+    data_code: r.data_code,
+    code_count: Number(r.code_count),
+    type_name: dicts.typeMap.get(r.type_code) || '',
+    station_name: dicts.stationMap.get(r.station_code) || '',
+    second_class_name: dicts.secondClassMap.get(r.type_code + '|' + r.second_class_code) || '',
+    third_class_name: dicts.thirdClassMap.get(r.type_code + '|' + r.second_class_code + '|' + r.third_class_code) || '',
+    data_type_name: dicts.dataCategoryMap.get(r.data_type_code + '|' + (r.type_code ? r.type_code.charAt(0) : '')) || '',
+    data_name: dicts.dataCodeMap.get(r.data_type_code + '|' + (r.data_code || '') + '|' + (r.second_class_code || '') + '|' + (r.type_code ? r.type_code.charAt(0) : '')) || '',
+  }));
 
-    query<{ code: string; name: string }>(
-      `SELECT station_code AS code, station_name AS name FROM ${getSchema()}.cec_new_energy_station_dict WHERE if_delete = '0' ORDER BY station_code`),
+  // ---- 筛选条件选项：从 groupedRows 提取不重复值 + 字典名称 ----
+  const filterCacheKey = schema + ':cgf:' + filterKey;
+  const cachedFilters = codeGenFilterCache.get(filterCacheKey);
 
-    // 二级类码：如果已选类型则按类型过滤
-    (() => {
-      let sql = `SELECT second_class_code AS code, MIN(second_class_name) AS name FROM ${getSchema()}.cec_new_energy_second_class_type_dict WHERE if_delete = '0' AND second_class_code IS NOT NULL`;
-      const p: string[] = [];
-      if (filters.typeCode) {
-        sql += ` AND type_code = $1`;
-        p.push(filters.typeCode);
-      }
-      sql += ` GROUP BY second_class_code ORDER BY code`;
-      return query<{ code: string; name: string }>(sql, p);
-    })(),
+  let typeOptions;
+  let stationOptions;
+  let secondClassOptions;
+  let thirdClassOptions;
+  let dataTypeOptions;
 
-    // 数据类码：如果已选二级类码则按二级类码过滤
-    (() => {
-      let sql = `SELECT data_category_code AS code, MIN(data_category_name) AS name FROM ${getSchema()}.cec_new_energy_code_dict WHERE if_delete = '0' AND data_category_code IS NOT NULL`;
-      const p: string[] = [];
-      if (filters.secondClassCode) {
-        sql += ` AND second_class_code = $1`;
-        p.push(filters.secondClassCode);
-      }
-      sql += ` GROUP BY data_category_code ORDER BY code`;
-      return query<{ code: string; name: string }>(sql, p);
-    })(),
-  ]);
+  if (cachedFilters && Date.now() < cachedFilters.expiresAt) {
+    ({ typeOptions, stationOptions, secondClassOptions, thirdClassOptions, dataTypeOptions } = cachedFilters.data);
+  } else {
+    const seen = { type: new Set(), station: new Set(), sc: new Set(), tc: new Set(), dt: new Set() };
+    typeOptions = [];
+    stationOptions = [];
+    secondClassOptions = [];
+    thirdClassOptions = [];
+    dataTypeOptions = [];
+    for (const r of groupedRows) {
+      if (r.type_code && !seen.type.has(r.type_code)) { seen.type.add(r.type_code); typeOptions.push({ code: r.type_code, name: dicts.typeMap.get(r.type_code) || '' }); }
+      if (r.station_code && !seen.station.has(r.station_code)) { seen.station.add(r.station_code); stationOptions.push({ code: r.station_code, name: dicts.stationMap.get(r.station_code) || '' }); }
+      if (r.second_class_code && !seen.sc.has(r.second_class_code)) { seen.sc.add(r.second_class_code); secondClassOptions.push({ code: r.second_class_code, name: dicts.secondClassMap.get(r.type_code + '|' + r.second_class_code) || '' }); }
+      if (r.third_class_code && !seen.tc.has(r.third_class_code)) { seen.tc.add(r.third_class_code); thirdClassOptions.push({ code: r.third_class_code, name: dicts.thirdClassMap.get(r.type_code + '|' + r.second_class_code + '|' + r.third_class_code) || '' }); }
+      if (r.data_type_code && !seen.dt.has(r.data_type_code)) { seen.dt.add(r.data_type_code); dataTypeOptions.push({ code: r.data_type_code, name: dicts.dataCategoryMap.get(r.data_type_code + '|' + (r.type_code ? r.type_code.charAt(0) : '')) || '' }); }
+    }
+    typeOptions.sort((a, b) => a.code.localeCompare(b.code));
+    stationOptions.sort((a, b) => a.code.localeCompare(b.code));
+    secondClassOptions.sort((a, b) => a.code.localeCompare(b.code));
+    thirdClassOptions.sort((a, b) => a.code.localeCompare(b.code));
+    dataTypeOptions.sort((a, b) => a.code.localeCompare(b.code));
+    codeGenFilterCache.set(filterCacheKey, {
+      data: { typeOptions, stationOptions, secondClassOptions, thirdClassOptions, dataTypeOptions },
+      expiresAt: Date.now() + FILTER_CACHE_TTL_MS,
+    });
+  }
 
   return {
     list,
@@ -337,6 +408,7 @@ export async function getCodeGenList(
       typeCodes: typeOptions,
       stationCodes: stationOptions,
       secondClassCodes: secondClassOptions,
+      thirdClassCodes: thirdClassOptions,
       dataTypeCodes: dataTypeOptions,
     },
   };
@@ -899,7 +971,7 @@ export async function getMeasureDrillDown(
 
 /** 全量测点按二级类码统计 */
 export async function getMeasureBySecondClass(
-  typeFilter?: 'wind' | 'solar',
+  typeFilter?: 'wind' | 'solar' | 'hydro',
 ): Promise<{
   items: Array<{ name: string; value: number; percentage: number }>
 }> {

@@ -38,6 +38,7 @@ export async function getCodeGenList(
     typeCode?: string;
     stationCode?: string;
     secondClassCode?: string;
+    thirdClassCode?: string;
     dataTypeCode?: string;
   },
 ): Promise<{
@@ -64,6 +65,7 @@ export async function getCodeGenList(
     typeCodes: Array<{ code: string; name: string }>;
     stationCodes: Array<{ code: string; name: string }>;
     secondClassCodes: Array<{ code: string; name: string }>;
+    thirdClassCodes: Array<{ code: string; name: string }>;
     dataTypeCodes: Array<{ code: string; name: string }>;
   };
 }> {
@@ -71,6 +73,7 @@ export async function getCodeGenList(
   if (filters?.typeCode) params.typeCode = filters.typeCode;
   if (filters?.stationCode) params.stationCode = filters.stationCode;
   if (filters?.secondClassCode) params.secondClassCode = filters.secondClassCode;
+  if (filters?.thirdClassCode) params.thirdClassCode = filters.thirdClassCode;
   if (filters?.dataTypeCode) params.dataTypeCode = filters.dataTypeCode;
   const res = await api.get('/statistics/code-gen/list', { params });
   return res.data;

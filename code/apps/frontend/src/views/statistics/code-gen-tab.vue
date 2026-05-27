@@ -104,124 +104,108 @@
     <div class="card-default">
       <div class="card-header">
         <span class="card-header-title">编码生成列表</span>
+        <div class="filter-actions">
+          <el-button @click="onResetListFilter" size="small">重置</el-button>
+          <span class="filter-divider" />
+          <el-button :disabled="selectedRows.length === 0" @click="handleExport" size="small">
+            <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></template>
+            导出选中
+          </el-button>
+          <el-button :disabled="selectedRows.length === 0" @click="handleDeleteSelected" size="small">
+            <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></template>
+            删除选中
+          </el-button>
+        </div>
       </div>
-      <div class="list-section">
-        <div class="list-filter-bar">
-          <div class="filter-group">
-            <el-select v-model="listFilters.typeCode" placeholder="类型" filterable clearable style="width:150px" @change="onTypeChange" :teleported="false">
-              <el-option v-for="t in filterOptionMap.typeCodes" :key="t.code" :label="`${t.code} ${t.name}`" :value="t.code" />
-            </el-select>
-            <el-select v-model="listFilters.stationCode" placeholder="场站" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
-              <el-option v-for="s in filterOptionMap.stationCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
-            </el-select>
-            <el-select v-model="listFilters.secondClassCode" placeholder="二级类码" filterable clearable style="width:150px" @change="onSecondClassChange" :teleported="false">
-              <el-option v-for="s in filterOptionMap.secondClassCodes" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
-            </el-select>
-            <el-select v-model="listFilters.dataTypeCode" placeholder="数据类码" filterable clearable style="width:150px" @change="onListFilter" :teleported="false">
-              <el-option v-for="d in filterOptionMap.dataTypeCodes" :key="d.code" :label="`${d.code} ${d.name}`" :value="d.code" />
-            </el-select>
-          </div>
-          <div class="filter-actions">
-            <el-button type="primary" @click="onListFilter">查询</el-button>
-            <el-button @click="onResetListFilter">重置</el-button>
-            <span class="filter-divider" />
-            <el-button :disabled="selectedRows.length === 0" @click="handleExport">
-              <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></template>
-              导出选中
-            </el-button>
-            <el-button :disabled="selectedRows.length === 0" @click="handleDeleteSelected">
-              <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></template>
-              删除选中
-            </el-button>
-          </div>
-        </div>
 
-        <el-table
-          ref="mainTableRef"
-          :data="codeList"
-          row-key="rowKey"
-          :expand-row-keys="expandedRowKeys"
-          border
-          stripe
-          v-loading="listLoading"
-          style="width:100%"
-          max-height="520"
-          @expand-change="onGroupExpand"
-          :row-class-name="getExpandRowClass"
-          @selection-change="onSelectionChange"
-          :header-cell-style="{ background: '#f5f7fa', color: '#303133', fontWeight: 600 }"
-        >
-          <el-table-column type="selection" width="45" fixed />
-          <el-table-column type="index" label="序号" width="60" fixed />
-          <el-table-column label="类型" width="90">
-            <template #default="{ row }">
-              <el-tag :type="typeTagType(row.type_code)" size="small" effect="plain">{{ row.type_code }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="场站" min-width="150">
-            <template #default="{ row }">
-              <span class="cell-code">{{ row.station_code }}</span>
-              <span v-if="row.station_name" class="cell-name"> {{ row.station_name }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="二级类码" min-width="150">
-            <template #default="{ row }">
-              <span class="cell-code">{{ row.second_class_code }}</span>
-              <span v-if="row.second_class_name" class="cell-name"> {{ row.second_class_name }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="三级类码" min-width="150">
-            <template #default="{ row }">
-              <span class="cell-code">{{ row.third_class_code }}</span>
-              <span v-if="row.third_class_name" class="cell-name"> {{ row.third_class_name }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="数据类码" min-width="90">
-            <template #default="{ row }">
-              <span class="cell-code">{{ row.data_type_code }}</span>
-              <span v-if="row.data_type_name" class="cell-name"> {{ row.data_type_name }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="数据码" min-width="120">
-            <template #default="{ row }">
-              <span class="cell-code">{{ row.data_code }}</span>
-              <span v-if="row.data_name" class="cell-name"> {{ row.data_name }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" min-width="140">
-            <template #default="{ row }">
-              <el-tag size="small" round type="primary" class="code-count-tag">{{ row.code_count }}</el-tag>
-              <el-button link type="primary" size="small" @click="toggleRowExpand(row)">
-                <template #icon><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline :points="isRowExpanded(row) ? '18 15 12 9 6 15' : '6 9 12 15 18 9'"/></svg></template>
-                {{ isRowExpanded(row) ? '收起' : '明细' }}
-              </el-button>
-            </template>
-          </el-table-column>
-          <el-table-column type="expand">
-            <template #default="{ row }">
-              <div v-if="row._detailLoading" class="expand-loading">加载中...</div>
-              <el-table v-else :data="row._detailList" size="small" class="detail-table">
-                <el-table-column type="index" label="序号" width="60" />
-                <el-table-column label="测点编码" min-width="280" prop="code" />
-                <el-table-column label="测点名称" min-width="400" prop="name" />
-                <el-table-column label="生成时间" width="180" prop="create_date" />
+      <el-table
+        ref="mainTableRef"
+        :data="codeList"
+        row-key="rowKey"
+        :expand-row-keys="expandedRowKeys"
+        stripe
+        v-loading="listLoading"
+        style="width:100%"
+        class="styled-table"
+        max-height="520"
+        @expand-change="onGroupExpand"
+        :row-class-name="getExpandRowClass"
+        @selection-change="onSelectionChange"
+        @filter-change="onHeaderFilterChange"
+        :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
+      >
+        <el-table-column type="selection" width="45" fixed />
+        <el-table-column type="index" label="序号" width="60" align="center" fixed />
+        <el-table-column label="类型" width="100" align="center" column-key="typeCode" :filters="headerFilterOptions.typeCode" filter-placement="bottom">
+          <template #default="{ row }">
+            <el-tag :type="typeTagType(row.type_code)" size="small" effect="plain">{{ typeLabel(row.type_code) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="场站" align="center" column-key="stationCode" :filters="headerFilterOptions.stationCode" filter-placement="bottom">
+          <template #default="{ row }">
+            <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.station_code }}</el-tag>
+            <span class="cell-name"> {{ row.station_name || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="二级类码" column-key="secondClassCode" :filters="headerFilterOptions.secondClassCode" filter-placement="bottom">
+          <template #default="{ row }">
+            <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.second_class_code }}</el-tag>
+            <span v-if="row.second_class_name" class="cell-name"> {{ row.second_class_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="三级类码" column-key="thirdClassCode" :filters="headerFilterOptions.thirdClassCode" filter-placement="bottom">
+          <template #default="{ row }">
+            <el-tag size="small" color="#f3e8ff" style="color: #8b5cf6; border: none; font-family: monospace; margin-right: 4px;">{{ row.third_class_code }}</el-tag>
+            <span v-if="row.third_class_name" class="cell-name"> {{ row.third_class_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="数据类码" column-key="dataTypeCode" :filters="headerFilterOptions.dataTypeCode" filter-placement="bottom">
+          <template #default="{ row }">
+            <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none; font-family: monospace; margin-right: 4px;">{{ row.data_type_code }}</el-tag>
+            <span v-if="row.data_type_name" class="cell-name"> {{ row.data_type_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="数据码">
+          <template #default="{ row }">
+            <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none; font-family: monospace; margin-right: 4px;">{{ row.data_code }}</el-tag>
+            <span v-if="row.data_name" class="cell-name"> {{ row.data_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" round type="primary" class="code-count-tag">{{ row.code_count }}</el-tag>
+            <el-button link type="primary" size="small" @click="toggleRowExpand(row)">
+              <template #icon><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline :points="isRowExpanded(row) ? '18 15 12 9 6 15' : '6 9 12 15 18 9'"/></svg></template>
+              {{ isRowExpanded(row) ? '收起' : '明细' }}
+            </el-button>
+          </template>
+        </el-table-column>
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div v-if="row._detailLoading" class="expand-loading">加载中...</div>
+            <div v-else class="detail-wrapper">
+              <el-table :data="row._detailList" size="small" class="detail-table">
+                <el-table-column type="index" label="序号" align="center" />
+                <el-table-column label="测点编码" prop="code" />
+                <el-table-column label="测点名称" prop="name" />
+                <el-table-column label="生成时间" prop="create_date" align="center" />
               </el-table>
-            </template>
-          </el-table-column>
-        </el-table>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
 
-        <div class="list-pagination">
-          <el-pagination
-            v-model:current-page="listPageNum"
-            v-model:page-size="listPageSize"
-            :total="listTotal"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next"
-            background
-            @current-change="loadCodeList"
-            @size-change="loadCodeList"
-          />
-        </div>
+      <div class="list-pagination">
+        <el-pagination
+          v-model:current-page="listPageNum"
+          v-model:page-size="listPageSize"
+          :total="listTotal"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next"
+          background
+          @current-change="loadCodeList"
+          @size-change="loadCodeList"
+        />
       </div>
     </div>
   </div>
@@ -430,13 +414,37 @@ const filterOptionMap = ref<{
   typeCodes: Array<{ code: string; name: string }>;
   stationCodes: Array<{ code: string; name: string }>;
   secondClassCodes: Array<{ code: string; name: string }>;
+  thirdClassCodes: Array<{ code: string; name: string }>;
   dataTypeCodes: Array<{ code: string; name: string }>;
-}>({ typeCodes: [], stationCodes: [], secondClassCodes: [], dataTypeCodes: [] });
+}>({ typeCodes: [], stationCodes: [], secondClassCodes: [], thirdClassCodes: [], dataTypeCodes: [] });
 const listFilters = reactive({
   typeCode: undefined as string | undefined,
   stationCode: undefined as string | undefined,
   secondClassCode: undefined as string | undefined,
+  thirdClassCode: undefined as string | undefined,
   dataTypeCode: undefined as string | undefined,
+});
+
+/** 表头筛选选项（联动：类型→二级类码→三级类码→数据类码） */
+const headerFilterOptions = computed(() => {
+  const map = filterOptionMap.value;
+  const toFilter = (items: Array<{ code: string; name: string }>) => {
+    const seen = new Set<string>();
+    return items.filter(i => {
+      if (!i.code) return false;
+      const key = `${i.code}|${i.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).map(i => ({ text: `${i.code} ${i.name}`, value: `${i.code}|${i.name}` }));
+  };
+  return {
+    typeCode: toFilter(map.typeCodes),
+    stationCode: toFilter(map.stationCodes),
+    secondClassCode: toFilter(map.secondClassCodes),
+    thirdClassCode: toFilter(map.thirdClassCodes),
+    dataTypeCode: toFilter(map.dataTypeCodes),
+  };
 });
 
 async function loadCodeList() {
@@ -483,17 +491,13 @@ function typeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' |
   return 'warning';
 }
 
-function onTypeChange() {
-  listFilters.secondClassCode = undefined;
-  listFilters.dataTypeCode = undefined;
-  listPageNum.value = 1;
-  loadCodeList();
-}
-
-function onSecondClassChange() {
-  listFilters.dataTypeCode = undefined;
-  listPageNum.value = 1;
-  loadCodeList();
+function typeLabel(code: string): string {
+  if (!code) return '其他';
+  const first = code.charAt(0).toUpperCase();
+  if (first === 'F') return '风电';
+  if (first === 'G') return '光伏';
+  if (first === 'S') return '水电';
+  return '其他';
 }
 
 function onListFilter() {
@@ -505,7 +509,40 @@ function onResetListFilter() {
   listFilters.typeCode = undefined;
   listFilters.stationCode = undefined;
   listFilters.secondClassCode = undefined;
+  listFilters.thirdClassCode = undefined;
   listFilters.dataTypeCode = undefined;
+  listPageNum.value = 1;
+  mainTableRef.value?.clearFilter();
+  loadCodeList();
+}
+
+/** 从列头筛选值中提取编码（值格式为 "code|name"） */
+function extractCode(val: string | undefined): string | undefined {
+  return val ? val.split('|')[0] : undefined;
+}
+
+/** 列头筛选变化 → 只更新当前列，其他筛选保持独立 → 触发查询 */
+function onHeaderFilterChange(filters: Record<string, any[]>) {
+  if ('typeCode' in filters) {
+    const val = filters.typeCode || [];
+    listFilters.typeCode = extractCode(val.length > 0 ? val[0] : undefined);
+  }
+  if ('stationCode' in filters) {
+    const val = filters.stationCode || [];
+    listFilters.stationCode = extractCode(val.length > 0 ? val[0] : undefined);
+  }
+  if ('secondClassCode' in filters) {
+    const val = filters.secondClassCode || [];
+    listFilters.secondClassCode = extractCode(val.length > 0 ? val[0] : undefined);
+  }
+  if ('thirdClassCode' in filters) {
+    const val = filters.thirdClassCode || [];
+    listFilters.thirdClassCode = extractCode(val.length > 0 ? val[0] : undefined);
+  }
+  if ('dataTypeCode' in filters) {
+    const val = filters.dataTypeCode || [];
+    listFilters.dataTypeCode = extractCode(val.length > 0 ? val[0] : undefined);
+  }
   listPageNum.value = 1;
   loadCodeList();
 }
@@ -664,26 +701,6 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .chart-section { height: 100%; }
 .chart-container-h { height: 360px; width: 100%; }
 
-/* ==================== 列表区域 ==================== */
-.list-section {
-  padding: 0;
-}
-.list-filter-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 16px;
-  background: #fafbff;
-  border-bottom: 1px solid #eef0f6;
-}
-.filter-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 .filter-actions {
   display: flex;
   align-items: center;
@@ -697,10 +714,10 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
   margin: 0 4px;
 }
 .list-pagination {
-  padding: 12px 16px;
+  padding: 14px 16px;
   display: flex;
   justify-content: flex-end;
-  background: #fafbff;
+  border-top: 1px solid #f5f5f5;
 }
 .cell-code {
   font-weight: 500;
@@ -721,10 +738,24 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 }
 
 /* ==================== 表格样式 ==================== */
-:deep(.el-table__header-wrapper th) { padding: 8px 0 !important; }
-:deep(.el-table__body tr:hover) { background: #eef5ff !important; }
-:deep(.el-table__body tr.el-table__row--striped:hover) { background: #e8f0fe !important; }
-:deep(.el-table--border) { border-color: #ebeef5; }
+:deep(.el-table) {
+  border: none !important;
+}
+:deep(.el-table .el-table__inner-wrapper) {
+  border: none !important;
+}
+:deep(.el-table__body tr) {
+  transition: background 0.2s ease;
+}
+:deep(.el-table__body tr:hover) {
+  background: #f0f7ff !important;
+}
+:deep(.el-table__body tr.el-table__row--striped:hover) {
+  background: #e8f0fe !important;
+}
+:deep(.el-table__cell) {
+  padding: 8px 0 !important;
+}
 
 /* ==================== 展开行相关 ==================== */
 :deep(.el-table__expand-column) { display: none; }
@@ -732,7 +763,143 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 :deep(.row-expanded-active > td.el-table__cell) { border-bottom-color: #d0e3ff !important; }
 :deep(.el-table__expanded-cell) { padding: 8px 16px 8px 50px !important; background: #f8faff !important; }
 .detail-table { border: none !important; }
+.detail-wrapper {
+  width: 90%;
+  margin: 0 auto;
+}
+.detail-wrapper :deep(.el-table) {
+  width: 100%;
+}
 :deep(.detail-table .el-table__inner-wrapper::before) { display: none; }
 :deep(.detail-table th) { background: #eef3ff !important; color: #303133; font-weight: 600; padding: 6px 0 !important; }
 :deep(.detail-table td) { background: #f8faff !important; padding: 6px 0 !important; }
+</style>
+
+<style>
+/* ==================== 表头筛选：科技风格（全局样式穿透弹窗） ==================== */
+.styled-table .el-table__column-filter-trigger {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  background: rgba(64, 158, 255, 0.06);
+  border: 1px solid rgba(64, 158, 255, 0.15);
+  position: relative;
+  top: -1px;
+}
+.styled-table .el-table__column-filter-trigger:hover {
+  background: rgba(64, 158, 255, 0.12);
+  border-color: rgba(64, 158, 255, 0.3);
+  box-shadow: 0 0 10px rgba(64, 158, 255, 0.15);
+}
+.styled-table .el-table__column-filter-trigger .el-icon {
+  font-size: 14px;
+  color: #7c9cf5;
+  transition: all 0.3s ease;
+  line-height: 1;
+}
+.styled-table .el-table__column-filter-trigger:hover .el-icon {
+  color: #409eff;
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 4px rgba(64, 158, 255, 0.5));
+}
+.styled-table .el-table__column-filter-trigger.is-active {
+  background: rgba(64, 158, 255, 0.25);
+  border-color: #409eff;
+  box-shadow: 0 0 12px rgba(64, 158, 255, 0.35);
+}
+.styled-table .el-table__column-filter-trigger.is-active .el-icon {
+  color: #409eff;
+  filter: drop-shadow(0 0 6px rgba(64, 158, 255, 0.7));
+}
+/* 筛选激活的表头单元格：更明显的背景色 */
+.styled-table th.is-filter-active,
+.styled-table .el-table__cell.is-filter-active {
+  background: #d6e8ff !important;
+  box-shadow: inset 0 -2px 0 0 #409eff;
+}
+/* 筛选激活的表头标签着色 */
+.styled-table th.is-filter-active .cell {
+  color: #1a5ec7 !important;
+}
+/* 表头单元格内容垂直居中 */
+.styled-table .el-table__header-wrapper .cell {
+  display: inline-flex;
+  align-items: center;
+}
+.el-table-filter {
+  background: rgba(20, 28, 52, 0.95) !important;
+  border: 1px solid rgba(64, 158, 255, 0.3) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 0 20px rgba(64, 158, 255, 0.15),
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(64, 158, 255, 0.1) !important;
+  backdrop-filter: blur(20px) !important;
+  padding: 8px !important;
+  overflow: hidden;
+}
+.el-table-filter__list {
+  padding: 4px !important;
+}
+.el-table-filter__list-item {
+  padding: 0 !important;
+  margin: 2px 0 !important;
+}
+.el-table-filter__list-item .el-checkbox {
+  display: flex !important;
+  align-items: center;
+  padding: 8px 14px !important;
+  border-radius: 8px !important;
+  transition: all 0.25s ease !important;
+}
+.el-table-filter__list-item .el-checkbox:hover {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.12), rgba(64, 158, 255, 0.05)) !important;
+}
+.el-table-filter__list-item.is-checked .el-checkbox {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.2), rgba(64, 158, 255, 0.08)) !important;
+}
+.el-table-filter__list-item .el-checkbox__label {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.5px;
+}
+.el-table-filter__list-item.is-checked .el-checkbox__label {
+  color: #66b1ff !important;
+  text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
+}
+.el-table-filter__list-item .el-checkbox__inner {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(64, 158, 255, 0.4) !important;
+  border-radius: 4px !important;
+  transition: all 0.25s ease !important;
+}
+.el-table-filter__list-item .el-checkbox__inner::after {
+  border-color: #409eff !important;
+}
+.el-table-filter__list-item .el-checkbox.is-checked .el-checkbox__inner {
+  background: rgba(64, 158, 255, 0.3) !important;
+  border-color: #409eff !important;
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.4) !important;
+}
+.el-table-filter__bottom {
+  border-top: 1px solid rgba(64, 158, 255, 0.15) !important;
+  padding: 8px 14px !important;
+  margin-top: 4px !important;
+}
+.el-table-filter__bottom button {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 12px !important;
+  transition: all 0.25s ease !important;
+}
+.el-table-filter__bottom button:hover {
+  color: #66b1ff !important;
+  text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
+}
 </style>

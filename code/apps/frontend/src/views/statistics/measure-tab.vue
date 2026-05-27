@@ -145,7 +145,7 @@ async function onCancelImport() {
   } catch {}
 }
 
-const secondClassData = computed(() => {
+const secondClassData = computed((): any => {
   if (!secondClassItems.value.length) return null;
   const items = [...secondClassItems.value].reverse();
   return {
@@ -207,7 +207,7 @@ const secondClassData = computed(() => {
   };
 });
 
-const stationData = computed(() => {
+const stationData = computed((): any => {
   if (!stationItems.value.length) return null;
   const items = [...stationItems.value].reverse();
   return {
