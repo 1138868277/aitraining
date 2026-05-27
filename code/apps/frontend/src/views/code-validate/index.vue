@@ -17,6 +17,18 @@
               <span class="tree-section-label">编码字典树</span>
             </div>
             <div class="toolbar-right">
+              <el-input
+                v-model="treeSearchText"
+                placeholder="搜索编码或名称"
+                clearable
+                size="small"
+                style="width:200px"
+                @input="onTreeSearch"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
               <el-button size="default" @click="onCollapseAll">收起所有</el-button>
               <el-button size="default" type="primary" :loading="loadingTree" @click="loadDictTree">刷新</el-button>
             </div>
@@ -28,6 +40,7 @@
               lazy
               :load="loadTreeNode"
               :props="treeProps"
+              :filter-node-method="filterTreeNode"
               v-loading="loadingTree"
               element-loading-text="字典数据加载中..."
               highlight-current
@@ -46,11 +59,18 @@
                   </span>
                   <span class="tree-node-meta">
                     <el-tag
-                      v-if="data.type === 'dataCode' && data.isManual === '1'"
+                      v-if="data.type === 'dataCode' && data.sourceTenant"
+                      size="small"
+                      color="#fff7e6"
+                      style="color:#d46b08;border:1px solid #ffd591;"
+                      class="source-tag"
+                    >{{ sourceLabel(data.sourceTenant) }}</el-tag>
+                    <el-tag
+                      v-else-if="data.type === 'dataCode' && data.isManual === '1'"
                       size="small"
                       type="warning"
                       class="source-tag"
-                    >{{ sourceLabel(data.isManual) }}</el-tag>
+                    >手动添加</el-tag>
                     <el-tag
                       v-else-if="data.type === 'dataCode' && data.isManual === '0'"
                       size="small"
@@ -276,7 +296,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
+import { Plus, Search } from '@element-plus/icons-vue';
 import * as XLSX from 'xlsx';
 import * as validateService from '@/services/validate';
 import * as approvalService from '@/services/approval';
@@ -299,9 +319,10 @@ const tenantDisplayNames: Record<string, string> = {
   admin: '集团',
 };
 
-function sourceLabel(isManual?: string): string {
-  if (isManual === '1') return tenantDisplayNames[currentUser] || currentUser;
-  return '集团统一';
+function sourceLabel(source?: string): string {
+  if (!source) return '手动添加';
+  if (source === '0' || source === '1') return source === '1' ? '手动添加' : '集团统一';
+  return tenantDisplayNames[source] || source;
 }
 
 const activeTab = ref(
@@ -319,6 +340,18 @@ const dictTreeData = ref<DictTreeNode[]>([]);
 const treeDataCache = ref<DictTreeNode[]>([]); // lazy load 查找缓存
 const loadingTree = ref(false);
 const treeRef = ref<any>(null);
+
+const treeSearchText = ref('');
+
+function onTreeSearch() {
+  treeRef.value?.filter(treeSearchText.value);
+}
+
+function filterTreeNode(value: string, data: any): boolean {
+  if (!value) return true;
+  const q = value.toLowerCase();
+  return data.code.toLowerCase().includes(q) || data.name.toLowerCase().includes(q);
+}
 
 const treeProps = {
   children: 'children',

@@ -108,9 +108,9 @@ export async function deleteCodeGenGroups(groups: Array<{
 let dictOverviewCache: any = null;
 
 export async function getDictOverview(forceRefresh = false): Promise<{
-  wind: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
-  solar: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
-  hydro: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number };
+  wind: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeCount: number };
+  solar: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeCount: number };
+  hydro: { firstClassCount: number; secondClassCount: number; thirdClassCount: number; dataCategoryCount: number; dataCodeCount: number };
 }> {
   if (!forceRefresh && dictOverviewCache) return dictOverviewCache;
   const res = await api.get('/statistics/dict/overview');

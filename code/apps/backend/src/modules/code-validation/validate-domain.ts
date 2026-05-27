@@ -18,6 +18,7 @@ export interface DictTreeNode {
   name: string;
   type: 'typeDomain' | 'secondClass' | 'dataCategory' | 'dataCode';
   isManual?: string;
+  sourceTenant?: string;
   children?: DictTreeNode[];
   childCount?: number;
 }
@@ -127,8 +128,8 @@ export async function getDictTreeDataCodes(
   secondClassCode: string,
   dataCategoryCode: string,
 ): Promise<DictTreeNode[]> {
-  const rows = await dbQuery<{ dcode: string; dname: string; im: string }>(
-    `SELECT data_code AS dcode, data_name AS dname, is_manual AS im
+  const rows = await dbQuery<{ dcode: string; dname: string; im: string; st: string | null }>(
+    `SELECT data_code AS dcode, data_name AS dname, is_manual AS im, source_tenant AS st
      FROM ${getSchema()}.cec_new_energy_code_dict
      WHERE if_delete = '0'
        AND type_domain_code = $1
@@ -144,6 +145,7 @@ export async function getDictTreeDataCodes(
     name: r.dname,
     type: 'dataCode' as const,
     isManual: r.im,
+    sourceTenant: r.st || undefined,
   }));
 }
 

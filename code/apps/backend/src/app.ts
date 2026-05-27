@@ -5,6 +5,7 @@ import { requestIdMiddleware, requestLogger, globalErrorHandler, tenantContextMi
 import { initTenantPools } from './db/index.js';
 import authRouter from './modules/auth/auth-controller.js';
 import { initUserTable } from './modules/auth/auth-service.js';
+import { TENANTS } from './config/tenants.js';
 import dictRouter from './modules/dict/dict-controller.js';
 import codeRouter from './modules/code-generation/code-controller.js';
 import validateRouter from './modules/code-validation/validate-controller.js';
@@ -58,6 +59,15 @@ export function createApp(): import('express').Express {
         name: '华电新能源测点编码管理工具',
       },
       timestamp: Date.now(),
+    });
+  });
+
+  // 租户列表
+  app.get('/api/tenants', (_req, res) => {
+    res.json({
+      code: 0,
+      message: 'success',
+      data: TENANTS.map(t => ({ id: t.id, displayName: t.displayName })),
     });
   });
 

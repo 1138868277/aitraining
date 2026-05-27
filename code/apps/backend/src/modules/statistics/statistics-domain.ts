@@ -481,29 +481,28 @@ export async function deleteCodeGenGroups(
 export async function getDictOverview(): Promise<{
   wind: {
     firstClassCount: number; secondClassCount: number; thirdClassCount: number;
-    dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
+    dataCategoryCount: number; dataCodeCount: number;
   };
   solar: {
     firstClassCount: number; secondClassCount: number; thirdClassCount: number;
-    dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
+    dataCategoryCount: number; dataCodeCount: number;
   };
   hydro: {
     firstClassCount: number; secondClassCount: number; thirdClassCount: number;
-    dataCategoryCount: number; dataCodeGroup: number; dataCodeManual: number;
+    dataCategoryCount: number; dataCodeCount: number;
   };
 }> {
   // 一次查询获取三个类型域的主表聚合数据
   const [mainRows, thirdRows] = await Promise.all([
     query<{
-      td: string; fc: string; sc: string; dc: string; dg: string; dm: string;
+      td: string; fc: string; sc: string; dcat: string; dcode: string;
     }>(
       `SELECT
          type_domain_code AS td,
          COUNT(DISTINCT first_class_code) AS fc,
          COUNT(DISTINCT second_class_code) AS sc,
-         COUNT(DISTINCT data_category_code) AS dc,
-         COUNT(*) FILTER (WHERE data_code IS NOT NULL AND (is_manual IS NULL OR is_manual = '0')) AS dg,
-         COUNT(*) FILTER (WHERE data_code IS NOT NULL AND is_manual = '1') AS dm
+         COUNT(DISTINCT data_category_code) AS dcat,
+         COUNT(*) FILTER (WHERE data_code IS NOT NULL) AS dcode
        FROM ${getSchema()}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND type_domain_code IN ('F', 'G', 'S')
        GROUP BY type_domain_code`),
@@ -535,9 +534,8 @@ export async function getDictOverview(): Promise<{
       firstClassCount: Number(m?.fc || 0),
       secondClassCount: Number(m?.sc || 0),
       thirdClassCount: Number(t?.c || 0),
-      dataCategoryCount: Number(m?.dc || 0),
-      dataCodeGroup: Number(m?.dg || 0),
-      dataCodeManual: Number(m?.dm || 0),
+      dataCategoryCount: Number(m?.dcat || 0),
+      dataCodeCount: Number(m?.dcode || 0),
     };
   }
 

@@ -46,11 +46,7 @@
       <div class="overview-stat-card">
         <div class="os-icon">🏷️</div>
         <div class="os-body">
-          <div class="os-split">
-            <span class="os-split-item"><span class="oss-label">集团统一</span><span class="oss-value" style="color: #3b82f6;">{{ data.dataCodeGroup }}</span></span>
-            <span class="os-split-divider"></span>
-            <span class="os-split-item"><span class="oss-label">手动添加</span><span class="oss-value" style="color: #e6a23c;">{{ data.dataCodeManual }}</span></span>
-          </div>
+          <div class="os-value" :style="{ color: typeFilter === 'wind' ? '#3b82f6' : '#10b981' }">{{ data.dataCodeCount }}</div>
           <div class="os-label">数据码</div>
         </div>
       </div>
@@ -73,7 +69,7 @@ const lastRefreshTime = ref('');
 
 const data = computed(() => {
   const d = typeFilter.value === 'wind' ? overview.value.wind : typeFilter.value === 'solar' ? overview.value.solar : overview.value.hydro;
-  return d || { firstClassCount: 0, secondClassCount: 0, thirdClassCount: 0, dataCategoryCount: 0, dataCodeGroup: 0, dataCodeManual: 0 };
+  return d || { firstClassCount: 0, secondClassCount: 0, thirdClassCount: 0, dataCategoryCount: 0, dataCodeCount: 0 };
 });
 
 function formatTime(ts: number): string {
@@ -198,27 +194,4 @@ onMounted(loadFromCache);
   margin-top: 2px;
 }
 
-.os-split {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.os-split-item { flex: 1; text-align: left; }
-
-.oss-label {
-  display: block;
-  font-size: 10px;
-  color: #909399;
-  margin-bottom: 1px;
-}
-
-.oss-value { font-size: 18px; font-weight: 700; }
-
-.os-split-divider {
-  width: 1px;
-  height: 28px;
-  background: #e4e7ed;
-  margin: 0 8px;
-}
 </style>

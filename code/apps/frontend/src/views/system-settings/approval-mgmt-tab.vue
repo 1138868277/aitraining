@@ -4,19 +4,24 @@
       管理各区域提交的数据码审批申请，审核通过后将自动下发给所有区域使用。
     </div>
 
+    <!-- 子标签：待审批 / 已审批 -->
+    <el-tabs v-model="activeSubTab" class="sub-tabs" @tab-change="onTabChange">
+      <el-tab-pane label="待审批" name="pending" />
+      <el-tab-pane label="已审批" name="done" />
+    </el-tabs>
+
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <div class="filter-left">
         <span class="section-label">审批列表</span>
       </div>
       <div class="filter-right">
-        <el-select v-model="filterStatus" placeholder="审批状态" style="width:140px" clearable @change="loadList">
-          <el-option label="待审批" value="pending" />
+        <el-select v-if="activeSubTab === 'done'" v-model="filterStatus" placeholder="审批状态" style="width:140px" clearable @change="loadList">
           <el-option label="已通过" value="approved" />
-          <el-option label="已拒绝" value="rejected" />
+          <el-option label="已驳回" value="rejected" />
         </el-select>
         <el-select v-model="filterSource" placeholder="来源区域" style="width:140px" clearable @change="loadList">
-          <el-option v-for="r in regionOptions" :key="r" :label="r" :value="r" />
+          <el-option v-for="r in regionOptions" :key="r.id" :label="r.displayName" :value="r.id" />
         </el-select>
         <el-button @click="loadList">搜索</el-button>
         <el-button @click="resetFilter">重置</el-button>
@@ -33,7 +38,7 @@
         </el-table-column>
         <el-table-column label="来源区域" align="center">
           <template #default="{ row }">
-            <el-tag effect="plain" color="#e8f4fd" style="color:#1677ff;border:none;">{{ row.sourceTenant }}</el-tag>
+            <el-tag effect="plain" color="#e8f4fd" style="color:#1677ff;border:none;">{{ tenantName(row.sourceTenant) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="类型" align="center">
@@ -63,7 +68,7 @@
           <template #default="{ row }">
             <el-tag v-if="row.status === 'pending'" type="warning" size="small">待审批</el-tag>
             <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
-            <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已拒绝</el-tag>
+            <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已驳回</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="提交时间">
@@ -80,9 +85,9 @@
           <template #default="{ row }">
             <template v-if="row.status === 'pending'">
               <el-button type="primary" link size="small" @click="handleApprove(row)">通过</el-button>
-              <el-button type="danger" link size="small" @click="handleReject(row)">拒绝</el-button>
+              <el-button type="danger" link size="small" @click="handleReject(row)">驳回</el-button>
             </template>
-            <span v-else-if="row.status === 'rejected' && row.rejectReason" style="color: #909399; font-size: 12px;">
+            <span v-else-if="row.status === 'rejected' && row.rejectReason" style="color: #f56c6c; font-size: 12px;">
               {{ row.rejectReason }}
             </span>
             <span v-else style="color: #c0c4cc;">-</span>
@@ -104,17 +109,17 @@
       </div>
     </div>
 
-    <!-- 拒绝对话框 -->
-    <el-dialog v-model="rejectDialog" title="拒绝原因" width="420px" :close-on-click-modal="false">
+    <!-- 驳回对话框 -->
+    <el-dialog v-model="rejectDialog" title="驳回原因" width="420px" :close-on-click-modal="false">
       <el-input
         v-model="rejectReason"
         type="textarea"
         :rows="4"
-        placeholder="请输入拒绝原因，区域用户将看到此原因"
+        placeholder="请输入驳回原因，区域用户将看到此原因"
       />
       <template #footer>
         <el-button @click="rejectDialog = false">取消</el-button>
-        <el-button type="danger" :loading="rejecting" @click="confirmReject">确定拒绝</el-button>
+        <el-button type="danger" :loading="rejecting" @click="confirmReject">确定驳回</el-button>
       </template>
     </el-dialog>
   </div>
@@ -124,29 +129,68 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as approvalService from '@/services/approval';
+import { getTenants } from '@/services/tenants';
+import type { TenantInfo } from '@/services/tenants';
 
 const loading = ref(false);
 const items = ref<any[]>([]);
 const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(20);
+const activeSubTab = ref('pending');
 const filterStatus = ref('');
 const filterSource = ref('');
-
-const regionOptions = ['yunnan', 'fujian'];
+const regionOptions = ref<TenantInfo[]>([]);
 
 const rejectDialog = ref(false);
 const rejectReason = ref('');
 const rejecting = ref(false);
 const currentRejectId = ref<number | null>(null);
 
+/** 租户 ID → 显示名称映射 */
+const tenantNames = ref<Record<string, string>>({});
+
+function tenantName(id: string): string {
+  return tenantNames.value[id] || id;
+}
+
+async function loadRegionOptions() {
+  try {
+    const tenants = await getTenants();
+    regionOptions.value = tenants.filter(t => t.id !== 'admin');
+    const map: Record<string, string> = {};
+    for (const t of tenants) {
+      map[t.id] = t.displayName;
+    }
+    tenantNames.value = map;
+  } catch {
+    // 降级：使用默认映射
+    const defaults: Record<string, string> = {
+      yunnan: '云南区域',
+      fujian: '福建区域',
+      admin: '集团',
+    };
+    regionOptions.value = [
+      { id: 'yunnan', displayName: '云南区域' },
+      { id: 'fujian', displayName: '福建区域' },
+    ];
+    tenantNames.value = defaults;
+  }
+}
+
 async function loadList() {
   loading.value = true;
   try {
+    let status: string | undefined;
+    if (activeSubTab.value === 'pending') {
+      status = 'pending';
+    } else if (filterStatus.value) {
+      status = filterStatus.value;
+    }
     const result = await approvalService.getApprovalList(
       pageNum.value,
       pageSize.value,
-      filterStatus.value || undefined,
+      status || undefined,
       filterSource.value || undefined,
     );
     items.value = result.items;
@@ -159,6 +203,13 @@ async function loadList() {
 }
 
 function resetFilter() {
+  filterStatus.value = '';
+  filterSource.value = '';
+  pageNum.value = 1;
+  loadList();
+}
+
+function onTabChange() {
   filterStatus.value = '';
   filterSource.value = '';
   pageNum.value = 1;
@@ -190,13 +241,13 @@ function handleReject(row: any) {
 
 async function confirmReject() {
   if (!rejectReason.value.trim()) {
-    ElMessage.warning('请填写拒绝原因');
+    ElMessage.warning('请填写驳回原因');
     return;
   }
   rejecting.value = true;
   try {
     await approvalService.rejectApproval(currentRejectId.value!, rejectReason.value.trim());
-    ElMessage.success('已拒绝');
+    ElMessage.success('已驳回');
     rejectDialog.value = false;
     loadList();
   } catch (err: any) {
@@ -231,7 +282,8 @@ function typeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' {
   return 'warning';
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadRegionOptions();
   loadList();
 });
 </script>
@@ -256,6 +308,10 @@ onMounted(() => {
   border: 1px solid #eef0f6;
   border-radius: 8px;
   line-height: 1.6;
+}
+
+.sub-tabs {
+  margin-bottom: 8px;
 }
 
 .filter-bar {
