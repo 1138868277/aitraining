@@ -252,7 +252,13 @@
         </el-tab-pane>
 
         <!-- Tab 3: 数据码审批（仅admin可见） -->
-        <el-tab-pane v-if="currentUser === 'admin'" label="数据码审批" name="approval">
+        <el-tab-pane v-if="currentUser === 'admin'" name="approval">
+          <template #label>
+            <span class="approval-tab-label">
+              数据码审批
+              <el-badge v-if="pendingApprovalCount > 0" :value="pendingApprovalCount" :max="99" class="approval-badge" />
+            </span>
+          </template>
           <div class="subpage-hero">
             <div class="hero-icon">📋</div>
             <div class="hero-text">
@@ -260,7 +266,7 @@
               <div class="hero-subtitle">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</div>
             </div>
           </div>
-          <ApprovalMgmtTab />
+          <ApprovalMgmtTab @refresh="loadPendingApprovalCount" :key="approvalTabKey" />
         </el-tab-pane>
 
         <!-- Tab 4: 场站维护 -->
@@ -293,6 +299,18 @@ const router = useRouter();
 
 const authUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
 const currentUser = authUser?.username || '';
+
+// ========== 审批待办计数 ==========
+const pendingApprovalCount = ref(0);
+const approvalTabKey = ref(0);
+
+async function loadPendingApprovalCount() {
+  if (currentUser !== 'admin') return;
+  try {
+    const result = await approvalService.getApprovalList(1, 1, 'pending');
+    pendingApprovalCount.value = result.total;
+  } catch {}
+}
 
 const activeTab = ref(
   currentUser !== 'admin' && (route.query.tab as string) === 'approval'
@@ -666,6 +684,7 @@ onMounted(() => {
   loadDictTree();
   loadManualStats();
   loadSubmissions();
+  loadPendingApprovalCount();
 });
 </script>
 
@@ -903,6 +922,17 @@ onMounted(() => {
   height: 300px;
   background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
   border-radius: 50%;
+}
+
+/* 审批待办红点 */
+.approval-tab-label { display: inline-flex; align-items: center; gap: 6px; }
+.approval-tab-label :deep(.el-badge__content) {
+  background: #f56c6c;
+  border: none;
+  font-size: 11px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
 }
 
 </style>

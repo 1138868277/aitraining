@@ -127,6 +127,8 @@ import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as approvalService from '@/services/approval';
 
+const emit = defineEmits<{ refresh: [] }>();
+
 const loading = ref(false);
 const items = ref<any[]>([]);
 const total = ref(0);
@@ -185,6 +187,7 @@ async function handleApprove(row: any) {
     await approvalService.approveApproval(row.approvalId);
     ElMessage.success('已审批通过，数据码已下发给所有区域');
     loadList();
+    emit('refresh');
   } catch (err: any) {
     if (err !== 'cancel') {
       ElMessage.error(err.response?.data?.message || '审批操作失败');
@@ -209,6 +212,7 @@ async function confirmReject() {
     ElMessage.success('已驳回');
     rejectDialog.value = false;
     loadList();
+    emit('refresh');
   } catch (err: any) {
     ElMessage.error(err.response?.data?.message || '操作失败');
   } finally {
