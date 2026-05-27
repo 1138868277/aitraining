@@ -41,7 +41,6 @@
             </template>
           </el-input>
           <div v-if="recentSearchTags.length > 0" class="recent-search-tags">
-            <span class="recent-tags-label">最近搜索：</span>
             <el-tag
               v-for="tag in recentSearchTags"
               :key="tag"
@@ -55,86 +54,88 @@
             </el-tag>
           </div>
         </div>
-        <div v-if="quickSearchLoading" class="quick-search-loading">
-          <span>搜索中...</span>
-        </div>
-        <div v-if="quickSearchResults.length > 0" class="quick-search-results">
-          <div class="quick-search-filter-bar">
-            <span class="quick-search-filter-label">类型：</span>
-            <el-select v-model="quickSearchTypeFilter" placeholder="全部" clearable size="small" style="width: 100px" @change="onQuickSearchFilterChange">
-              <el-option v-for="item in quickSearchTypeOptions" :key="item" :label="item" :value="item" />
-            </el-select>
-            <span class="quick-search-filter-label">二级类码：</span>
-            <el-select v-model="quickSearchSecondClassFilter" placeholder="全部" clearable size="small" style="width: 200px" @change="onQuickSearchFilterChange">
-              <el-option
-                v-for="item in quickSearchFilteredSecondClassOptions"
-                :key="item.code"
-                :label="item.code + ' ' + item.name"
-                :value="item.code"
+        <div v-if="quickSearchText.trim()" class="card-default mb-16" style="border-top: none;">
+          <div class="card-header quick-filter-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <el-radio-group v-model="quickSearchTypeFilter" size="small" class="type-radio-group" @change="onQuickSearchFilterChange">
+                <el-radio-button value="">全部</el-radio-button>
+                <el-radio-button value="F">风电 F</el-radio-button>
+                <el-radio-button value="G">光伏 G</el-radio-button>
+                <el-radio-button value="S">水电 S</el-radio-button>
+              </el-radio-group>
+            </div>
+          </div>
+          <template v-if="quickSearchResults.length > 0">
+            <el-table
+              :data="quickSearchFilteredResults"
+              stripe
+              style="width: 100%"
+              class="styled-table"
+              max-height="360"
+              size="small"
+              v-loading="quickSearchLoading"
+              element-loading-text="搜索中..."
+              :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
+              @filter-change="onQuickSearchHeaderFilterChange"
+              ref="quickSearchTableRef"
+            >
+              <el-table-column label="类型域" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small" effect="plain">{{ row.typeCode }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="二级类码" column-key="quickSecondClassCode" :filters="quickSearchSecondClassFilterOptions" filter-placement="bottom">
+                <template #default="{ row }">
+                  <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.secondClassCode }}</el-tag>
+                  <span class="cell-name">{{ row.secondClassName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="数据类码">
+                <template #default="{ row }">
+                  <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCategoryCode }}</el-tag>
+                  <span class="cell-name">{{ row.dataCategoryName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="数据码">
+                <template #default="{ row }">
+                  <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCode }}</el-tag>
+                  <span class="cell-name">{{ row.dataName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="来源" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.isManual === '1'" size="small" type="warning">手动添加</el-tag>
+                  <el-tag v-else size="small" type="info">集团统一</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="onQuickSearchRowClick(row)">快速编码</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="list-pagination">
+              <span style="font-size:13px;color:#909399;">共 {{ quickSearchResults.length }} 条结果</span>
+            </div>
+            <div class="quick-search-pagination">
+              <el-pagination
+                v-if="quickSearchTotal > 0"
+                v-model:current-page="quickSearchPageNum"
+                v-model:page-size="quickSearchPageSize"
+                :total="quickSearchTotal"
+                :page-sizes="[10, 20, 50, 100]"
+                layout="total, sizes, prev, pager, next"
+                small
+                @current-change="onQuickSearchPageChange"
+                @size-change="onQuickSearchPageChange"
               />
-            </el-select>
-          </div>
-          <el-table
-            :data="quickSearchResults"
-            border
-            stripe
-            style="width: 100%"
-            max-height="360"
-            size="small"
-          >
-            <el-table-column label="类型域" min-width="70">
-              <template #default="{ row }">
-                <span class="code-highlight">{{ row.typeCode }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="二级类码" min-width="160">
-              <template #default="{ row }">
-                <span class="code-highlight">{{ row.secondClassCode }}</span>
-                <span class="name-muted">&nbsp;{{ row.secondClassName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="数据类码" min-width="140">
-              <template #default="{ row }">
-                <span class="code-highlight">{{ row.dataCategoryCode }}</span>
-                <span class="name-muted">&nbsp;{{ row.dataCategoryName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="数据码" min-width="180">
-              <template #default="{ row }">
-                <span class="code-highlight">{{ row.dataCode }}</span>
-                <span class="name-muted">&nbsp;{{ row.dataName }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="来源" width="140">
-              <template #default="{ row }">
-                <el-tag v-if="row.isManual === '1'" size="small" type="warning">手动添加</el-tag>
-                <el-tag v-else size="small" type="info">集团统一</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="140" fixed="right">
-              <template #default="{ row }">
-                <el-button link type="primary" size="small" @click="onQuickSearchRowClick(row)">筛选</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div class="quick-search-pagination">
-            <el-pagination
-              v-if="quickSearchTotal > 0"
-              v-model:current-page="quickSearchPageNum"
-              v-model:page-size="quickSearchPageSize"
-              :total="quickSearchTotal"
-              :page-sizes="[10, 20, 50, 100]"
-              layout="total, sizes, prev, pager, next"
-              small
-              @current-change="onQuickSearchPageChange"
-              @size-change="onQuickSearchPageChange"
-            />
-          </div>
+            </div>
+          </template>
+          <el-empty
+            v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading && quickSearchText.trim()"
+            description="未找到匹配的数据码"
+          />
         </div>
-        <el-empty
-          v-if="quickSearchSearched && quickSearchResults.length === 0 && !quickSearchLoading && quickSearchText.trim()"
-          description="未找到匹配的数据码"
-        />
     </div>
 
     <!-- 手动新增编码字典对话框（批量） -->
@@ -407,46 +408,51 @@
       <el-tabs v-model="activeTab" @tab-click="onTabClick">
         <!-- 编码预览标签页 -->
         <el-tab-pane label="编码预览" name="preview">
-          <div v-if="generatedCodes.length > 0" class="preview-actions">
-            <span class="preview-count">共 {{ generatedCodes.length }} 条</span>
-            <el-button size="small" @click="copyAllPreview">一键复制全部</el-button>
-            <el-button size="small" type="primary" :loading="savedSaving" @click="handleSaveCodes">保存</el-button>
-          </div>
-          <el-table :data="paginatedPreviewCodes" border stripe style="width: 100%">
-            <el-table-column type="index" label="序号" width="60" :index="previewPageIndex" />
-            <el-table-column prop="code" label="编码" width="320" />
-            <el-table-column label="编码名称" min-width="260">
-              <template #default="{ row }">
-                <div v-if="editingIndex === findPreviewIndex(row)" class="name-editor">
-                  <el-input
-                    v-model="editingName"
-                    size="small"
-                    class="name-editor-input"
-                    @keyup.enter="confirmEditName"
-                    @blur="confirmEditName"
-                  />
-                </div>
-                <span v-else class="name-display" @click="startEditName(row)">{{ row.name }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="generateTime" label="生成时间" width="180" />
-            <el-table-column label="操作" width="100" fixed="right">
-              <template #default="{ row }">
-                <el-button link type="primary" @click="copyCode(row.code)">复制</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div v-if="generatedCodes.length > 0" class="preview-pagination">
-            <el-pagination
-              v-model:current-page="previewPageNum"
-              v-model:page-size="previewPageSize"
-              :total="generatedCodes.length"
-              :page-sizes="[10, 20, 50, 100, 200, 500]"
-              layout="total, sizes, prev, pager, next"
-              background
-              @current-change="onPreviewPageChange"
-              @size-change="onPreviewSizeChange"
-            />
+          <div v-if="generatedCodes.length > 0" class="card-default" style="border-top: none;">
+            <div class="card-header">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="card-header-title" style="margin-right:4px;">共 {{ generatedCodes.length }} 条</span>
+                <span class="filter-divider" />
+                <el-button size="default" @click="copyAllPreview">复制全部</el-button>
+                <el-button size="default" type="primary" :loading="savedSaving" @click="handleSaveCodes">保存</el-button>
+              </div>
+            </div>
+            <el-table :data="paginatedPreviewCodes" stripe v-loading="savedSaving" style="width:100%" class="styled-table" max-height="520" :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }">
+              <el-table-column type="index" label="序号" width="200" align="center" :index="previewPageIndex" />
+              <el-table-column prop="code" label="编码" min-width="200" />
+              <el-table-column label="编码名称" min-width="200">
+                <template #default="{ row }">
+                  <div v-if="editingIndex === findPreviewIndex(row)" class="name-editor">
+                    <el-input
+                      v-model="editingName"
+                      size="small"
+                      class="name-editor-input"
+                      @keyup.enter="confirmEditName"
+                      @blur="confirmEditName"
+                    />
+                  </div>
+                  <span v-else class="name-display" @click="startEditName(row)">{{ row.name }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="generateTime" label="生成时间" min-width="160" align="center" />
+              <el-table-column label="操作" width="80" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="copyCode(row.code)">复制</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="list-pagination">
+              <el-pagination
+                v-model:current-page="previewPageNum"
+                v-model:page-size="previewPageSize"
+                :total="generatedCodes.length"
+                :page-sizes="[10, 20, 50, 100, 200, 500]"
+                layout="total, sizes, prev, pager, next"
+                background
+                @current-change="onPreviewPageChange"
+                @size-change="onPreviewSizeChange"
+              />
+            </div>
           </div>
           <el-empty v-if="generatedCodes.length === 0" description="暂无生成记录" />
         </el-tab-pane>
@@ -1086,40 +1092,55 @@ const quickSearchResults = ref<Array<{
 const quickSearchLoading = ref(false);
 const quickSearchSearched = ref(false);
 const quickSearchTotal = ref(0);
+const quickSearchTableRef = ref<any>(null);
 const quickSearchPageNum = ref(1);
 const quickSearchPageSize = ref(20);
 const quickSearchTypeFilter = ref('');
-const quickSearchSecondClassFilter = ref('');
+const quickSearchSecondClassFilter = ref<string[]>([]);
 const quickSearchTypeOptions = ref<string[]>([]);
 let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
 
-const quickSearchFilteredSecondClassOptions = computed(() => {
-  let options = quickSearchSecondClassOptions.value;
-  if (quickSearchTypeFilter.value) {
-    options = options.filter(s => s.typeCode === quickSearchTypeFilter.value);
-  }
-  // 筛选后再按 code 去重
+/** 列头筛选选项：二级类码 */
+const quickSearchSecondClassFilterOptions = computed(() => {
   const seen = new Set<string>();
-  return options.filter(s => {
-    if (seen.has(s.code)) return false;
-    seen.add(s.code);
-    return true;
-  });
+  return quickSearchResults.value
+    .filter(r => {
+      if (!r.secondClassCode) return false;
+      const key = `${r.secondClassCode}|${r.secondClassName}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map(r => ({ text: `${r.secondClassCode} ${r.secondClassName}`, value: `${r.secondClassCode}|${r.secondClassName}` }));
 });
 
-function onQuickSearchFilterChange() {
-  // 类型筛选变化时，若当前二级类码不属于该类型则清空
-  if (quickSearchTypeFilter.value && quickSearchSecondClassFilter.value) {
-    const match = quickSearchSecondClassOptions.value.find(
-      s => s.code === quickSearchSecondClassFilter.value && s.typeCode === quickSearchTypeFilter.value
-    );
-    if (!match) {
-      quickSearchSecondClassFilter.value = '';
-    }
+/** 客户端二级类码筛选后的结果 */
+const quickSearchFilteredResults = computed(() => {
+  const codes = quickSearchSecondClassFilterCodes.value;
+  if (codes.length === 0) return quickSearchResults.value;
+  return quickSearchResults.value.filter(r => codes.includes(r.secondClassCode));
+});
+
+/** 二级类码表头选中的编码列表 */
+const quickSearchSecondClassFilterCodes = computed(() => {
+  const f = quickSearchSecondClassFilter.value;
+  if (!f) return [];
+  return f.map((v: string) => v.split('|')[0]);
+});
+
+/** 表头筛选变化 */
+function onQuickSearchHeaderFilterChange(filters: Record<string, any[]>) {
+  if ('quickSecondClassCode' in filters) {
+    quickSearchSecondClassFilter.value = filters.quickSecondClassCode || [];
   }
-  // 重新请求服务端带编码生成的分页数据
+}
+
+function onQuickSearchFilterChange() {
+  // 类型切换后清除二级类码筛选
+  quickSearchSecondClassFilter.value = [];
+  quickSearchTableRef.value?.clearFilter();
   doQuickSearch();
 }
 
@@ -1131,8 +1152,7 @@ async function doQuickSearch(resetPage: boolean = true) {
   if (resetPage) quickSearchPageNum.value = 1;
   try {
     const typeFilter = quickSearchTypeFilter.value || undefined;
-    const secondClassFilter = quickSearchSecondClassFilter.value || undefined;
-    const result = await dictService.quickSearchDict(text, quickSearchPageNum.value, quickSearchPageSize.value, typeFilter, secondClassFilter);
+    const result = await dictService.quickSearchDict(text, quickSearchPageNum.value, quickSearchPageSize.value, typeFilter);
     quickSearchResults.value = result.items;
     quickSearchTotal.value = result.total;
     quickSearchTypeOptions.value = result.typeOptions || [];
@@ -1408,7 +1428,7 @@ function onQuickSearchInput() {
     quickSearchTotal.value = 0;
     quickSearchPageNum.value = 1;
     quickSearchTypeFilter.value = '';
-    quickSearchSecondClassFilter.value = '';
+    quickSearchSecondClassFilter.value = [];
     quickSearchSecondClassOptions.value = [];
     quickSearchTypeOptions.value = [];
     return;
@@ -1416,7 +1436,7 @@ function onQuickSearchInput() {
   quickSearchTimer = setTimeout(async () => {
     quickSearchSearched.value = true;
     quickSearchTypeFilter.value = '';
-    quickSearchSecondClassFilter.value = '';
+    quickSearchSecondClassFilter.value = [];
     await doQuickSearch();
     if (quickSearchResults.value.length > 0) {
       saveRecentSearchTag(text);
@@ -1430,7 +1450,7 @@ function onQuickSearchClear() {
   quickSearchTotal.value = 0;
   quickSearchPageNum.value = 1;
   quickSearchTypeFilter.value = '';
-  quickSearchSecondClassFilter.value = '';
+  quickSearchSecondClassFilter.value = [];
   quickSearchSecondClassOptions.value = [];
   quickSearchTypeOptions.value = [];
 }
@@ -1458,8 +1478,8 @@ async function onQuickSearchRowClick(row: {
   // 2. 触发类型级联，加载二级类码列表
   await onConditionChange('typeCode');
 
-  // 3. 设置二级类码（锁定字段使用原值）
-  conditions.secondClassCode = lockedFields.secondClassCode ? conditions.secondClassCode : row.secondClassCode;
+  // 3. 设置二级类码（即使锁定也自动填充）
+  conditions.secondClassCode = row.secondClassCode;
   // 4. 触发二级类级联，加载三级类码/数据类码列表
   await onConditionChange('secondClassCode');
 
@@ -2313,7 +2333,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 /* ==================== 快速检索 ==================== */
 .quick-search-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -2332,13 +2352,14 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 }
 
 .recent-tags-label {
-  font-size: 12px;
-  color: #909399;
+  font-size: 14px;
+  color: #606266;
   white-space: nowrap;
 }
 
 .recent-tag {
   cursor: pointer;
+  font-size: 13px;
 }
 
 .recent-tag:hover {
@@ -2348,11 +2369,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 .search-prefix {
   color: #909399;
   font-size: 13px;
-}
-
-.quick-search-loading {
-  font-size: 13px;
-  color: #909399;
 }
 
 .quick-search-results {
@@ -2382,9 +2398,95 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 
 .quick-search-filter-label {
   font-size: 13px;
-  color: #606266;
+  color: #303133;
+  font-weight: 600;
   white-space: nowrap;
 }
+
+/* 快速检索筛选栏固定 */
+.quick-filter-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #ffffff !important;
+}
+
+/* 类型切换圆片 + 下拉框统一科技风 */
+:deep(.type-radio-group) {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(20, 28, 52, 0.08);
+  border-radius: 6px;
+  height: 32px;
+  padding: 0;
+}
+:deep(.type-radio-group .el-radio-button) {
+  padding: 0 !important;
+}
+:deep(.type-radio-group .el-radio-button__inner) {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 5px !important;
+  color: rgba(30, 50, 100, 0.55) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 0 12px !important;
+  height: 26px !important;
+  line-height: 26px !important;
+  transition: all 0.25s ease !important;
+  box-shadow: none !important;
+  letter-spacing: 0.3px !important;
+  margin: 3px;
+}
+:deep(.type-radio-group .el-radio-button__inner:hover) {
+  color: #409eff !important;
+  background: rgba(64, 158, 255, 0.08) !important;
+}
+:deep(.type-radio-group .el-radio-button.is-active .el-radio-button__inner) {
+  background: linear-gradient(135deg, #fff, #f0f5ff) !important;
+  color: #1a5ec7 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(64, 158, 255, 0.15) !important;
+}
+/* 统一与下拉框同高度 */
+:deep(.tech-select) {
+  height: 50px;
+  vertical-align: middle;
+}
+:deep(.tech-select .el-input__wrapper) {
+  background: rgba(20, 28, 52, 0.08) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  transition: all 0.25s ease !important;
+  padding: 0 10px !important;
+  height: 50px !important;
+}
+:deep(.tech-select .el-input__wrapper:hover) {
+  background: rgba(64, 158, 255, 0.1) !important;
+}
+:deep(.tech-select .el-input__wrapper.is-focus) {
+  background: rgba(64, 158, 255, 0.12) !important;
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.12) !important;
+}
+:deep(.tech-select .el-input__inner) {
+  color: #1a3a6a !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  height: 48px !important;
+}
+:deep(.tech-select .el-input__inner::placeholder) {
+  color: rgba(100, 120, 180, 0.6) !important;
+}
+:deep(.tech-select .el-input__suffix) {
+  color: #7c9cf5 !important;
+  height: 48px !important;
+  transition: color 0.25s ease !important;
+}
+:deep(.tech-select:hover .el-input__suffix) {
+  color: #409eff !important;
+}
+
 
 .quick-search-filter-count {
   font-size: 12px;
@@ -2508,23 +2610,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   transform: translateY(0);
 }
 
-.preview-actions {
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.preview-count {
-  font-size: 14px;
-  color: #606266;
-}
-
-.preview-pagination {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
 
 .saved-filter-bar {
   margin-bottom: 12px;
@@ -3136,5 +3221,40 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 .el-table-filter__bottom button:hover {
   color: #66b1ff !important;
   text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
+}
+
+/* 科技感下拉框弹出面板 */
+.tech-select-popper {
+  background: rgba(20, 28, 52, 0.95) !important;
+  border: 1px solid rgba(64, 158, 255, 0.3) !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 0 20px rgba(64, 158, 255, 0.15),
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(64, 158, 255, 0.1) !important;
+  backdrop-filter: blur(20px) !important;
+  padding: 4px !important;
+}
+.tech-select-popper .el-select-dropdown__item {
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  padding: 6px 12px !important;
+  margin: 2px 0 !important;
+  transition: all 0.2s ease !important;
+}
+.tech-select-popper .el-select-dropdown__item:hover {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.15), rgba(64, 158, 255, 0.05)) !important;
+  color: #fff !important;
+}
+.tech-select-popper .el-select-dropdown__item.selected {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.25), rgba(64, 158, 255, 0.1)) !important;
+  color: #66b1ff !important;
+  box-shadow: inset 0 0 0 1px rgba(64, 158, 255, 0.3);
+}
+.tech-select-popper .el-popper__arrow::before {
+  background: rgba(20, 28, 52, 0.95) !important;
+  border-color: rgba(64, 158, 255, 0.3) !important;
 }
 </style>
