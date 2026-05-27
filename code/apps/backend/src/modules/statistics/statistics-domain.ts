@@ -546,7 +546,7 @@ export async function getDictOverview(): Promise<{
 export async function getDictNewAddition(
   startTime?: string, endTime?: string,
 ): Promise<{
-  totalNewCodes: number; manualCodes: number; autoCodes: number;
+  totalNewCodes: number;
   newCodesBySecondClass: Array<{ secondClassCode: string; secondClassName: string; count: number }>;
   newCodesByDate: Array<{ date: string; count: number }>;
 }> {
@@ -555,9 +555,8 @@ export async function getDictNewAddition(
   if (startTime) { cond += ` AND create_tm >= $${params.length + 1}`; params.push(startTime); }
   if (endTime) { cond += ` AND create_tm <= $${params.length + 1}::date + 1`; params.push(endTime); }
 
-  const [totalRes, manualRes, scRes, dateRes] = await Promise.all([
+  const [totalRes, scRes, dateRes] = await Promise.all([
     query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${getSchema()}.cec_new_energy_code_dict WHERE ${cond}`, params),
-    query<{ c: string }>(`SELECT COUNT(*) AS c FROM ${getSchema()}.cec_new_energy_code_dict WHERE ${cond} AND is_manual = '1'`, params),
     query<{ sc: string; sn: string; c: string }>(
       `SELECT second_class_code AS sc, second_class_name AS sn, COUNT(*) AS c
        FROM ${getSchema()}.cec_new_energy_code_dict WHERE ${cond}
@@ -570,8 +569,6 @@ export async function getDictNewAddition(
 
   return {
     totalNewCodes: Number(totalRes[0]?.c || 0),
-    manualCodes: Number(manualRes[0]?.c || 0),
-    autoCodes: Number(totalRes[0]?.c || 0) - Number(manualRes[0]?.c || 0),
     newCodesBySecondClass: scRes.map(r => ({ secondClassCode: r.sc, secondClassName: r.sn, count: Number(r.c) })),
     newCodesByDate: dateRes.map(r => ({ date: r.dt, count: Number(r.c) })),
   };

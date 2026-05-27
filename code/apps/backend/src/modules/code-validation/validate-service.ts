@@ -1,6 +1,7 @@
 import * as validateDomain from './validate-domain.js';
 import * as approvalDomain from '../approval/approval-domain.js';
 import type { DictTreeNode, ManualStatItem } from './validate-domain.js';
+import { query as dbQuery, getSchema } from '../../db/index.js';
 
 /** 获取字典树数据 */
 export async function getDictTree(): Promise<DictTreeNode[]> {
@@ -42,7 +43,7 @@ export async function submitCodeForApproval(input: {
   submitter: string;
   sourceTenant: string;
 }) {
-  // 1. 查询字典条目详情
+  // 1. 查询草稿条目
   const entry = await validateDomain.getDictEntryByFields({
     typeDomainCode: input.typeDomainCode,
     secondClassCode: input.secondClassCode,
@@ -65,20 +66,7 @@ export async function submitCodeForApproval(input: {
     throw Object.assign(new Error('该数据码已提交过审批，请勿重复提交'), { code: 'DUPLICATE_SUBMISSION' });
   }
 
-  // 3. 创建草稿
-  const draftId = await approvalDomain.createDraft({
-    typeCode: input.typeDomainCode,
-    secondClassCode: input.secondClassCode,
-    secondClassName: entry.secondClassName,
-    dataCategoryCode: input.dataCategoryCode,
-    dataCategoryName: entry.dataCategoryName,
-    dataCode: input.dataCode,
-    dataName: entry.dataName,
-    status: 'submitted',
-    creator: input.submitter,
-  });
-
-  // 4. 在 admin 侧创建审批记录
+  // 3. 在 admin 侧创建审批记录
   let approvalId: number;
   try {
     approvalId = await approvalDomain.createApprovalRecord({
@@ -93,15 +81,23 @@ export async function submitCodeForApproval(input: {
       submitter: input.submitter,
     });
   } catch (err) {
-    // 创建审批记录失败时回滚草稿
-    await approvalDomain.updateDraftStatus(draftId, 'draft');
     throw err;
   }
 
-  // 5. 更新草稿的 approval_id
-  await approvalDomain.updateDraftApprovalId(draftId, approvalId);
+  // 4. 更新草稿状态为 submitted，关联 approval_id
+  const draftEntry = await dbQuery<{ draft_id: number }>(
+    `SELECT draft_id FROM ${getSchema()}.cec_new_energy_code_draft
+     WHERE type_code = $1 AND second_class_code = $2
+       AND data_category_code = $3 AND data_code = $4
+       AND status = 'draft' LIMIT 1`,
+    [input.typeDomainCode, input.secondClassCode, input.dataCategoryCode, input.dataCode],
+  );
 
-  return { draftId, approvalId };
+  if (draftEntry.length > 0) {
+    await approvalDomain.updateDraftStatus(draftEntry[0].draft_id, 'submitted', approvalId);
+  }
+
+  return { draftId: draftEntry[0]?.draft_id, approvalId };
 }
 
 /** 删除手动添加的数据码 */

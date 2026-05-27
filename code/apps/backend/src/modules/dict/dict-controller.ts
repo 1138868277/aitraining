@@ -241,6 +241,11 @@ router.get('/api/dict/:dictType/items', async (req: Request, res: Response) => {
 /** 手动新增编码字典项 */
 router.post('/api/dict/manual-code', async (req: Request, res: Response) => {
   try {
+    const userInfo = getUserInfo(req);
+    if (!userInfo) {
+      error(res, ErrorCode.AUTH_FAILED, '未获取到用户信息，请重新登录', 401);
+      return;
+    }
     const { typeCode, secondClassCode, secondClassName, dataCategoryCode, dataCategoryName, dataCode, dataName } = req.body;
 
     if (!typeCode || !secondClassCode || !dataCategoryCode || !dataCode) {
@@ -261,7 +266,7 @@ router.post('/api/dict/manual-code', async (req: Request, res: Response) => {
       dataCategoryName,
       dataCode,
       dataName,
-      creator: req.headers['x-session-id'] as string || 'manual',
+      creator: userInfo.tenant || userInfo.username,
     });
 
     success(res, result, 201);
@@ -336,6 +341,12 @@ router.delete('/api/dict/manual-code', async (req: Request, res: Response) => {
 /** 批量新增编码字典项 */
 router.post('/api/dict/manual-code/batch', async (req: Request, res: Response) => {
   try {
+    const userInfo = getUserInfo(req);
+    if (!userInfo) {
+      error(res, ErrorCode.AUTH_FAILED, '未获取到用户信息，请重新登录', 401);
+      return;
+    }
+
     const { typeCode, secondClassCode, secondClassName, entries, mode } = req.body;
 
     if (!typeCode || !secondClassCode || !entries || !Array.isArray(entries) || entries.length === 0) {
@@ -416,7 +427,7 @@ router.post('/api/dict/manual-code/batch', async (req: Request, res: Response) =
         dataCode: e.dataCode,
         dataName: e.dataName || '',
       })),
-      creator: req.headers['x-session-id'] as string || 'manual',
+      creator: userInfo.tenant || userInfo.username,
     });
 
     success(res, result, 201);

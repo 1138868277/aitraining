@@ -119,7 +119,7 @@ export async function getDictOverview(forceRefresh = false): Promise<{
 }
 
 export async function getDictNewAddition(startTime?: string, endTime?: string): Promise<{
-  totalNewCodes: number; manualCodes: number; autoCodes: number;
+  totalNewCodes: number;
   newCodesBySecondClass: Array<{ secondClassCode: string; secondClassName: string; count: number }>;
   newCodesByDate: Array<{ date: string; count: number }>;
 }> {

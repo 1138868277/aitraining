@@ -7,16 +7,12 @@ export const dictTreeNodeSchema: z.ZodType<{
   code: string;
   name: string;
   type: 'typeDomain' | 'secondClass' | 'dataCategory' | 'dataCode';
-  isManual?: string;
-  sourceTenant?: string;
   childCount?: number;
   children?: any[];
 }> = z.object({
   code: z.string(),
   name: z.string(),
   type: z.enum(['typeDomain', 'secondClass', 'dataCategory', 'dataCode']),
-  isManual: z.string().optional(),
-  sourceTenant: z.string().optional(),
   childCount: z.number().optional(),
   children: z.array(z.lazy((): z.ZodType<any> => dictTreeNodeSchema)).optional(),
 });

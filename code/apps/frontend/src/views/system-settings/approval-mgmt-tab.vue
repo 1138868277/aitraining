@@ -20,9 +20,6 @@
           <el-option label="已通过" value="approved" />
           <el-option label="已驳回" value="rejected" />
         </el-select>
-        <el-select v-model="filterSource" placeholder="来源区域" style="width:140px" clearable @change="loadList">
-          <el-option v-for="r in regionOptions" :key="r.id" :label="r.displayName" :value="r.id" />
-        </el-select>
         <el-button @click="loadList">搜索</el-button>
         <el-button @click="resetFilter">重置</el-button>
       </div>
@@ -34,11 +31,6 @@
         <el-table-column type="index" label="序号" align="center">
           <template #default="{ $index }">
             {{ ($index + 1) + (pageNum - 1) * pageSize }}
-          </template>
-        </el-table-column>
-        <el-table-column label="来源区域" align="center">
-          <template #default="{ row }">
-            <el-tag effect="plain" color="#e8f4fd" style="color:#1677ff;border:none;">{{ tenantName(row.sourceTenant) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="类型" align="center">
@@ -62,6 +54,11 @@
           <template #default="{ row }">
             <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none;">{{ row.dataCode }}</el-tag>
             <span class="cell-name-tag">{{ row.dataName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="提交区域" align="center" width="110">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain" :color="regionColor(row.sourceTenant)" style="color:#fff;border:none;">{{ regionLabel(row.sourceTenant) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="状态" align="center">
@@ -129,8 +126,6 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as approvalService from '@/services/approval';
-import { getTenants } from '@/services/tenants';
-import type { TenantInfo } from '@/services/tenants';
 
 const loading = ref(false);
 const items = ref<any[]>([]);
@@ -139,44 +134,11 @@ const pageNum = ref(1);
 const pageSize = ref(20);
 const activeSubTab = ref('pending');
 const filterStatus = ref('');
-const filterSource = ref('');
-const regionOptions = ref<TenantInfo[]>([]);
 
 const rejectDialog = ref(false);
 const rejectReason = ref('');
 const rejecting = ref(false);
 const currentRejectId = ref<number | null>(null);
-
-/** 租户 ID → 显示名称映射 */
-const tenantNames = ref<Record<string, string>>({});
-
-function tenantName(id: string): string {
-  return tenantNames.value[id] || id;
-}
-
-async function loadRegionOptions() {
-  try {
-    const tenants = await getTenants();
-    regionOptions.value = tenants.filter(t => t.id !== 'admin');
-    const map: Record<string, string> = {};
-    for (const t of tenants) {
-      map[t.id] = t.displayName;
-    }
-    tenantNames.value = map;
-  } catch {
-    // 降级：使用默认映射
-    const defaults: Record<string, string> = {
-      yunnan: '云南区域',
-      fujian: '福建区域',
-      admin: '集团',
-    };
-    regionOptions.value = [
-      { id: 'yunnan', displayName: '云南区域' },
-      { id: 'fujian', displayName: '福建区域' },
-    ];
-    tenantNames.value = defaults;
-  }
-}
 
 async function loadList() {
   loading.value = true;
@@ -184,14 +146,13 @@ async function loadList() {
     let status: string | undefined;
     if (activeSubTab.value === 'pending') {
       status = 'pending';
-    } else if (filterStatus.value) {
-      status = filterStatus.value;
+    } else if (activeSubTab.value === 'done') {
+      status = filterStatus.value || 'approved,rejected';
     }
     const result = await approvalService.getApprovalList(
       pageNum.value,
       pageSize.value,
       status || undefined,
-      filterSource.value || undefined,
     );
     items.value = result.items;
     total.value = result.total;
@@ -204,14 +165,12 @@ async function loadList() {
 
 function resetFilter() {
   filterStatus.value = '';
-  filterSource.value = '';
   pageNum.value = 1;
   loadList();
 }
 
 function onTabChange() {
   filterStatus.value = '';
-  filterSource.value = '';
   pageNum.value = 1;
   loadList();
 }
@@ -257,6 +216,20 @@ async function confirmReject() {
   }
 }
 
+const REGION_MAP: Record<string, { label: string; color: string }> = {
+  admin: { label: '集团', color: '#409eff' },
+  yunnan: { label: '云南省', color: '#67c23a' },
+  fujian: { label: '福建省', color: '#e6a23c' },
+};
+
+function regionLabel(tenant: string): string {
+  return REGION_MAP[tenant]?.label || tenant || '-';
+}
+
+function regionColor(tenant: string): string {
+  return REGION_MAP[tenant]?.color || '#909399';
+}
+
 function formatTime(tm: string): string {
   if (!tm) return '-';
   const d = new Date(tm);
@@ -282,8 +255,7 @@ function typeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' {
   return 'warning';
 }
 
-onMounted(async () => {
-  await loadRegionOptions();
+onMounted(() => {
   loadList();
 });
 </script>

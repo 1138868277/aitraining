@@ -1,5 +1,4 @@
 import * as dictDomain from './dict-domain.js';
-import { invalidateDictTreeCache } from '../code-validation/validate-domain.js';
 
 export interface DictItemResponse {
   code: string;
@@ -14,7 +13,6 @@ export interface QuickSearchItem {
   dataCategoryName: string;
   dataCode: string;
   dataName: string;
-  isManual?: string;
 }
 
 export interface QuickSearchResult {
@@ -62,7 +60,7 @@ export async function quickSearchDict(searchText: string, pageNum: number = 1, p
   return dictDomain.quickSearchDict(searchText, pageNum, pageSize, typeFilter, secondClassFilter);
 }
 
-/** 手动新增编码字典项 */
+/** 手动新增编码草稿 */
 export async function createManualCode(input: {
   typeCode: string;
   secondClassCode: string;
@@ -73,12 +71,10 @@ export async function createManualCode(input: {
   dataName?: string;
   creator: string;
 }) {
-  const result = await dictDomain.createManualCode(input);
-  invalidateDictTreeCache();
-  return result;
+  return dictDomain.createManualCode(input);
 }
 
-/** 批量新增编码字典项 */
+/** 批量新增编码草稿 */
 export async function batchCreateManualCode(input: {
   typeCode: string;
   secondClassCode: string;
@@ -91,9 +87,7 @@ export async function batchCreateManualCode(input: {
   }>;
   creator: string;
 }) {
-  const result = await dictDomain.batchCreateManualCode(input);
-  invalidateDictTreeCache();
-  return result;
+  return dictDomain.batchCreateManualCode(input);
 }
 
 /** 获取指定数据类码下最大数据码 */

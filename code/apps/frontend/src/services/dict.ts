@@ -48,7 +48,6 @@ export async function quickSearchDict(q: string, pageNum: number = 1, pageSize: 
     secondClassCode: string; secondClassName: string;
     dataCategoryCode: string; dataCategoryName: string;
     dataCode: string; dataName: string;
-    isManual?: string;
   }>;
   total: number;
   typeOptions: string[];
@@ -67,7 +66,7 @@ export async function createManualCode(data: {
   dataCategoryName: string;
   dataCode: string;
   dataName: string;
-}): Promise<{ codeDictId: number; isManual: string }> {
+}): Promise<{ draftId: number }> {
   const res = await api.post('/dict/manual-code', data);
   return res.data;
 }

@@ -17,8 +17,6 @@ export interface DictTreeNode {
   code: string;
   name: string;
   type: 'typeDomain' | 'secondClass' | 'dataCategory' | 'dataCode';
-  isManual?: string;
-  sourceTenant?: string;
   children?: DictTreeNode[];
   childCount?: number;
 }
@@ -57,10 +55,10 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
        FROM ${getSchema()}.cec_new_energy_code_dict
        WHERE if_delete = '0' ORDER BY td, sc`,
     ),
-    dbQuery<{ td: string; sc: string; dc: string; dn: string; hm: boolean; cnt: number }>(
+    dbQuery<{ td: string; sc: string; dc: string; dn: string; cnt: number }>(
       `SELECT type_domain_code AS td, second_class_code AS sc,
               data_category_code AS dc, data_category_name AS dn,
-              BOOL_OR(is_manual = '1') AS hm, COUNT(*) AS cnt
+              COUNT(*) AS cnt
        FROM ${getSchema()}.cec_new_energy_code_dict
        WHERE if_delete = '0' AND data_code IS NOT NULL
        GROUP BY td, sc, dc, dn
@@ -104,7 +102,6 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
       code: row.dc,
       name: row.dn,
       type: 'dataCategory',
-      isManual: row.hm ? '1' : '0',
       childCount: Number(row.cnt),
       children: [],
     });
@@ -128,8 +125,8 @@ export async function getDictTreeDataCodes(
   secondClassCode: string,
   dataCategoryCode: string,
 ): Promise<DictTreeNode[]> {
-  const rows = await dbQuery<{ dcode: string; dname: string; im: string; st: string | null }>(
-    `SELECT data_code AS dcode, data_name AS dname, is_manual AS im, source_tenant AS st
+  const rows = await dbQuery<{ dcode: string; dname: string }>(
+    `SELECT data_code AS dcode, data_name AS dname
      FROM ${getSchema()}.cec_new_energy_code_dict
      WHERE if_delete = '0'
        AND type_domain_code = $1
@@ -144,8 +141,6 @@ export async function getDictTreeDataCodes(
     code: r.dcode,
     name: r.dname,
     type: 'dataCode' as const,
-    isManual: r.im,
-    sourceTenant: r.st || undefined,
   }));
 }
 
@@ -166,7 +161,7 @@ const SORT_COLUMNS: Record<string, string> = {
   createTm: 'd.create_tm',
 };
 
-/** 分页查询手动添加的编码记录 */
+/** 分页查询草稿记录（原手动添加的编码记录） */
 export async function getManualStatistics(
   pageNum: number,
   pageSize: number,
@@ -180,114 +175,60 @@ export async function getManualStatistics(
   secondClassOptions: Array<{ code: string; name: string }>;
   typeOptions: Array<{ code: string; name: string }>;
 }> {
-  // 动态构建过滤条件
-  // 数据过滤条件（含所有筛选）
-  const dataConditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
-  // 选项过滤条件（不含 secondClassCode，避免选中后选项列表只剩当前项）
-  const optConditions: string[] = ["d.if_delete = '0'", "d.is_manual = '1'"];
+  const conditions: string[] = ["d.status IN ('draft', 'submitted')"];
   const params: any[] = [];
-  const optParams: any[] = [];
   let paramIdx = 1;
-  let optParamIdx = 1;
 
   if (secondClassCode) {
-    // 支持 "code|name" 格式，同时匹配编码和名称
     const parts = secondClassCode.split('|');
-    const scIdx = paramIdx++;
+    conditions.push(`d.second_class_code = $${paramIdx++}`);
     params.push(parts[0]);
-    dataConditions.push(`d.second_class_code = $${scIdx}`);
     if (parts.length > 1) {
-      const snIdx = paramIdx++;
+      conditions.push(`d.second_class_name = $${paramIdx++}`);
       params.push(parts[1]);
-      dataConditions.push(`d.second_class_name = $${snIdx}`);
     }
   }
   if (typeCode) {
-    const domainCode = typeCodeToDomain(typeCode);
-
-    // 数据查询参数
-    const tcIdx = paramIdx++;
+    // draft 表 type_code 存储的是类型域代码（F/G/S/Y）
+    conditions.push(`d.type_code = $${paramIdx++}`);
     params.push(typeCode);
-    // 选项查询参数（独立索引，不包含 secondClassCode）
-    const optTcIdx = optParamIdx++;
-    optParams.push(typeCode);
-
-    if (domainCode) {
-      const domIdx = paramIdx++;
-      params.push(domainCode);
-      const optDomIdx = optParamIdx++;
-      optParams.push(domainCode);
-
-      const dataFilter = `(
-        d.type_code LIKE $${tcIdx} || '%'
-        OR (d.type_code IS NULL AND d.type_domain_code = $${domIdx})
-      )`;
-      dataConditions.push(dataFilter);
-
-      const optFilter = `(
-        d.type_code LIKE $${optTcIdx} || '%'
-        OR (d.type_code IS NULL AND d.type_domain_code = $${optDomIdx})
-      )`;
-      optConditions.push(optFilter);
-    } else {
-      const dataFilter = `(
-        d.type_code = $${tcIdx}
-        OR (d.type_code IS NULL AND d.second_class_code IN (
-          SELECT second_class_code FROM ${getSchema()}.cec_new_energy_second_class_type_dict
-          WHERE type_code = $${tcIdx} AND if_delete = '0'
-        ))
-      )`;
-      dataConditions.push(dataFilter);
-
-      const optFilter = `(
-        d.type_code = $${optTcIdx}
-        OR (d.type_code IS NULL AND d.second_class_code IN (
-          SELECT second_class_code FROM ${getSchema()}.cec_new_energy_second_class_type_dict
-          WHERE type_code = $${optTcIdx} AND if_delete = '0'
-        ))
-      )`;
-      optConditions.push(optFilter);
-    }
   }
 
-  const whereClause = dataConditions.join(' AND ');
-  const optionWhereClause = optConditions.join(' AND ');
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // 总数
   const countResult = await dbQuery<{ cnt: string }>(
-    `SELECT COUNT(*) AS cnt FROM ${getSchema()}.cec_new_energy_code_dict d WHERE ${whereClause}`,
+    `SELECT COUNT(*) AS cnt FROM ${getSchema()}.cec_new_energy_code_draft d ${whereClause}`,
     params,
   );
   const total = Number(countResult[0].cnt);
 
-  // 二级类码选项（不含 secondClassCode 过滤，避免选中后选项只剩当前项）
+  // 二级类码选项
   const optionRows = await dbQuery<{ code: string; name: string }>(
     `SELECT DISTINCT d.second_class_code AS code, d.second_class_name AS name
-     FROM ${getSchema()}.cec_new_energy_code_dict d
-     WHERE ${optionWhereClause} ORDER BY code`,
-    optParams,
-  );
-
-  // 所有类型选项（按域级聚合: F/G）
-  const typeRows = await dbQuery<{ code: string; name: string }>(
-    `SELECT SUBSTRING(type_code, 1, 1) AS code,
-            CASE WHEN SUBSTRING(type_code, 1, 1) = 'F' THEN '风电'
-                 WHEN SUBSTRING(type_code, 1, 1) = 'G' THEN '光伏'
-                 WHEN SUBSTRING(type_code, 1, 1) = 'S' THEN '水电'
-                 ELSE '其他' END AS name
-     FROM ${getSchema()}.cec_new_energy_type_dict
-     WHERE if_delete = '0'
-     GROUP BY SUBSTRING(type_code, 1, 1)
+     FROM ${getSchema()}.cec_new_energy_code_draft d
+     WHERE d.status IN ('draft', 'submitted')
      ORDER BY code`,
   );
 
-  // 排序（多列联动：sortBy="col1,col2" sortOrder="asc,desc"，最后添加的优先级最高）
+  // 类型选项（来自草稿表已有数据）
+  const typeRows = await dbQuery<{ code: string; name: string }>(
+    `SELECT DISTINCT d.type_code AS code,
+            CASE d.type_code
+              WHEN 'F' THEN '风电' WHEN 'G' THEN '光伏'
+              WHEN 'S' THEN '水电' ELSE '其他'
+            END AS name
+     FROM ${getSchema()}.cec_new_energy_code_draft d
+     WHERE d.status IN ('draft', 'submitted')
+     ORDER BY code`,
+  );
+
+  // 排序
   let orderBy = 'd.create_tm DESC';
   if (sortBy && sortOrder) {
     const cols = sortBy.split(',');
     const dirs = sortOrder.split(',');
     const clauses: string[] = [];
-    // 反转：前端最后添加的优先级最高 → SQL 最左边的优先级最高
     for (let i = cols.length - 1; i >= 0; i--) {
       const col = SORT_COLUMNS[cols[i]];
       if (col) {
@@ -308,35 +249,16 @@ export async function getManualStatistics(
             d.data_code AS "dataCode",
             d.data_name AS "dataName",
             d.create_tm AS "createTm",
-            COALESCE(d.type_code, (
-              SELECT t.type_code FROM ${getSchema()}.cec_new_energy_second_class_type_dict sct
-              JOIN ${getSchema()}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
-              WHERE sct.second_class_code = d.second_class_code
-                AND sct.type_code LIKE d.type_domain_code || '%'
-                AND sct.if_delete = '0' AND t.if_delete = '0'
-              LIMIT 1
-            )) AS "typeCode",
-            COALESCE(
-              (SELECT t.type_name FROM ${getSchema()}.cec_new_energy_type_dict t
-               WHERE t.type_code = d.type_code AND t.if_delete = '0' LIMIT 1),
-              (SELECT t.type_name FROM ${getSchema()}.cec_new_energy_second_class_type_dict sct
-               JOIN ${getSchema()}.cec_new_energy_type_dict t ON t.type_code = sct.type_code
-               WHERE sct.second_class_code = d.second_class_code
-                 AND sct.type_code LIKE d.type_domain_code || '%'
-                 AND sct.if_delete = '0' AND t.if_delete = '0'
-               LIMIT 1)
-            ) AS "typeName",
-            dr.status AS "status",
-            dr.reject_reason AS "rejectReason",
-            dr.draft_id AS "draftId"
-     FROM ${getSchema()}.cec_new_energy_code_dict d
-     LEFT JOIN ${getSchema()}.cec_new_energy_code_draft dr
-       ON dr.type_code = d.type_domain_code
-      AND dr.second_class_code = d.second_class_code
-      AND dr.data_category_code = d.data_category_code
-      AND dr.data_code = d.data_code
-      AND dr.status IN ('submitted', 'approved', 'rejected')
-     WHERE ${whereClause}
+            d.type_code AS "typeCode",
+            CASE d.type_code
+              WHEN 'F' THEN '风电' WHEN 'G' THEN '光伏'
+              WHEN 'S' THEN '水电' ELSE '其他'
+            END AS "typeName",
+            d.status AS "status",
+            d.reject_reason AS "rejectReason",
+            d.draft_id AS "draftId"
+     FROM ${getSchema()}.cec_new_energy_code_draft d
+     ${whereClause}
      ORDER BY ${orderBy}
      LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
     itemsParams,
@@ -349,6 +271,7 @@ export async function getManualStatistics(
     typeOptions: typeRows.map((r) => ({ code: r.code, name: r.name })),
   };
 }
+
 
 /** 获取所有手动添加记录（不分页，用于导出） */
 export async function getAllManualStatistics(secondClassCode?: string, typeCode?: string, sortBy?: string, sortOrder?: string): Promise<ManualStatItem[]> {
@@ -624,7 +547,7 @@ export async function batchCorrectCodes(
   return results;
 }
 
-/** 根据字段查询数据码字典条目 */
+/** 根据字段查询数据码草稿条目 */
 export async function getDictEntryByFields(fields: {
   typeDomainCode: string;
   secondClassCode: string;
@@ -634,17 +557,18 @@ export async function getDictEntryByFields(fields: {
   secondClassName: string;
   dataCategoryName: string;
   dataName: string;
+  typeCode: string;
 } | null> {
   const sql = `SELECT second_class_name AS "secondClassName",
                       data_category_name AS "dataCategoryName",
-                      data_name AS "dataName"
-               FROM ${getSchema()}.cec_new_energy_code_dict
-               WHERE type_domain_code = $1
+                      data_name AS "dataName",
+                      type_code AS "typeCode"
+               FROM ${getSchema()}.cec_new_energy_code_draft
+               WHERE type_code = $1
                  AND second_class_code = $2
                  AND data_category_code = $3
                  AND data_code = $4
-                 AND if_delete = '0'
-                 AND is_manual = '1'
+                 AND status IN ('draft', 'submitted')
                LIMIT 1`;
   const rows = await dbQuery<any>(sql, [
     fields.typeDomainCode,
@@ -655,23 +579,22 @@ export async function getDictEntryByFields(fields: {
   return rows[0] || null;
 }
 
-/** 软删除手动添加的数据码 */
+/** 软删除数据码草稿 */
 export async function deleteManualCode(fields: {
   typeDomainCode: string;
   secondClassCode: string;
   dataCategoryCode: string;
   dataCode: string;
 }): Promise<boolean> {
-  const sql = `UPDATE ${getSchema()}.cec_new_energy_code_dict
-               SET if_delete = '1', modify_tm = NOW()
-               WHERE type_domain_code = $1
+  const sql = `UPDATE ${getSchema()}.cec_new_energy_code_draft
+               SET status = 'deleted', modify_tm = NOW()
+               WHERE type_code = $1
                  AND second_class_code = $2
                  AND data_category_code = $3
                  AND data_code = $4
-                 AND if_delete = '0'
-                 AND is_manual = '1'
-               RETURNING data_code`;
-  const result = await dbQuery<{ data_code: string }>(sql, [
+                 AND status IN ('draft', 'rejected')
+               RETURNING draft_id`;
+  const result = await dbQuery<{ draft_id: string }>(sql, [
     fields.typeDomainCode,
     fields.secondClassCode,
     fields.dataCategoryCode,

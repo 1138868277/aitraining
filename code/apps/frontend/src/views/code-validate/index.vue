@@ -58,25 +58,6 @@
                     <span class="tree-node-name">{{ data.name }}</span>
                   </span>
                   <span class="tree-node-meta">
-                    <el-tag
-                      v-if="data.type === 'dataCode' && data.sourceTenant"
-                      size="small"
-                      color="#fff7e6"
-                      style="color:#d46b08;border:1px solid #ffd591;"
-                      class="source-tag"
-                    >{{ sourceLabel(data.sourceTenant) }}</el-tag>
-                    <el-tag
-                      v-else-if="data.type === 'dataCode' && data.isManual === '1'"
-                      size="small"
-                      type="warning"
-                      class="source-tag"
-                    >手动添加</el-tag>
-                    <el-tag
-                      v-else-if="data.type === 'dataCode' && data.isManual === '0'"
-                      size="small"
-                      type="info"
-                      class="source-tag"
-                    >集团统一</el-tag>
                     <span
                       v-if="data.childCount !== undefined"
                       class="child-count"
@@ -162,7 +143,7 @@
               </el-table-column>
               <el-table-column label="状态" width="100" align="center">
                 <template #default="{ row }">
-                  <el-tag v-if="!row.status" type="info" size="small">未提交</el-tag>
+                  <el-tag v-if="!row.status || row.status === 'draft'" type="info" size="small">待提交</el-tag>
                   <el-tag v-else-if="row.status === 'submitted'" type="warning" size="small">审批中</el-tag>
                   <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
                   <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已驳回</el-tag>
@@ -171,7 +152,7 @@
               </el-table-column>
               <el-table-column label="操作" width="170" fixed="right" align="center">
                 <template #default="{ row }">
-                  <template v-if="!row.status || row.status === 'rejected'">
+                  <template v-if="!row.status || row.status === 'draft' || row.status === 'rejected'">
                     <el-button type="primary" link size="small" :loading="submittingId === row.dataCode" @click="handleSubmitApproval(row)">提交审批</el-button>
                     <el-button type="danger" link size="small" :loading="deletingId === row.dataCode" @click="handleDeleteCode(row)">删除</el-button>
                     <span v-if="row.status === 'rejected' && row.rejectReason" style="color: #f56c6c; font-size: 12px; display: block; margin-top: 2px;">{{ row.rejectReason }}</span>
@@ -200,37 +181,37 @@
             <div class="section-header">
               <span class="section-title">我的提交记录</span>
             </div>
-            <el-table :data="submissions" stripe style="width:100%" class="styled-table" v-loading="loadingSubmissions" empty-text="暂无提交记录" :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }">
-              <el-table-column type="index" label="序号" width="60" align="center">
+            <el-table :data="submissions" stripe style="width:100%" class="styled-table submissions-table" v-loading="loadingSubmissions" empty-text="暂无提交记录" :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }">
+              <el-table-column type="index" label="序号" width="50" align="center">
                 <template #default="{ $index }">
                   {{ ($index + 1) + (subPageNum - 1) * subPageSize }}
                 </template>
               </el-table-column>
-              <el-table-column label="类型" width="150" align="center">
+              <el-table-column label="类型" align="center">
                 <template #default="{ row }">
                   <el-tag v-if="row.typeCode" :type="statsTypeTagType(row.typeCode)" size="small" effect="plain">{{ statsTypeLabel(row.typeCode) }}</el-tag>
                   <el-tag v-else size="small" type="danger">未识别</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="二级类码" min-width="180">
+              <el-table-column label="二级类码">
                 <template #default="{ row }">
                   <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.secondClassCode }}</el-tag>
                   <span class="cell-name-tag">{{ row.secondClassName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="数据类码" min-width="180">
+              <el-table-column label="数据类码">
                 <template #default="{ row }">
                   <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCategoryCode }}</el-tag>
                   <span class="cell-name-tag">{{ row.dataCategoryName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="数据码" min-width="180">
+              <el-table-column label="数据码">
                 <template #default="{ row }">
                   <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCode }}</el-tag>
                   <span class="cell-name-tag">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="状态" width="120" align="center">
+              <el-table-column label="状态" align="center">
                 <template #default="{ row }">
                   <el-tag v-if="row.status === 'submitted'" type="warning" size="small">待审批</el-tag>
                   <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
@@ -238,18 +219,18 @@
                   <el-tag v-else type="info" size="small">{{ row.status }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="审批意见" min-width="160">
+              <el-table-column label="审批意见">
                 <template #default="{ row }">
                   <span v-if="row.rejectReason" style="color: #f56c6c; font-size: 12px;">{{ row.rejectReason }}</span>
                   <span v-else style="color: #c0c4cc;">-</span>
                 </template>
               </el-table-column>
-              <el-table-column label="提交时间" width="170">
+              <el-table-column label="提交时间">
                 <template #default="{ row }">
                   <span class="time-cell">{{ formatTime(row.submitTm || row.createTm) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="审批时间" width="170">
+              <el-table-column label="审批时间">
                 <template #default="{ row }">
                   <span class="time-cell">{{ row.reviewTm ? formatTime(row.reviewTm) : '-' }}</span>
                 </template>
@@ -312,18 +293,6 @@ const router = useRouter();
 
 const authUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
 const currentUser = authUser?.username || '';
-
-const tenantDisplayNames: Record<string, string> = {
-  yunnan: '云南区域',
-  fujian: '福建区域',
-  admin: '集团',
-};
-
-function sourceLabel(source?: string): string {
-  if (!source) return '手动添加';
-  if (source === '0' || source === '1') return source === '1' ? '手动添加' : '集团统一';
-  return tenantDisplayNames[source] || source;
-}
 
 const activeTab = ref(
   currentUser !== 'admin' && (route.query.tab as string) === 'approval'
@@ -1054,5 +1023,14 @@ onMounted(() => {
 .el-table-filter__bottom button:hover {
   color: #66b1ff !important;
   text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
+}
+
+/* 提交记录表各列均分宽度 */
+.styled-table.submissions-table .el-table__body-wrapper table,
+.styled-table.submissions-table .el-table__header-wrapper table {
+  table-layout: fixed !important;
+}
+.styled-table.submissions-table .el-table__body-wrapper {
+  overflow-x: hidden !important;
 }
 </style>

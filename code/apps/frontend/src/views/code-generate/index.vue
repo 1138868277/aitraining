@@ -102,12 +102,6 @@
                   <span class="cell-name">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="来源" align="center">
-                <template #default="{ row }">
-                  <el-tag v-if="row.isManual === '1'" size="small" type="warning">{{ sourceLabel(row.isManual) }}</el-tag>
-                  <el-tag v-else size="small" type="info">集团统一</el-tag>
-                </template>
-              </el-table-column>
               <el-table-column label="操作" align="center" fixed="right">
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="onQuickSearchRowClick(row)">快速编码</el-button>
@@ -522,17 +516,6 @@ import AddCodeDialog from '@/components/add-code-dialog.vue';
 
 const authUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
 const currentTenant = authUser?.tenant || authUser?.username || '';
-
-const tenantDisplayNames: Record<string, string> = {
-  yunnan: '云南区域',
-  fujian: '福建区域',
-  admin: '集团',
-};
-
-function sourceLabel(isManual?: string): string {
-  if (isManual === '1') return tenantDisplayNames[currentTenant] || currentTenant;
-  return '集团统一';
-}
 
 interface ConditionField {
   key: string;

@@ -61,7 +61,6 @@ export type CreateManualDictCodeRequest = z.infer<typeof createManualDictCodeSch
 /** 手动新增编码字典响应 */
 export const createManualDictCodeResponseSchema = z.object({
   codeDictId: z.number(),
-  isManual: z.string(),
 });
 
 export type CreateManualDictCodeResponse = z.infer<typeof createManualDictCodeResponseSchema>;

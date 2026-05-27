@@ -43,7 +43,6 @@ export type SubmitApprovalResponse = z.infer<typeof submitApprovalResponseSchema
 /** 审批记录项 */
 export const approvalItemSchema = z.object({
   approvalId: z.number(),
-  sourceTenant: z.string(),
   typeCode: z.string(),
   secondClassCode: z.string(),
   secondClassName: z.string(),

@@ -13,18 +13,6 @@
               <div class="os-label">新增总数</div>
             </div>
           </div>
-          <div class="overview-stat-card">
-            <div class="os-body" style="text-align:center">
-              <div class="os-value" style="color:#409eff">{{ add.manualCodes }}</div>
-              <div class="os-label">手动新增</div>
-            </div>
-          </div>
-          <div class="overview-stat-card">
-            <div class="os-body" style="text-align:center">
-              <div class="os-value" style="color:#67c23a">{{ add.autoCodes }}</div>
-              <div class="os-label">自动新增</div>
-            </div>
-          </div>
         </div>
         <div class="chart-row">
           <div class="chart-col">
@@ -47,7 +35,7 @@ import * as statsService from '@/services/statistics';
 import VChart from 'vue-echarts';
 import 'echarts';
 
-const add = ref({ totalNewCodes: 0, manualCodes: 0, autoCodes: 0, newCodesBySecondClass: [] as any[], newCodesByDate: [] as any[] });
+const add = ref({ totalNewCodes: 0, newCodesBySecondClass: [] as any[], newCodesByDate: [] as any[] });
 
 const scBarData = computed(() => {
   const items = add.value.newCodesBySecondClass;
