@@ -21,8 +21,8 @@
         <span class="card-title">快速检索</span>
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" size="small" @click="showAddDialog = true">
-          <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增
+        <el-button type="primary" @click="showAddDialog = true">
+          <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增数据码
         </el-button>
       </div>
     </div>
@@ -104,7 +104,7 @@
               </el-table-column>
               <el-table-column label="来源" align="center">
                 <template #default="{ row }">
-                  <el-tag v-if="row.isManual === '1'" size="small" type="warning">手动添加</el-tag>
+                  <el-tag v-if="row.isManual === '1'" size="small" type="warning">{{ sourceLabel(row.isManual) }}</el-tag>
                   <el-tag v-else size="small" type="info">集团统一</el-tag>
                 </template>
               </el-table-column>
@@ -138,72 +138,8 @@
         </div>
     </div>
 
-    <!-- 手动新增编码字典对话框（批量） -->
-    <el-dialog v-model="showAddDialog" title="新增编码字典" width="820px" :close-on-click-modal="false">
-      <el-form :model="addForm" label-width="120px" label-position="top">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="类型" required>
-              <el-select v-model="addForm.typeCode" placeholder="请选择类型" filterable clearable style="width: 100%" @change="onAddTypeChange">
-                <el-option label="F 风力发电" value="F" />
-                <el-option label="G 光伏发电" value="G" />
-                <el-option label="S 水力发电" value="S" />
-                <el-option label="Y 通用" value="Y" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="二级类码" required>
-              <el-select v-model="addForm.secondClassCode" placeholder="请选择二级类码" filterable clearable style="width: 100%" :disabled="!addForm.typeCode" @change="onAddSecondClassChange">
-                <el-option
-                  v-for="item in addSecondClassOptions"
-                  :key="item.code"
-                  :label="item.code + ' ' + item.name"
-                  :value="item.code"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="添加方式">
-          <el-radio-group v-model="addMode">
-            <el-radio value="existing">选择已有数据类码</el-radio>
-            <el-radio value="new">新增数据类码</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item v-if="addMode === 'existing'" label="数据类码" required>
-          <el-select v-model="addForm.dataCategoryCode" placeholder="请选择已有数据类码" filterable clearable style="width: 100%" @change="onAddDataCategorySelect">
-            <el-option v-for="item in addDataTypeOptions" :key="item.code" :label="item.code + ' ' + item.name" :value="item.code" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="addMode === 'new'" label="数据类码" required>
-          <div class="code-name-pair">
-            <el-input v-model="addForm.dataCategoryCode" placeholder="2位数字" clearable maxlength="2" style="width: 120px" @input="onDataCategoryCodeInput" />
-            <el-input v-model="addForm.dataCategoryName" placeholder="名称（必填）" clearable maxlength="100" />
-          </div>
-        </el-form-item>
-        <el-form-item label="数据码列表">
-          <div class="batch-entry-table">
-            <div class="batch-entry-header">
-              <span class="batch-entry-col batch-entry-col-code">数据码</span>
-              <span class="batch-entry-col batch-entry-col-name">数据码名称</span>
-              <span class="batch-entry-col batch-entry-col-action">操作</span>
-            </div>
-            <div v-for="(entry, index) in addEntries" :key="index" class="batch-entry-row">
-              <el-input v-model="entry.dataCode" placeholder="3位数字" clearable maxlength="3" class="batch-entry-col batch-entry-col-code" size="small" @input="onDataCodeInput(entry)" />
-              <el-input v-model="entry.dataName" placeholder="名称（必填）" clearable maxlength="100" class="batch-entry-col batch-entry-col-name" size="small" />
-              <el-button type="danger" link size="small" @click="removeEntryRow(index)">删除</el-button>
-            </div>
-            <el-button class="batch-entry-add-btn" size="small" @click="addEntryRow">+ 添加一行</el-button>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="batch-entry-count">已添加 {{ addEntries.length }} 条记录</span>
-        <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" :loading="addLoading" :disabled="!addFormValid" @click="handleAddSave">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- 手动新增编码字典对话框 -->
+    <AddCodeDialog v-model="showAddDialog" @success="onAddCodeSuccess" />
 
     <!-- 编码生成条件面板 -->
     <div class="section-card">
@@ -582,6 +518,21 @@ import * as dictService from '@/services/dict';
 import * as codeService from '@/services/code-generation';
 import * as statsService from '@/services/statistics';
 import { generateCodeRequestSchema } from '@cec/contracts';
+import AddCodeDialog from '@/components/add-code-dialog.vue';
+
+const authUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
+const currentTenant = authUser?.tenant || authUser?.username || '';
+
+const tenantDisplayNames: Record<string, string> = {
+  yunnan: '云南区域',
+  fujian: '福建区域',
+  admin: '集团',
+};
+
+function sourceLabel(isManual?: string): string {
+  if (isManual === '1') return tenantDisplayNames[currentTenant] || currentTenant;
+  return '集团统一';
+}
 
 interface ConditionField {
   key: string;
@@ -1175,218 +1126,12 @@ async function onQuickSearchPageChange() {
 
 /** 手动新增编码字典对话框 */
 const showAddDialog = ref(false);
-const addLoading = ref(false);
-const addMode = ref<'existing' | 'new'>('existing');
-const addForm = reactive({
-  typeCode: '',
-  secondClassCode: '',
-  dataCategoryCode: '',
-  dataCategoryName: '',
-});
-const addEntries = ref<Array<{
-  dataCode: string;
-  dataName: string;
-}>>([{ dataCode: '', dataName: '' }]);
-const addSecondClassOptions = ref<Array<{ code: string; name: string }>>([]);
-const addDataTypeOptions = ref<Array<{ code: string; name: string }>>([]);
 
-const addFormValid = computed(() => {
-  if (!addForm.typeCode || !addForm.secondClassCode) return false;
-  if (addMode.value === 'existing') {
-    return !!addForm.dataCategoryCode
-      && addEntries.value.length > 0
-      && addEntries.value.every(e => /^\d{3}$/.test(e.dataCode) && e.dataName);
-  }
-  return /^\d{2}$/.test(addForm.dataCategoryCode) && addForm.dataCategoryName
-    && addEntries.value.length > 0
-    && addEntries.value.every(e => /^\d{3}$/.test(e.dataCode) && e.dataName);
-});
-
-/** 编码递增工具 */
-function padStart3(num: number): string {
-  return String(num).padStart(3, '0');
-}
-function getNextDataCode(prev: string): string {
-  const n = parseInt(prev, 10);
-  return padStart3(isNaN(n) ? 1 : n + 1);
-}
-function getNextCategoryCode(prev: string): string {
-  const n = parseInt(prev, 10);
-  return String(isNaN(n) ? 1 : n + 1).padStart(2, '0');
-}
-
-/** 用起始数据码填充编码列表（连续递增） */
-function fillEntries(startCode: string) {
-  const start = parseInt(startCode, 10);
-  addEntries.value = [{ dataCode: padStart3(isNaN(start) ? 1 : start), dataName: '' }];
-}
-
-function addEntryRow() {
-  const last = addEntries.value[addEntries.value.length - 1];
-  addEntries.value.push({ dataCode: getNextDataCode(last.dataCode), dataName: '' });
-}
-
-function removeEntryRow(index: number) {
-  if (addEntries.value.length <= 1) return;
-  addEntries.value.splice(index, 1);
-}
-
-/** 数据类码输入：只允许数字，最多2位 */
-function onDataCategoryCodeInput(value: string) {
-  addForm.dataCategoryCode = value.replace(/\D/g, '').slice(0, 2);
-}
-
-/** 数据码输入：只允许数字，最多3位 */
-function onDataCodeInput(entry: { dataCode: string }) {
-  entry.dataCode = entry.dataCode.replace(/\D/g, '').slice(0, 3);
-}
-
-/** 切换添加方式时清空数据类码相关字段和数据码列表 */
-watch(addMode, () => {
-  addForm.dataCategoryCode = '';
-  addForm.dataCategoryName = '';
-  addEntries.value = [{ dataCode: '', dataName: '' }];
-  if (addForm.typeCode && addForm.secondClassCode) {
-    if (addMode.value === 'existing') {
-      loadAddDataTypeOptions();
-    } else {
-      fillNewCategoryCodeAndEntries();
-    }
-  }
-});
-
-/** 选择已有数据类码 → 自动填充名称 + 获取最大数据码并自动编号 */
-async function onAddDataCategorySelect(code: string) {
-  if (!code) { addForm.dataCategoryName = ''; return; }
-  const selected = addDataTypeOptions.value.find(o => o.code === code);
-  addForm.dataCategoryName = selected?.name || '';
-  try {
-    const mappedType = TYPE_CODE_MAP[addForm.typeCode] || addForm.typeCode;
-    const maxDataCode = await dictService.getMaxDataCode(addForm.secondClassCode, code, mappedType);
-    fillEntries(maxDataCode ? getNextDataCode(maxDataCode) : '001');
-  } catch {
-    fillEntries('001');
+function onAddCodeSuccess() {
+  if (quickSearchText.value.trim()) {
+    onQuickSearchInput();
   }
 }
-
-/** 二级类码变更 → 加载已有数据类码 或 自动填充新增数据类码 */
-async function onAddSecondClassChange() {
-  addForm.dataCategoryCode = '';
-  addForm.dataCategoryName = '';
-  addDataTypeOptions.value = [];
-  addEntries.value = [{ dataCode: '', dataName: '' }];
-  if (!addForm.typeCode || !addForm.secondClassCode) return;
-
-  if (addMode.value === 'existing') {
-    await loadAddDataTypeOptions();
-  } else {
-    await fillNewCategoryCodeAndEntries();
-  }
-}
-
-/** 新增数据类码模式：取最大数据类码+1 并初始化数据码从001开始 */
-async function fillNewCategoryCodeAndEntries() {
-  try {
-    const mappedType = TYPE_CODE_MAP[addForm.typeCode] || addForm.typeCode;
-    const maxCategoryCode = await dictService.getMaxDataCategoryCode(addForm.secondClassCode, mappedType);
-    const nextCode = maxCategoryCode ? getNextCategoryCode(maxCategoryCode) : '01';
-    // 如果溢出（超过2位），则留空让用户手动输入
-    addForm.dataCategoryCode = nextCode.length <= 2 ? nextCode : '';
-    fillEntries('001');
-  } catch {
-    addForm.dataCategoryCode = '01';
-    fillEntries('001');
-  }
-}
-
-async function loadAddDataTypeOptions() {
-  try {
-    const mappedType = TYPE_CODE_MAP[addForm.typeCode] || addForm.typeCode;
-    addDataTypeOptions.value = await dictService.getDataTypeBySecondClass(mappedType, addForm.secondClassCode);
-  } catch {
-    addDataTypeOptions.value = [];
-  }
-}
-
-// F/G/Y 映射到具体类型码，用于加载二级类码
-const TYPE_CODE_MAP: Record<string, string> = {
-  F: 'F1',
-  S: 'S1',
-  G: 'G1',
-  Y: 'Y0',
-};
-
-async function onAddTypeChange() {
-  addForm.secondClassCode = '';
-  addForm.dataCategoryCode = '';
-  addForm.dataCategoryName = '';
-  addEntries.value = [{ dataCode: '', dataName: '' }];
-  addSecondClassOptions.value = [];
-  addDataTypeOptions.value = [];
-  if (addForm.typeCode) {
-    const mappedType = TYPE_CODE_MAP[addForm.typeCode];
-    if (mappedType) {
-      try {
-        addSecondClassOptions.value = await dictService.getSecondClassByType(mappedType);
-      } catch {
-        addSecondClassOptions.value = [];
-      }
-    }
-  }
-}
-
-async function handleAddSave() {
-  if (!addFormValid.value) return;
-  addLoading.value = true;
-  try {
-    const secondClass = addSecondClassOptions.value.find(item => item.code === addForm.secondClassCode);
-    await dictService.batchCreateManualCode({
-      mode: addMode.value,
-      typeCode: addForm.typeCode,
-      secondClassCode: addForm.secondClassCode,
-      secondClassName: secondClass?.name || '',
-      entries: addEntries.value.map(e => ({
-        dataCategoryCode: addForm.dataCategoryCode,
-        dataCategoryName: addForm.dataCategoryName,
-        dataCode: e.dataCode,
-        dataName: e.dataName,
-      })),
-    });
-    ElMessage.success(`新增成功，共 ${addEntries.value.length} 条`);
-    showAddDialog.value = false;
-    // 重置表单
-    addMode.value = 'existing';
-    addForm.typeCode = '';
-    addForm.secondClassCode = '';
-    addForm.dataCategoryCode = '';
-    addForm.dataCategoryName = '';
-    addEntries.value = [{ dataCode: '', dataName: '' }];
-    addSecondClassOptions.value = [];
-    addDataTypeOptions.value = [];
-    // 如果当前有搜索文本，刷新搜索结果
-    if (quickSearchText.value.trim()) {
-      onQuickSearchInput();
-    }
-  } catch (err: any) {
-    ElMessage.error(err.message || '新增失败');
-  } finally {
-    addLoading.value = false;
-  }
-}
-
-// 监听对话框打开
-watch(showAddDialog, (val) => {
-  if (!val) {
-    addMode.value = 'existing';
-    addForm.typeCode = '';
-    addForm.secondClassCode = '';
-    addForm.dataCategoryCode = '';
-    addForm.dataCategoryName = '';
-    addEntries.value = [{ dataCode: '', dataName: '' }];
-    addSecondClassOptions.value = [];
-    addDataTypeOptions.value = [];
-  }
-});
 
 /** 最近搜索标签 */
 const RECENT_SEARCH_KEY = 'quick_recent_searches';
@@ -2889,69 +2634,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 
 .name-editor {
   width: 100%;
-}
-
-.code-name-pair {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-
-/* 批量新增编码字典 - 表格列表 */
-.batch-entry-table {
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  padding: 12px;
-  width: 100%;
-}
-
-.batch-entry-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 0 8px 0;
-  font-size: 12px;
-  color: #909399;
-  font-weight: 600;
-  border-bottom: 1px solid #ebeef5;
-  margin-bottom: 8px;
-}
-
-.batch-entry-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.batch-entry-row:last-child {
-  margin-bottom: 0;
-}
-
-.batch-entry-col-code {
-  width: 110px;
-  flex-shrink: 0;
-}
-
-.batch-entry-col-name {
-  flex: 1;
-  min-width: 0;
-}
-
-.batch-entry-col-action {
-  width: 50px;
-  flex-shrink: 0;
-  text-align: center;
-}
-
-.batch-entry-add-btn {
-  margin-top: 8px;
-  width: 100%;
-}
-
-.batch-entry-count {
-  font-size: 13px;
-  color: #909399;
 }
 
 /* ==================== 表格通用样式 ==================== */

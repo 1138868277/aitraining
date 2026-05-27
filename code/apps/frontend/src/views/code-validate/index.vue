@@ -50,7 +50,7 @@
                       size="small"
                       type="warning"
                       class="source-tag"
-                    >手动添加</el-tag>
+                    >{{ sourceLabel(data.isManual) }}</el-tag>
                     <el-tag
                       v-else-if="data.type === 'dataCode' && data.isManual === '0'"
                       size="small"
@@ -74,23 +74,26 @@
           <div class="subpage-hero">
             <div class="hero-icon">📝</div>
             <div class="hero-text">
-              <div class="hero-title">数据码管理</div>
-              <div class="hero-subtitle">手动添加数据码词典，录入新增的数据类码及其对应的数据码，支持批量操作和Excel导出</div>
+              <div class="hero-title">数据码新增和审批</div>
+              <div class="hero-subtitle">手动新增数据码并提交集团审批，审批通过后将自动下发给所有区域使用</div>
             </div>
           </div>
-          <div class="list-header">
-            <span class="list-header-title">新增数据码记录</span>
-            <div class="list-header-actions">
-              <el-button @click="resetTable">一键重置</el-button>
-              <el-button @click="loadManualStats">刷新</el-button>
-              <el-button
-                v-if="manualStats.length > 0"
-                type="primary"
-                @click="handleExportStats"
-              >导出Excel</el-button>
+          <div class="section-card" style="margin-top: 10px;">
+            <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="section-title">新增数据码记录</span>
+              <div style="display:flex;gap:8px;">
+                <el-button type="primary" @click="showAddDialog = true">
+                  <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增数据码
+                </el-button>
+                <el-button @click="resetTable">一键重置</el-button>
+                <el-button @click="loadManualStats">刷新</el-button>
+                <el-button
+                  v-if="manualStats.length > 0"
+                  type="primary"
+                  @click="handleExportStats"
+                >导出Excel</el-button>
+              </div>
             </div>
-          </div>
-          <div class="data-mgmt-section">
             <el-table
               ref="statsTableRef"
               :data="manualStats"
@@ -137,8 +140,27 @@
                   <span class="time-cell">{{ formatTime(row.createTm) }}</span>
                 </template>
               </el-table-column>
+              <el-table-column label="状态" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="!row.status" type="info" size="small">未提交</el-tag>
+                  <el-tag v-else-if="row.status === 'submitted'" type="warning" size="small">审批中</el-tag>
+                  <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
+                  <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已驳回</el-tag>
+                  <el-tag v-else type="info" size="small">{{ row.status }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="170" fixed="right" align="center">
+                <template #default="{ row }">
+                  <template v-if="!row.status || row.status === 'rejected'">
+                    <el-button type="primary" link size="small" :loading="submittingId === row.dataCode" @click="handleSubmitApproval(row)">提交审批</el-button>
+                    <el-button type="danger" link size="small" :loading="deletingId === row.dataCode" @click="handleDeleteCode(row)">删除</el-button>
+                    <span v-if="row.status === 'rejected' && row.rejectReason" style="color: #f56c6c; font-size: 12px; display: block; margin-top: 2px;">{{ row.rejectReason }}</span>
+                  </template>
+                  <span v-else-if="row.status === 'submitted'" style="color: #909399; font-size: 12px;">等待审核</span>
+                  <span v-else style="color: #c0c4cc;">-</span>
+                </template>
+              </el-table-column>
             </el-table>
-            <el-empty v-if="!loadingStats && manualStats.length === 0" description="暂无手动添加记录" />
             <div v-if="statsTotal > 0" class="data-mgmt-pagination">
               <el-pagination
                 v-model:current-page="statsPageNum"
@@ -152,11 +174,92 @@
               />
             </div>
           </div>
+
+          <!-- 提交记录 -->
+          <div class="section-card" style="margin-top: 16px;">
+            <div class="section-header">
+              <span class="section-title">我的提交记录</span>
+            </div>
+            <el-table :data="submissions" stripe style="width:100%" class="styled-table" v-loading="loadingSubmissions" empty-text="暂无提交记录" :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }">
+              <el-table-column type="index" label="序号" width="60" align="center">
+                <template #default="{ $index }">
+                  {{ ($index + 1) + (subPageNum - 1) * subPageSize }}
+                </template>
+              </el-table-column>
+              <el-table-column label="类型" width="150" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.typeCode" :type="statsTypeTagType(row.typeCode)" size="small" effect="plain">{{ statsTypeLabel(row.typeCode) }}</el-tag>
+                  <el-tag v-else size="small" type="danger">未识别</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="二级类码" min-width="180">
+                <template #default="{ row }">
+                  <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.secondClassCode }}</el-tag>
+                  <span class="cell-name-tag">{{ row.secondClassName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="数据类码" min-width="180">
+                <template #default="{ row }">
+                  <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCategoryCode }}</el-tag>
+                  <span class="cell-name-tag">{{ row.dataCategoryName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="数据码" min-width="180">
+                <template #default="{ row }">
+                  <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCode }}</el-tag>
+                  <span class="cell-name-tag">{{ row.dataName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="120" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.status === 'submitted'" type="warning" size="small">待审批</el-tag>
+                  <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
+                  <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已拒绝</el-tag>
+                  <el-tag v-else type="info" size="small">{{ row.status }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="审批意见" min-width="160">
+                <template #default="{ row }">
+                  <span v-if="row.rejectReason" style="color: #f56c6c; font-size: 12px;">{{ row.rejectReason }}</span>
+                  <span v-else style="color: #c0c4cc;">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="提交时间" width="170">
+                <template #default="{ row }">
+                  <span class="time-cell">{{ formatTime(row.submitTm || row.createTm) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="审批时间" width="170">
+                <template #default="{ row }">
+                  <span class="time-cell">{{ row.reviewTm ? formatTime(row.reviewTm) : '-' }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div v-if="subTotal > 0" class="data-mgmt-pagination">
+              <el-pagination
+                v-model:current-page="subPageNum"
+                v-model:page-size="subPageSize"
+                :total="subTotal"
+                :page-sizes="[10, 20, 50]"
+                layout="total, sizes, prev, pager, next"
+                background
+                @current-change="loadSubmissions"
+                @size-change="loadSubmissions"
+              />
+            </div>
+          </div>
         </el-tab-pane>
 
-        <!-- Tab 3: 数据码审批 -->
-        <el-tab-pane label="数据码审批" name="approval">
-          <CodeApprovalTab />
+        <!-- Tab 3: 数据码审批（仅admin可见） -->
+        <el-tab-pane v-if="currentUser === 'admin'" label="数据码审批" name="approval">
+          <div class="subpage-hero">
+            <div class="hero-icon">📋</div>
+            <div class="hero-text">
+              <div class="hero-title">数据码审批</div>
+              <div class="hero-subtitle">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</div>
+            </div>
+          </div>
+          <ApprovalMgmtTab />
         </el-tab-pane>
 
         <!-- Tab 4: 场站维护 -->
@@ -165,24 +268,47 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+    <AddCodeDialog v-model="showAddDialog" @success="onAddCodeSuccess" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Plus } from '@element-plus/icons-vue';
 import * as XLSX from 'xlsx';
 import * as validateService from '@/services/validate';
+import * as approvalService from '@/services/approval';
 import DictOverviewCard from './dict-overview-card.vue';
 import StationTab from './station-tab.vue';
-import CodeApprovalTab from './code-approval-tab.vue';
+import AddCodeDialog from '@/components/add-code-dialog.vue';
+import ApprovalMgmtTab from '@/views/system-settings/approval-mgmt-tab.vue';
 import type { DictTreeNode, ManualStatItem } from '@cec/contracts';
 
 // ========== Tab Switching ==========
 const route = useRoute();
 const router = useRouter();
-const activeTab = ref((route.query.tab as string) || 'dictTree');
+
+const authUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
+const currentUser = authUser?.username || '';
+
+const tenantDisplayNames: Record<string, string> = {
+  yunnan: '云南区域',
+  fujian: '福建区域',
+  admin: '集团',
+};
+
+function sourceLabel(isManual?: string): string {
+  if (isManual === '1') return tenantDisplayNames[currentUser] || currentUser;
+  return '集团统一';
+}
+
+const activeTab = ref(
+  currentUser !== 'admin' && (route.query.tab as string) === 'approval'
+    ? 'dictTree'
+    : (route.query.tab as string) || 'dictTree'
+);
 
 watch(activeTab, (tab) => {
   router.replace({ query: { ...route.query, tab } });
@@ -298,6 +424,96 @@ const statsTypeFilter = ref('');
 const statsSecondClassFilter = ref('');
 const typeOptions = ref<Array<{ code: string; name: string }>>([]);
 const secondClassOptions = ref<Array<{ code: string; name: string }>>([]);
+
+/** 新增数据码对话框 */
+const showAddDialog = ref(false);
+function onAddCodeSuccess() {
+  loadManualStats();
+}
+
+/** 提交审批和删除操作 */
+const submittingId = ref<string | null>(null);
+const deletingId = ref<string | null>(null);
+
+async function handleSubmitApproval(row: any) {
+  try {
+    await ElMessageBox.confirm(
+      `确定提交「${row.dataCode} ${row.dataName}」到审批吗？`,
+      '提交审批',
+      { confirmButtonText: '确定提交', cancelButtonText: '取消', type: 'info' },
+    );
+    submittingId.value = row.dataCode;
+    const domainCode = row.typeCode ? row.typeCode.charAt(0) : '';
+    if (!domainCode) {
+      ElMessage.warning('无法确定类型域代码');
+      return;
+    }
+    await validateService.submitCodeForApproval({
+      typeDomainCode: domainCode,
+      secondClassCode: row.secondClassCode,
+      dataCategoryCode: row.dataCategoryCode,
+      dataCode: row.dataCode,
+    });
+    ElMessage.success('已提交审批，请等待集团审核');
+    loadManualStats();
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.code !== 'cancel') {
+      ElMessage.error(err.response?.data?.message || '提交失败');
+    }
+  } finally {
+    submittingId.value = null;
+  }
+}
+
+async function handleDeleteCode(row: any) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${row.dataCode} ${row.dataName}」吗？删除后不可恢复。`,
+      '确认删除',
+      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' },
+    );
+    deletingId.value = row.dataCode;
+    const domainCode = row.typeCode ? row.typeCode.charAt(0) : '';
+    if (!domainCode) {
+      ElMessage.warning('无法确定类型域代码');
+      return;
+    }
+    await validateService.deleteManualCode({
+      typeDomainCode: domainCode,
+      secondClassCode: row.secondClassCode,
+      dataCategoryCode: row.dataCategoryCode,
+      dataCode: row.dataCode,
+    });
+    ElMessage.success('已删除');
+    loadManualStats();
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.code !== 'cancel') {
+      ElMessage.error(err.response?.data?.message || '删除失败');
+    }
+  } finally {
+    deletingId.value = null;
+  }
+}
+
+/** 提交记录 */
+const submissions = ref<any[]>([]);
+const loadingSubmissions = ref(false);
+const subTotal = ref(0);
+const subPageNum = ref(1);
+const subPageSize = ref(20);
+
+async function loadSubmissions() {
+  loadingSubmissions.value = true;
+  try {
+    const result = await approvalService.getMySubmissions(subPageNum.value, subPageSize.value);
+    submissions.value = result.items;
+    subTotal.value = result.total;
+  } catch {
+    ElMessage.error('加载提交记录失败');
+  } finally {
+    loadingSubmissions.value = false;
+  }
+}
 
 /** 表头筛选：类型选项 */
 const typeFilterOptions = computed(() => {
@@ -447,6 +663,7 @@ async function handleExportStats() {
 onMounted(() => {
   loadDictTree();
   loadManualStats();
+  loadSubmissions();
 });
 </script>
 
@@ -570,48 +787,8 @@ onMounted(() => {
 .child-count { font-size: 12px; color: #909399; }
 
 /* ==================== Tab 2: 数据码管理 ==================== */
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding: 12px 16px;
-  background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
-}
-.list-header-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 12px;
-}
-.list-header-title::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 2px;
-  bottom: 2px;
-  width: 3px;
-  border-radius: 2px;
-  background: #409eff;
-}
-.list-header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.data-mgmt-section {
-  background: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  border: 1px solid #f0f0f0;
-  padding: 4px;
-  overflow: hidden;
-}
 .data-mgmt-pagination {
-  padding: 14px 16px;
+  padding: 8px 14px;
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid #f5f5f5;
@@ -655,7 +832,7 @@ onMounted(() => {
   background: #e8f0fe !important;
 }
 .styled-table :deep(.el-table__cell) {
-  padding: 8px 0 !important;
+  padding: 4px 0 !important;
 }
 .styled-table :deep(.el-table--border) { border-color: #ebeef5; }
 
@@ -670,13 +847,45 @@ onMounted(() => {
   color: #909399;
 }
 
+/* ==================== 提交记录卡片 ==================== */
+.section-card {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 12px;
+}
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: #409eff;
+}
+
 /* ==================== 子页面功能介绍卡片 ==================== */
 .subpage-hero {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 20px;
-  margin-bottom: 16px;
+  padding: 12px 18px;
+  margin-bottom: 10px;
   background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);

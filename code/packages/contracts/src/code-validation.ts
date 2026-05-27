@@ -32,6 +32,12 @@ export const manualStatItemSchema = z.object({
   createTm: z.string(),
   typeCode: z.string().optional(),
   typeName: z.string().optional(),
+  /** 审批状态: draft | submitted | approved | rejected | null（null=未提交） */
+  status: z.string().nullable().optional(),
+  /** 驳回原因 */
+  rejectReason: z.string().nullable().optional(),
+  /** 草稿ID（用于操作关联） */
+  draftId: z.number().nullable().optional(),
 });
 
 export type ManualStatItem = z.infer<typeof manualStatItemSchema>;

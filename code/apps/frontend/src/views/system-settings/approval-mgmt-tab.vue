@@ -26,52 +26,57 @@
     <!-- 审批表格 -->
     <div class="table-container">
       <el-table :data="items" stripe style="width:100%" v-loading="loading" empty-text="暂无审批记录">
-        <el-table-column type="index" label="序号" width="60" align="center">
+        <el-table-column type="index" label="序号" align="center">
           <template #default="{ $index }">
             {{ ($index + 1) + (pageNum - 1) * pageSize }}
           </template>
         </el-table-column>
-        <el-table-column label="来源区域" width="110" align="center">
+        <el-table-column label="来源区域" align="center">
           <template #default="{ row }">
             <el-tag effect="plain" color="#e8f4fd" style="color:#1677ff;border:none;">{{ row.sourceTenant }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="二级类码" width="150">
+        <el-table-column label="类型" align="center">
+          <template #default="{ row }">
+            <el-tag :type="typeTagType(row.typeCode)" size="small" effect="plain">{{ typeLabel(row.typeCode) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="二级类码">
           <template #default="{ row }">
             <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none;">{{ row.secondClassCode }}</el-tag>
             <span class="cell-name-tag">{{ row.secondClassName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="数据类码" width="140">
+        <el-table-column label="数据类码">
           <template #default="{ row }">
             <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none;">{{ row.dataCategoryCode }}</el-tag>
             <span class="cell-name-tag">{{ row.dataCategoryName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="数据码" width="140">
+        <el-table-column label="数据码">
           <template #default="{ row }">
             <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none;">{{ row.dataCode }}</el-tag>
             <span class="cell-name-tag">{{ row.dataName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="提交人" width="100" align="center">
-          <template #default="{ row }">
-            {{ row.submitter }}
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column label="状态" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.status === 'pending'" type="warning" size="small">待审批</el-tag>
             <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
             <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已拒绝</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="提交时间" width="170">
+        <el-table-column label="提交时间">
           <template #default="{ row }">
             <span class="time-cell">{{ formatTime(row.submitTm) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="审批时间">
+          <template #default="{ row }">
+            <span class="time-cell">{{ row.status === 'pending' ? '-' : formatTime(row.reviewTm) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center">
           <template #default="{ row }">
             <template v-if="row.status === 'pending'">
               <el-button type="primary" link size="small" @click="handleApprove(row)">通过</el-button>
@@ -206,6 +211,24 @@ function formatTime(tm: string): string {
   const d = new Date(tm);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function typeLabel(code: string): string {
+  if (!code) return '其他';
+  const first = code.charAt(0).toUpperCase();
+  if (first === 'F') return '风电';
+  if (first === 'G') return '光伏';
+  if (first === 'S') return '水电';
+  return '其他';
+}
+
+function typeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' {
+  if (!code) return 'info';
+  const first = code.charAt(0).toUpperCase();
+  if (first === 'F') return 'primary';
+  if (first === 'G') return 'success';
+  if (first === 'S') return 'info';
+  return 'warning';
 }
 
 onMounted(() => {

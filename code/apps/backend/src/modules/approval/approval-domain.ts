@@ -158,7 +158,8 @@ export async function getMySubmissions(
       data_category_name AS "dataCategoryName",
       data_code AS "dataCode", data_name AS "dataName",
       status, reject_reason AS "rejectReason",
-      submit_tm AS "submitTm", create_tm AS "createTm"
+      submit_tm AS "submitTm", create_tm AS "createTm",
+      modify_tm AS "reviewTm"
     FROM ${getSchema()}.cec_new_energy_code_draft
     WHERE creator = $1
     ORDER BY create_tm DESC
@@ -275,7 +276,7 @@ export function getRegionTenantIds(): string[] {
   return TENANTS.filter(t => t.id !== 'admin').map(t => t.id);
 }
 
-/** 遍历所有区域插入数据码 */
+/** 遍历所有区域插入数据码（跳过来源区域，避免重复） */
 export async function distributeToAllRegions(data: {
   typeCode: string;
   secondClassCode: string;
@@ -285,13 +286,34 @@ export async function distributeToAllRegions(data: {
   dataCode: string;
   dataName: string;
   creator: string;
+  skipTenant?: string;
 }): Promise<void> {
-  const regionTenants = TENANTS.filter(t => t.id !== 'admin');
-
   const typeDomainCode = getTypeDomainCode(data.typeCode);
   const firstClassCode = 'B1';
   const firstClassName = '生产运行';
 
+  // 1. 写入集团数据码库，作为全量基准
+  try {
+    const adminSchema = getAdminSchema();
+    await queryAsTenant(
+      'admin',
+      `INSERT INTO ${adminSchema}.cec_new_energy_code_dict
+        (type_domain_code, type_code, first_class_code, first_class_name,
+         second_class_code, second_class_name,
+         data_category_code, data_category_name, data_code, data_name,
+         is_manual, creator, create_tm, modifier, modify_tm)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '0', $11, NOW(), $11, NOW())`,
+      [typeDomainCode, data.typeCode, firstClassCode, firstClassName,
+       data.secondClassCode, data.secondClassName,
+       data.dataCategoryCode, data.dataCategoryName,
+       data.dataCode, data.dataName, data.creator],
+    );
+  } catch (err) {
+    console.error('Failed to distribute code to admin:', err);
+  }
+
+  // 2. 下发到各区域（来源区域已存在，跳过）
+  const regionTenants = TENANTS.filter(t => t.id !== 'admin' && t.id !== data.skipTenant);
   for (const tenant of regionTenants) {
     const schema = tenant.datasource.schema;
     const sql = `INSERT INTO ${schema}.cec_new_energy_code_dict
@@ -299,7 +321,7 @@ export async function distributeToAllRegions(data: {
        second_class_code, second_class_name,
        data_category_code, data_category_name, data_code, data_name,
        is_manual, creator, create_tm, modifier, modify_tm)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '1', $11, NOW(), $11, NOW())`;
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '0', $11, NOW(), $11, NOW())`;
 
     try {
       await queryAsTenant(tenant.id, sql, [
@@ -319,6 +341,29 @@ export async function distributeToAllRegions(data: {
       console.error(`Failed to distribute code to tenant ${tenant.id}:`, err);
     }
   }
+}
+
+/** 审批通过后删除集团（admin）的手动编码记录（集团自审批场景） */
+export async function deleteAdminManualDictRecord(fields: {
+  typeCode: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+}): Promise<void> {
+  const schema = getAdminSchema();
+  const typeDomainCode = getTypeDomainCode(fields.typeCode);
+  await queryAsTenant(
+    'admin',
+    `UPDATE ${schema}.cec_new_energy_code_dict
+     SET if_delete = '1', modify_tm = NOW()
+     WHERE type_domain_code = $1
+       AND second_class_code = $2
+       AND data_category_code = $3
+       AND data_code = $4
+       AND if_delete = '0'
+       AND is_manual = '1'`,
+    [typeDomainCode, fields.secondClassCode, fields.dataCategoryCode, fields.dataCode],
+  );
 }
 
 /** 根据审批 ID 更新来源区域的草稿状态为 approved */
@@ -346,5 +391,29 @@ export async function updateDraftStatusRejected(sourceTenant: string, approvalId
      SET status = 'rejected', reject_reason = $1, modify_tm = NOW()
      WHERE approval_id = $2`,
     [reason, approvalId],
+  );
+}
+
+/** 软删除来源区域的手动编码记录（驳回时调用） */
+export async function deleteSourceTenantDictRecord(sourceTenant: string, fields: {
+  typeDomainCode: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+}): Promise<void> {
+  const tenant = TENANTS.find(t => t.id === sourceTenant);
+  if (!tenant) return;
+  const schema = tenant.datasource.schema;
+  await queryAsTenant(
+    sourceTenant,
+    `UPDATE ${schema}.cec_new_energy_code_dict
+     SET if_delete = '1', modify_tm = NOW()
+     WHERE type_domain_code = $1
+       AND second_class_code = $2
+       AND data_category_code = $3
+       AND data_code = $4
+       AND if_delete = '0'
+       AND is_manual = '1'`,
+    [fields.typeDomainCode, fields.secondClassCode, fields.dataCategoryCode, fields.dataCode],
   );
 }

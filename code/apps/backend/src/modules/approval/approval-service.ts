@@ -98,6 +98,7 @@ export async function approveApproval(approvalId: number, reviewer: string) {
   await approvalDomain.approveRecord(approvalId, reviewer);
 
   // 3. 下发到所有区域
+  const isAdminSelfApproval = record.sourceTenant === 'admin';
   await approvalDomain.distributeToAllRegions({
     typeCode: record.typeCode,
     secondClassCode: record.secondClassCode,
@@ -107,16 +108,33 @@ export async function approveApproval(approvalId: number, reviewer: string) {
     dataCode: record.dataCode,
     dataName: record.dataName,
     creator: reviewer,
+    // 集团自审批：不下发到集团（集团已有 is_manual='0' 的基准记录），下发到所有区域
+    // 区域审批：跳过来源区域（来源区域已有 is_manual='0' 的基准记录）
+    skipTenant: isAdminSelfApproval ? undefined : record.sourceTenant,
   });
 
-  // 4. 更新来源区域的草稿状态
+  // 4. 集团自审批：清理集团原有的 is_manual='1' 手动记录
+  if (isAdminSelfApproval) {
+    try {
+      await approvalDomain.deleteAdminManualDictRecord({
+        typeCode: record.typeCode,
+        secondClassCode: record.secondClassCode,
+        dataCategoryCode: record.dataCategoryCode,
+        dataCode: record.dataCode,
+      });
+    } catch (err) {
+      console.error('Failed to delete admin manual dict record:', err);
+    }
+  }
+
+  // 5. 更新来源区域的草稿状态
   try {
     await approvalDomain.updateDraftStatusBySourceTenant(record.sourceTenant, approvalId, 'approved');
   } catch (err) {
     console.error(`Failed to update draft status for tenant ${record.sourceTenant}:`, err);
   }
 
-  // 5. 失效字典树缓存
+  // 6. 失效字典树缓存
   invalidateDictTreeCache();
 }
 
@@ -139,5 +157,17 @@ export async function rejectApproval(approvalId: number, reason: string, reviewe
     await approvalDomain.updateDraftStatusRejected(record.sourceTenant, approvalId, reason);
   } catch (err) {
     console.error(`Failed to update draft reject status for tenant ${record.sourceTenant}:`, err);
+  }
+
+  // 4. 软删除来源区域的手动编码记录，避免出现在快速检索中
+  try {
+    await approvalDomain.deleteSourceTenantDictRecord(record.sourceTenant, {
+      typeDomainCode: record.typeCode,
+      secondClassCode: record.secondClassCode,
+      dataCategoryCode: record.dataCategoryCode,
+      dataCode: record.dataCode,
+    });
+  } catch (err) {
+    console.error(`Failed to delete source tenant dict record for ${record.sourceTenant}:`, err);
   }
 }

@@ -32,6 +32,9 @@ export interface ManualStatItem {
   createTm: string;
   typeCode?: string;
   typeName?: string;
+  status?: string | null;
+  rejectReason?: string | null;
+  draftId?: number | null;
 }
 
 /** 获取字典树数据（三级：类型域→二级类码→数据类码，数据码展开时懒加载） */
@@ -320,8 +323,17 @@ export async function getManualStatistics(
                  AND sct.type_code LIKE d.type_domain_code || '%'
                  AND sct.if_delete = '0' AND t.if_delete = '0'
                LIMIT 1)
-            ) AS "typeName"
+            ) AS "typeName",
+            dr.status AS "status",
+            dr.reject_reason AS "rejectReason",
+            dr.draft_id AS "draftId"
      FROM ${getSchema()}.cec_new_energy_code_dict d
+     LEFT JOIN ${getSchema()}.cec_new_energy_code_draft dr
+       ON dr.type_code = d.type_domain_code
+      AND dr.second_class_code = d.second_class_code
+      AND dr.data_category_code = d.data_category_code
+      AND dr.data_code = d.data_code
+      AND dr.status IN ('submitted', 'approved', 'rejected')
      WHERE ${whereClause}
      ORDER BY ${orderBy}
      LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
@@ -608,4 +620,60 @@ export async function batchCorrectCodes(
   }
 
   return results;
+}
+
+/** 根据字段查询数据码字典条目 */
+export async function getDictEntryByFields(fields: {
+  typeDomainCode: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+}): Promise<{
+  secondClassName: string;
+  dataCategoryName: string;
+  dataName: string;
+} | null> {
+  const sql = `SELECT second_class_name AS "secondClassName",
+                      data_category_name AS "dataCategoryName",
+                      data_name AS "dataName"
+               FROM ${getSchema()}.cec_new_energy_code_dict
+               WHERE type_domain_code = $1
+                 AND second_class_code = $2
+                 AND data_category_code = $3
+                 AND data_code = $4
+                 AND if_delete = '0'
+                 AND is_manual = '1'
+               LIMIT 1`;
+  const rows = await dbQuery<any>(sql, [
+    fields.typeDomainCode,
+    fields.secondClassCode,
+    fields.dataCategoryCode,
+    fields.dataCode,
+  ]);
+  return rows[0] || null;
+}
+
+/** 软删除手动添加的数据码 */
+export async function deleteManualCode(fields: {
+  typeDomainCode: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+}): Promise<boolean> {
+  const sql = `UPDATE ${getSchema()}.cec_new_energy_code_dict
+               SET if_delete = '1', modify_tm = NOW()
+               WHERE type_domain_code = $1
+                 AND second_class_code = $2
+                 AND data_category_code = $3
+                 AND data_code = $4
+                 AND if_delete = '0'
+                 AND is_manual = '1'
+               RETURNING data_code`;
+  const result = await dbQuery<{ data_code: string }>(sql, [
+    fields.typeDomainCode,
+    fields.secondClassCode,
+    fields.dataCategoryCode,
+    fields.dataCode,
+  ]);
+  return result.length > 0;
 }

@@ -51,6 +51,27 @@ export async function exportManualStatistics(secondClassCode?: string, typeCode?
   return res.data;
 }
 
+/** 提交手动添加的数据码到审批 */
+export async function submitCodeForApproval(data: {
+  typeDomainCode: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+}): Promise<{ draftId: number }> {
+  const res = await api.post('/dict/manual-code/submit-approval', data);
+  return res.data;
+}
+
+/** 删除手动添加的数据码 */
+export async function deleteManualCode(data: {
+  typeDomainCode: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+}): Promise<void> {
+  await api.delete('/dict/manual-code', { params: data });
+}
+
 /** 编码修正：批量修正编码 */
 export async function batchCorrectCodes(
   items: Array<{ code: string; description: string; modification: string }>,

@@ -4,6 +4,21 @@ import * as validateService from '../code-validation/validate-service.js';
 import { success, error } from '../../common/response.js';
 import { ErrorCode } from '@cec/contracts';
 
+/** 从请求头解析用户信息 */
+function getUserInfo(req: Request): { username: string; tenant: string } | null {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+    const token = authHeader.slice(7);
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+    return { username: payload.username, tenant: payload.tenant };
+  } catch {
+    return null;
+  }
+}
+
 const router: Router = Router();
 
 /** 编码解析：解析31位编码的各段信息 */
@@ -153,6 +168,49 @@ router.get('/api/dict/manual-statistics/export', async (req: Request, res: Respo
   }
 });
 
+/** 根据类型代码和二级类码获取数据类码（必须在通配路由之前注册） */
+router.get('/api/dict/data-type/filter', async (req: Request, res: Response) => {
+  try {
+    const typeCode = req.query.typeCode as string | undefined;
+    const secondClassCode = req.query.secondClassCode as string | undefined;
+    if (!typeCode || !secondClassCode) {
+      error(res, ErrorCode.DICT_LOAD_FAILED, '类型代码和二级类码不能为空', 400);
+      return;
+    }
+    const items = await dictService.getDataTypeBySecondClass(typeCode, secondClassCode);
+    success(res, { items });
+  } catch (err) {
+    console.error('Failed to load data type by second class:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '数据类码加载失败，请刷新重试', 500);
+  }
+});
+
+/** 获取数据码（根据数据类码过滤，必须在通配路由之前注册） */
+router.get('/api/dict/data-code/:dataTypeCode', async (req: Request, res: Response) => {
+  try {
+    const { dataTypeCode } = req.params;
+    const secondClassCode = req.query.secondClassCode as string | undefined;
+    const typeCode = req.query.typeCode as string | undefined;
+    const items = await dictService.getDataCodes(dataTypeCode, secondClassCode, typeCode);
+    success(res, { items });
+  } catch (err) {
+    console.error('Failed to load data codes:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '数据码加载失败，请刷新重试', 500);
+  }
+});
+
+/** 根据类型代码获取二级类码列表（必须在通配路由之前注册） */
+router.get('/api/dict/second-class/:typeCode', async (req: Request, res: Response) => {
+  try {
+    const { typeCode } = req.params;
+    const items = await dictService.getSecondClassByType(typeCode);
+    success(res, { items });
+  } catch (err) {
+    console.error('Failed to load second class by type:', err);
+    error(res, ErrorCode.DICT_LOAD_FAILED, '二级类码加载失败，请刷新重试', 500);
+  }
+});
+
 /** 获取指定类型的字典数据 */
 router.get('/api/dict/:dictType', async (req: Request, res: Response) => {
   try {
@@ -177,49 +235,6 @@ router.get('/api/dict/:dictType/items', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Failed to load cascaded dict:', err);
     error(res, ErrorCode.DICT_LOAD_FAILED, '筛选条件加载失败，请刷新重试', 500);
-  }
-});
-
-/** 根据类型代码和二级类码获取数据类码 */
-router.get('/api/dict/data-type/filter', async (req: Request, res: Response) => {
-  try {
-    const typeCode = req.query.typeCode as string | undefined;
-    const secondClassCode = req.query.secondClassCode as string | undefined;
-    if (!typeCode || !secondClassCode) {
-      error(res, ErrorCode.DICT_LOAD_FAILED, '类型代码和二级类码不能为空', 400);
-      return;
-    }
-    const items = await dictService.getDataTypeBySecondClass(typeCode, secondClassCode);
-    success(res, { items });
-  } catch (err) {
-    console.error('Failed to load data type by second class:', err);
-    error(res, ErrorCode.DICT_LOAD_FAILED, '数据类码加载失败，请刷新重试', 500);
-  }
-});
-
-/** 获取数据码（根据数据类码过滤） */
-router.get('/api/dict/data-code/:dataTypeCode', async (req: Request, res: Response) => {
-  try {
-    const { dataTypeCode } = req.params;
-    const secondClassCode = req.query.secondClassCode as string | undefined;
-    const typeCode = req.query.typeCode as string | undefined;
-    const items = await dictService.getDataCodes(dataTypeCode, secondClassCode, typeCode);
-    success(res, { items });
-  } catch (err) {
-    console.error('Failed to load data codes:', err);
-    error(res, ErrorCode.DICT_LOAD_FAILED, '数据码加载失败，请刷新重试', 500);
-  }
-});
-
-/** 根据类型代码获取二级类码列表 */
-router.get('/api/dict/second-class/:typeCode', async (req: Request, res: Response) => {
-  try {
-    const { typeCode } = req.params;
-    const items = await dictService.getSecondClassByType(typeCode);
-    success(res, { items });
-  } catch (err) {
-    console.error('Failed to load second class by type:', err);
-    error(res, ErrorCode.DICT_LOAD_FAILED, '二级类码加载失败，请刷新重试', 500);
   }
 });
 
@@ -253,6 +268,68 @@ router.post('/api/dict/manual-code', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Failed to create manual dict code:', err);
     error(res, ErrorCode.SYSTEM_ERROR, '新增编码失败，请重试', 500);
+  }
+});
+
+/** 提交手动添加的数据码到审批 */
+router.post('/api/dict/manual-code/submit-approval', async (req: Request, res: Response) => {
+  try {
+    const userInfo = getUserInfo(req);
+    if (!userInfo) {
+      error(res, ErrorCode.AUTHENTICATION_FAILED, '未登录或登录已过期', 401);
+      return;
+    }
+
+    const { typeDomainCode, secondClassCode, dataCategoryCode, dataCode } = req.body;
+    if (!typeDomainCode || !secondClassCode || !dataCategoryCode || !dataCode) {
+      error(res, ErrorCode.MISSING_PARAMETER, '参数不完整', 400);
+      return;
+    }
+    const result = await validateService.submitCodeForApproval({
+      typeDomainCode,
+      secondClassCode,
+      dataCategoryCode,
+      dataCode,
+      submitter: userInfo.username,
+      sourceTenant: userInfo.tenant,
+    });
+    success(res, result);
+  } catch (err: any) {
+    if (err.code === 'DUPLICATE_SUBMISSION') {
+      error(res, ErrorCode.DUPLICATE_SUBMISSION, err.message, 400);
+      return;
+    }
+    if (err.code === 'RESOURCE_NOT_FOUND') {
+      error(res, ErrorCode.RESOURCE_NOT_FOUND, err.message, 404);
+      return;
+    }
+    console.error('Failed to submit code for approval:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '提交审批失败', 500);
+  }
+});
+
+/** 删除手动添加的数据码 */
+router.delete('/api/dict/manual-code', async (req: Request, res: Response) => {
+  try {
+    const { typeDomainCode, secondClassCode, dataCategoryCode, dataCode } = req.query;
+    if (!typeDomainCode || !secondClassCode || !dataCategoryCode || !dataCode) {
+      error(res, ErrorCode.MISSING_PARAMETER, '参数不完整', 400);
+      return;
+    }
+    const deleted = await validateService.deleteManualCode({
+      typeDomainCode: typeDomainCode as string,
+      secondClassCode: secondClassCode as string,
+      dataCategoryCode: dataCategoryCode as string,
+      dataCode: dataCode as string,
+    });
+    if (!deleted) {
+      error(res, ErrorCode.RESOURCE_NOT_FOUND, '数据码不存在或已被删除', 404);
+      return;
+    }
+    success(res, { deleted: true });
+  } catch (err) {
+    console.error('Failed to delete manual code:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '删除失败', 500);
   }
 });
 
