@@ -537,6 +537,31 @@ export async function getDictTypeDomainDist(): Promise<{
 
 // ========== 3. 全量测点统计 ==========
 
+// ========== 查询缓存（测点数据只随导入/清空变化） ==========
+const measureCache = new Map<string, { data: any; expiresAt: number }>();
+const CACHE_TTL_MS = 60_000; // 60秒
+
+function cacheGet<T>(key: string): T | null {
+  const entry = measureCache.get(key);
+  if (entry && Date.now() < entry.expiresAt) return entry.data as T;
+  measureCache.delete(key);
+  return null;
+}
+
+function cacheSet(key: string, data: any): void {
+  measureCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+function cacheClearMeasurement(): void {
+  // 清除所有测点相关的缓存键
+  for (const key of measureCache.keys()) {
+    if (key.includes(':measure:')) measureCache.delete(key);
+  }
+}
+
+// 仅首次启动时检查建表，避免每次请求都跑 DDL
+const tableVerifiedSchemas = new Set<string>();
+
 /** 导入状态存储 */
 export interface ImportTask {
   importing: boolean;
@@ -634,7 +659,7 @@ export async function importMeasurementFile(
 
   const batchId = store.batchId;
 
-  // 确保测点表存在
+  // 确保测点表存在，并创建分析查询所需的索引
   await queryAsTenant(tenantId, `CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
     id BIGSERIAL PRIMARY KEY,
     code VARCHAR(31) NOT NULL,
@@ -655,6 +680,9 @@ export async function importMeasurementFile(
     modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     if_delete CHAR(1) DEFAULT '0'
   )`);
+  await queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_type ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code)`);
+  await queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_second_class ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code, second_class_code)`);
+  await queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_station ON ${schema}.cec_new_energy_measurement_points (if_delete, station_code)`);
 
   // 先清空所有旧数据
   await queryAsTenant(tenantId, `DELETE FROM ${schema}.cec_new_energy_measurement_points`);
@@ -735,6 +763,8 @@ export async function importMeasurementFile(
     store.importing = false;
     store.status = 'COMPLETED';
     store.message = `导入完成，有效编码 ${validCount} 条（${sheetNames.length} 个Sheet）`;
+    tableVerifiedSchemas.add(schema);
+    cacheClearMeasurement();
 
     return { batchId };
   } catch (err: any) {
@@ -750,16 +780,25 @@ export async function getMeasureOverview(): Promise<{
   totalPoints: number; windCount: number; solarCount: number; otherCount: number; lastImportTime: string | null;
 }> {
   const schema = getSchema();
-  await query(`CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
-    id BIGSERIAL PRIMARY KEY, code VARCHAR(31) NOT NULL,
-    station_code VARCHAR(4), type_code VARCHAR(2), project_line_code VARCHAR(3),
-    prefix_no VARCHAR(1), first_class_code VARCHAR(2), second_class_code VARCHAR(3),
-    second_ext_code VARCHAR(4), third_class_code VARCHAR(3), third_ext_code VARCHAR(4),
-    data_category_code VARCHAR(2), data_code VARCHAR(3),
-    import_batch_id VARCHAR(50), creator VARCHAR(50) DEFAULT 'system',
-    create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP, modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    if_delete CHAR(1) DEFAULT '0'
-  )`);
+  const cacheKey = `${schema}:measure:overview`;
+  const cached = cacheGet<{
+    totalPoints: number; windCount: number; solarCount: number; otherCount: number; lastImportTime: string | null;
+  }>(cacheKey);
+  if (cached) return cached;
+
+  if (!tableVerifiedSchemas.has(schema)) {
+    await query(`CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
+      id BIGSERIAL PRIMARY KEY, code VARCHAR(31) NOT NULL,
+      station_code VARCHAR(4), type_code VARCHAR(2), project_line_code VARCHAR(3),
+      prefix_no VARCHAR(1), first_class_code VARCHAR(2), second_class_code VARCHAR(3),
+      second_ext_code VARCHAR(4), third_class_code VARCHAR(3), third_ext_code VARCHAR(4),
+      data_category_code VARCHAR(2), data_code VARCHAR(3),
+      import_batch_id VARCHAR(50), creator VARCHAR(50) DEFAULT 'system',
+      create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP, modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      if_delete CHAR(1) DEFAULT '0'
+    )`);
+    tableVerifiedSchemas.add(schema);
+  }
   const sql = `SELECT
       COUNT(*) AS total,
       COUNT(CASE WHEN type_code LIKE 'F%' OR type_code = '01' THEN 1 END) AS wind,
@@ -770,13 +809,15 @@ export async function getMeasureOverview(): Promise<{
     FROM ${schema}.cec_new_energy_measurement_points
     WHERE if_delete = '0'`;
   const r = await query<{ total: string; wind: string; solar: string; other: string; last_import_time: string }>(sql);
-  return {
+  const result = {
     totalPoints: Number(r[0]?.total || 0),
     windCount: Number(r[0]?.wind || 0),
     solarCount: Number(r[0]?.solar || 0),
     otherCount: Number(r[0]?.other || 0),
     lastImportTime: r[0]?.last_import_time || null,
   };
+  cacheSet(cacheKey, result);
+  return result;
 }
 
 /** 全量测点维度统计 */
@@ -862,6 +903,10 @@ export async function getMeasureBySecondClass(
 ): Promise<{
   items: Array<{ name: string; value: number; percentage: number }>
 }> {
+  const cacheKey = `${getSchema()}:measure:secondClass:${typeFilter || 'all'}`;
+  const cached = cacheGet<{ items: Array<{ name: string; value: number; percentage: number }> }>(cacheKey);
+  if (cached) return cached;
+
   let typeCondition = '';
   let dictTypeCondition = '';
   if (typeFilter === 'wind') {
@@ -892,13 +937,19 @@ export async function getMeasureBySecondClass(
       percentage: total > 0 ? Math.round((Number(r.cnt) / total) * 1000) / 10 : 0,
     };
   });
-  return { items };
+  const result = { items };
+  cacheSet(cacheKey, result);
+  return result;
 }
 
 /** 全量测点按场站统计 */
 export async function getMeasureByStation(): Promise<{
   items: Array<{ name: string; value: number; percentage: number }>
 }> {
+  const cacheKey = `${getSchema()}:measure:station`;
+  const cached = cacheGet<{ items: Array<{ name: string; value: number; percentage: number }> }>(cacheKey);
+  if (cached) return cached;
+
   const sql = `
     SELECT t.code_val, d.station_name AS name_val, t.cnt
     FROM (
@@ -917,7 +968,9 @@ export async function getMeasureByStation(): Promise<{
     value: Number(r.cnt),
     percentage: total > 0 ? Math.round((Number(r.cnt) / total) * 1000) / 10 : 0,
   }));
-  return { items };
+  const result = { items };
+  cacheSet(cacheKey, result);
+  return result;
 }
 
 /** 全量测点列表（含筛选分页） */
@@ -1064,6 +1117,7 @@ export async function clearMeasurementData(schema: string, tenantId: string): Pr
   s.validRows = 0;
   s.status = 'IDLE';
   s.message = undefined;
+  cacheClearMeasurement();
 }
 
 /** 批量校验编码是否重复（同时校验数据库重复和输入内重复） */
