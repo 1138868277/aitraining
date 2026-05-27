@@ -4,79 +4,109 @@
       <el-tabs v-model="activeTab" class="page-tabs">
         <!-- Tab 1: 字典查询 -->
         <el-tab-pane label="字典查询" name="dictTree">
-          <div class="subpage-hero">
-            <div class="hero-icon">🔍</div>
-            <div class="hero-text">
-              <div class="hero-title">字典查询</div>
-              <div class="hero-subtitle">按照类型→二级类码→数据类码→数据码的层级结构浏览编码字典，支持树形展开和手动来源标识</div>
+          <!-- 科技风顶部 -->
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <h2 class="tech-hero-title"><span class="hero-title-icon">📖</span> 编码字典查询</h2>
+              <p class="tech-hero-desc">按类型 → 二级类码 → 数据类码 → 数据码层级浏览，支持数据码快速检索</p>
             </div>
           </div>
-          <DictOverviewCard />
-          <div class="tree-toolbar-card">
-            <div class="toolbar-left">
-              <span class="tree-section-label">编码字典树</span>
+
+          <!-- 数据概览卡片组 -->
+          <div class="tech-metrics-wrap">
+            <div class="tech-metrics-filter">
+              <button :class="['tmf-btn', { active: overviewTypeFilter === 'wind' }]" @click="overviewTypeFilter = 'wind'">🌬️ 风电</button>
+              <button :class="['tmf-btn', { active: overviewTypeFilter === 'solar' }]" @click="overviewTypeFilter = 'solar'">☀️ 光伏</button>
+              <button :class="['tmf-btn', { active: overviewTypeFilter === 'hydro' }]" @click="overviewTypeFilter = 'hydro'">💧 水电</button>
             </div>
-            <div class="toolbar-right">
-              <el-input
-                v-model="treeSearchText"
-                placeholder="搜索编码或名称"
-                clearable
-                size="small"
-                style="width:200px"
-                @input="onTreeSearch"
-              >
-                <template #prefix>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
-              <el-button size="default" @click="onCollapseAll">收起所有</el-button>
-              <el-button size="default" type="primary" :loading="loadingTree" @click="loadDictTree">刷新</el-button>
+            <div class="tech-metrics">
+              <div class="tech-metric-card" v-for="m in metrics" :key="m.label">
+                <div class="tmc-icon" :style="{ color: m.color, background: m.bg }">{{ m.icon }}</div>
+                <div class="tmc-body">
+                  <div class="tmc-value" :style="{ color: m.color }">{{ resolvedOverview[m.field] }}</div>
+                  <div class="tmc-label">{{ m.label }}</div>
+                </div>
+                <div class="tmc-glow" :style="{ background: m.color }"></div>
+              </div>
             </div>
           </div>
-          <div class="tree-container-card">
-            <el-tree
-              ref="treeRef"
-              :data="dictTreeData"
-              lazy
-              :load="loadTreeNode"
-              :props="treeProps"
-              :filter-node-method="filterTreeNode"
-              v-loading="loadingTree"
-              element-loading-text="字典数据加载中..."
-              highlight-current
-              class="styled-tree"
-            >
-              <template #default="{ node, data }">
-                <span class="custom-tree-node">
-                  <span class="tree-node-label">
-                    <el-tag
-                      :type="typeTagType(data.type)"
-                      size="small"
-                      class="type-tag"
-                    >{{ typeLabel(data.type) }}</el-tag>
-                    <span :class="['tree-node-code', typeCodeClass(data.type)]">{{ data.code }}</span>
-                    <span class="tree-node-name">{{ data.name }}</span>
-                  </span>
-                  <span class="tree-node-meta">
-                    <span
-                      v-if="data.childCount !== undefined"
-                      class="child-count"
-                    >{{ data.childCount }} 项</span>
-                  </span>
-                </span>
-              </template>
-            </el-tree>
-            <el-empty v-if="!loadingTree && dictTreeData.length === 0" description="暂无字典数据" />
+
+          <!-- 字典树 + 查询 -->
+          <div class="tech-panel">
+            <div class="tech-panel-header">
+              <div class="tph-left">
+                <div class="tph-switch">
+                  <button :class="['tph-btn', { active: queryMode === 'tree' }]" @click="queryMode = 'tree'">
+                    <span class="tph-btn-icon">🌳</span> 树形浏览
+                  </button>
+                  <button :class="['tph-btn', { active: queryMode === 'search' }]" @click="queryMode = 'search'">
+                    <span class="tph-btn-icon">🔎</span> 数据码查询
+                  </button>
+                </div>
+              </div>
+              <div class="tph-right">
+                <div v-if="queryMode === 'tree'" class="tph-search">
+                  <el-input
+                    v-model="treeSearchText"
+                    placeholder="搜索编码或名称"
+                    clearable
+                    size="small"
+                    suffix-icon="Search"
+                    @input="onTreeSearch"
+                  />
+                  <button class="tph-action-btn" title="收起所有" @click="onCollapseAll">⟵</button>
+                </div>
+                <button class="tph-action-btn" title="刷新" @click="loadDictTree" :disabled="loadingTree">↻</button>
+              </div>
+            </div>
+            <div class="tech-panel-body">
+              <!-- 树形浏览 -->
+              <div v-show="queryMode === 'tree'" class="tech-tree-container">
+                <el-tree
+                  ref="treeRef"
+                  :data="dictTreeData"
+                  lazy
+                  :load="loadTreeNode"
+                  :props="treeProps"
+                  :filter-node-method="filterTreeNode"
+                  v-loading="loadingTree"
+                  element-loading-text="字典数据加载中..."
+                  highlight-current
+                  class="tech-tree"
+                >
+                  <template #default="{ node, data }">
+                    <span class="tech-tree-node">
+                      <span class="ttn-badge" :class="'badge-' + data.type">{{ typeLabel(data.type) }}</span>
+                      <span class="ttn-code">{{ data.code }}</span>
+                      <span class="ttn-name">{{ data.name }}</span>
+                      <span v-if="data.childCount !== undefined" class="ttn-count">{{ data.childCount }} 项</span>
+                    </span>
+                  </template>
+                </el-tree>
+                <el-empty v-if="!loadingTree && dictTreeData.length === 0 && queryMode === 'tree'" description="暂无字典数据" />
+              </div>
+              <!-- 数据码查询 -->
+              <QuickSearchPanel v-show="queryMode === 'search'" />
+            </div>
           </div>
         </el-tab-pane>
 
         <!-- Tab 2: 新增字典记录 -->
         <el-tab-pane label="数据码管理" name="statistics">
-          <div class="subpage-hero">
-            <div class="hero-icon">📝</div>
-            <div class="hero-text">
-              <div class="hero-title">数据码新增和审批</div>
-              <div class="hero-subtitle">手动新增数据码并提交集团审批，审批通过后将自动下发给所有区域使用</div>
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <h2 class="tech-hero-title"><span class="hero-title-icon">📝</span> 数据码新增和审批</h2>
+              <p class="tech-hero-desc">手动新增数据码并提交集团审批，审批通过后将自动下发给所有区域使用</p>
             </div>
           </div>
           <div class="section-card" style="margin-top: 10px;">
@@ -259,11 +289,15 @@
               <el-badge v-if="pendingApprovalCount > 0" :value="pendingApprovalCount" :max="99" class="approval-badge" />
             </span>
           </template>
-          <div class="subpage-hero">
-            <div class="hero-icon">📋</div>
-            <div class="hero-text">
-              <div class="hero-title">数据码审批</div>
-              <div class="hero-subtitle">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</div>
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <h2 class="tech-hero-title"><span class="hero-title-icon">📋</span> 数据码审批</h2>
+              <p class="tech-hero-desc">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</p>
             </div>
           </div>
           <ApprovalMgmtTab @refresh="loadPendingApprovalCount" :key="approvalTabKey" />
@@ -287,9 +321,10 @@ import { Plus, Search } from '@element-plus/icons-vue';
 import * as XLSX from 'xlsx';
 import * as validateService from '@/services/validate';
 import * as approvalService from '@/services/approval';
-import DictOverviewCard from './dict-overview-card.vue';
+import * as statsService from '@/services/statistics';
 import StationTab from './station-tab.vue';
 import AddCodeDialog from '@/components/add-code-dialog.vue';
+import QuickSearchPanel from './quick-search-panel.vue';
 import ApprovalMgmtTab from '@/views/system-settings/approval-mgmt-tab.vue';
 import type { DictTreeNode, ManualStatItem } from '@cec/contracts';
 
@@ -323,6 +358,28 @@ watch(activeTab, (tab) => {
 });
 
 // ========== Tab 1: 字典查询 ==========
+const dictOverviewData = ref<any>(null);
+const overviewTypeFilter = ref<'wind' | 'solar' | 'hydro'>('wind');
+
+const resolvedOverview = computed(() => {
+  const d = dictOverviewData.value?.[overviewTypeFilter.value];
+  return d || { firstClassCount: 0, secondClassCount: 0, thirdClassCount: 0, dataCategoryCount: 0, dataCodeCount: 0 };
+});
+
+const metrics = [
+  { icon: '📂', label: '一级类码', field: 'firstClassCount', color: '#667eea', bg: 'rgba(102,126,234,0.1)' },
+  { icon: '📁', label: '二级类码', field: 'secondClassCount', color: '#764ba2', bg: 'rgba(118,75,162,0.1)' },
+  { icon: '🗂️', label: '三级类码', field: 'thirdClassCount', color: '#f093fb', bg: 'rgba(240,147,251,0.1)' },
+  { icon: '📋', label: '数据类码', field: 'dataCategoryCount', color: '#4facfe', bg: 'rgba(79,172,254,0.1)' },
+  { icon: '🏷️', label: '数据码', field: 'dataCodeCount', color: '#43e97b', bg: 'rgba(67,233,123,0.1)' },
+];
+
+async function loadDictOverview() {
+  try {
+    dictOverviewData.value = await statsService.getDictOverview();
+  } catch {}
+}
+
 const dictTreeData = ref<DictTreeNode[]>([]);
 const treeDataCache = ref<DictTreeNode[]>([]); // lazy load 查找缓存
 const loadingTree = ref(false);
@@ -376,8 +433,10 @@ function typeCodeClass(type: string): string {
   return '';
 }
 
+// ========== 数据码查询 ==========
+const queryMode = ref<'tree' | 'search'>('tree');
+
 function formatTime(tm: string): string {
-  // ISO 字符串裁剪到秒: "2024-01-01T12:00:00.000Z" → "2024-01-01 12:00:00"
   const d = new Date(tm);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -682,6 +741,7 @@ async function handleExportStats() {
 // ========== 生命周期 ==========
 onMounted(() => {
   loadDictTree();
+  loadDictOverview();
   loadManualStats();
   loadSubmissions();
   loadPendingApprovalCount();
@@ -698,30 +758,6 @@ onMounted(() => {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ==================== 功能介绍卡片 ==================== */
-.hero-icon {
-  font-size: 36px;
-  line-height: 1;
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-}
-
-.hero-text { flex: 1; position: relative; z-index: 1; }
-
-.hero-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 1px;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-
-.hero-subtitle {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
-  margin-top: 4px;
-}
 
 /* ==================== 页面主体 ==================== */
 .page-body {
@@ -737,75 +773,239 @@ onMounted(() => {
 }
 
 /* ==================== Tab 1: 字典树工具栏 ==================== */
-.tree-toolbar-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  margin: 8px 0 12px;
-  background: #fafbff;
-  border-radius: 8px;
-  border: 1px solid #eef0f6;
+/* ==================== 科技风 - 字典查询 ==================== */
+
+/* --- 顶部 Hero --- */
+.tech-hero {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 50%, #1d4ed8 100%);
+}
+.tech-hero-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tech-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.tech-glow {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.3;
+}
+.tech-glow-1 { top: -100px; right: -50px; background: #7dd3fc; }
+.tech-glow-2 { bottom: -120px; left: -80px; background: #1e40af; }
+
+.tech-hero-content {
+  position: relative;
+  padding: 14px 28px;
+  z-index: 1;
+}
+.tech-hero-left { flex: 1; }
+.tech-hero-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+  letter-spacing: 1px;
+}
+.tech-hero-desc {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  margin: 0;
+  line-height: 1.6;
 }
 
-.tree-section-label {
-  font-size: 14px;
+.hero-title-icon {
+  font-size: 28px;
+  margin-right: 4px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+	/* --- 数据概览卡片组 --- */
+.tech-metrics-wrap { margin-bottom: 16px; }
+.tech-metrics-filter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.tmf-btn {
+  padding: 5px 16px;
+  border-radius: 8px;
+  border: 1.5px solid #e8ecf1;
+  background: #fff;
+  color: #909399;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.tmf-btn:hover { border-color: #c0c8d6; color: #606266; }
+.tmf-btn.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.06));
+  color: #667eea;
   font-weight: 600;
-  color: #303133;
 }
-
-.tree-container-card {
-  padding: 4px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-}
-
-.styled-tree {
-  font-size: 14px;
-}
-
-.custom-tree-node {
+.tech-metrics {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  gap: 12px;
+}
+.tech-metric-card {
   flex: 1;
-  padding-right: 16px;
-  font-size: 14px;
-}
-
-.tree-node-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #f0f2f5;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-
-.type-tag {
-  min-width: 60px;
-  text-align: center;
+.tech-metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.08);
 }
+.tmc-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  opacity: 0.6;
+}
+.tmc-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.tmc-body { flex: 1; }
+.tmc-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.tmc-label { font-size: 12px; color: #909399; margin-top: 2px; }
 
-.tree-node-code {
+/* --- 主面板 (树/查询) --- */
+.tech-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #f0f2f5;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+.tech-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f2f4f8;
+}
+.tph-left { display: flex; align-items: center; gap: 12px; }
+.tph-switch { display: flex; gap: 4px; background: #f2f4f8; border-radius: 8px; padding: 3px; }
+.tph-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #909399;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.tph-btn:hover { color: #606266; }
+.tph-btn.active {
+  background: #fff;
+  color: #302b63;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   font-weight: 600;
 }
+.tph-btn-icon { font-size: 15px; }
 
-.code-type-domain { color: #f56c6c; }
-.code-second-class { color: #409eff; }
-.code-data-category { color: #67c23a; }
-.code-data-code { color: #e6a23c; }
-
-.tree-node-name {
+.tph-right { display: flex; align-items: center; gap: 8px; }
+.tph-search { display: flex; align-items: center; gap: 6px; }
+.tph-search :deep(.el-input__wrapper) { border-radius: 8px !important; }
+.tph-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e8ecf1;
+  background: #fff;
   color: #606266;
-  margin-left: 2px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
+.tph-action-btn:hover { border-color: #667eea; color: #667eea; }
+.tph-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.tree-node-meta {
+.tech-panel-body { padding: 8px 0; }
+
+/* --- 树形浏览 --- */
+.tech-tree-container { min-height: 300px; }
+.tech-tree { font-size: 13px; }
+.tech-tree :deep(.el-tree-node__content) {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 6px;
+  margin: 1px 6px;
+  transition: all 0.2s ease;
+}
+.tech-tree :deep(.el-tree-node__content:hover) {
+  background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.04));
+}
+.tech-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.06));
+  box-shadow: inset 3px 0 0 #667eea;
+}
+.tech-tree-node {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+}
+.ttn-badge {
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.badge-typeDomain { background: rgba(245,108,108,0.12); color: #f56c6c; }
+.badge-secondClass { background: rgba(64,158,255,0.12); color: #409eff; }
+.badge-dataCategory { background: rgba(103,194,58,0.12); color: #67c23a; }
+.badge-dataCode { background: rgba(230,162,60,0.12); color: #e6a23c; }
+.ttn-code { font-weight: 600; color: #303133; font-family: monospace; }
+.ttn-name { color: #606266; }
+.ttn-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: #c0c4cc;
+  white-space: nowrap;
 }
 
-.source-tag { font-size: 11px; }
-.child-count { font-size: 12px; color: #909399; }
 
 /* ==================== Tab 2: 数据码管理 ==================== */
 .data-mgmt-pagination {
@@ -901,29 +1101,6 @@ onMounted(() => {
 }
 
 /* ==================== 子页面功能介绍卡片 ==================== */
-.subpage-hero {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 18px;
-  margin-bottom: 10px;
-  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-  border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);
-  position: relative;
-  overflow: hidden;
-}
-.subpage-hero::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
-  border-radius: 50%;
-}
-
 /* 审批待办红点 */
 .approval-tab-label { display: inline-flex; align-items: center; gap: 6px; }
 .approval-tab-label :deep(.el-badge__content) {

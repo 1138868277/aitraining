@@ -4,11 +4,15 @@
       <el-tabs v-model="activeTab" class="page-tabs">
         <!-- Tab 1: 编码解析 -->
         <el-tab-pane label="编码解析" name="parse">
-          <div class="subpage-hero">
-            <div class="hero-icon">🔬</div>
-            <div class="hero-text">
-              <div class="hero-title">编码解析</div>
-              <div class="hero-subtitle">支持单个编码逐段解析和批量导入解析，快速识别编码结构及各段位含义</div>
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <h2 class="tech-hero-title"><span class="hero-title-icon">🔬</span> 编码解析</h2>
+              <p class="tech-hero-desc">支持单个编码逐段解析和批量导入解析，快速识别编码结构及各段位含义</p>
             </div>
           </div>
           <el-tabs v-model="parseMode" class="parse-mode-tabs">
@@ -202,11 +206,15 @@
 
         <!-- Tab 3: 重复编码校验 -->
         <el-tab-pane label="重复编码校验" name="audit">
-          <div class="subpage-hero">
-            <div class="hero-icon">🚫</div>
-            <div class="hero-text">
-              <div class="hero-title">重复编码校验</div>
-              <div class="hero-subtitle">批量导入编码列表，快速检查是否存在与数据库中已有编码重复或输入列表中重复的情况</div>
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <h2 class="tech-hero-title"><span class="hero-title-icon">🚫</span> 重复编码校验</h2>
+              <p class="tech-hero-desc">批量导入编码列表，快速检查是否存在与数据库中已有编码重复或输入列表中重复的情况</p>
             </div>
           </div>
           <div class="audit-container">
@@ -258,11 +266,15 @@
 
         <!-- Tab 4: 编码修正 -->
         <el-tab-pane label="编码修正" name="correct">
-          <div class="subpage-hero">
-            <div class="hero-icon">✏️</div>
-            <div class="hero-text">
-              <div class="hero-title">编码修正</div>
-              <div class="hero-subtitle">导入Excel修正数据，批量修改测点编码的二级类码、数据类码、数据码等段位，支持重复校验和结果导出</div>
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <h2 class="tech-hero-title"><span class="hero-title-icon">✏️</span> 编码修正</h2>
+              <p class="tech-hero-desc">导入Excel修正数据，批量修改测点编码的二级类码、数据类码、数据码等段位，支持重复校验和结果导出</p>
             </div>
           </div>
           <div class="correct-container">
@@ -724,11 +736,60 @@ function exportCorrectResults() {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ==================== 功能介绍卡片 ==================== */
-.hero-icon { font-size: 36px; line-height: 1; position: relative; z-index: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
-.hero-text { flex: 1; position: relative; z-index: 1; }
-.hero-title { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; text-shadow: 0 1px 3px rgba(0,0,0,0.15); }
-.hero-subtitle { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+/* ==================== 科技风英雄卡片 ==================== */
+.tech-hero {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 50%, #1d4ed8 100%);
+}
+.tech-hero-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tech-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.tech-glow {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.3;
+}
+.tech-glow-1 { top: -100px; right: -50px; background: #7dd3fc; }
+.tech-glow-2 { bottom: -120px; left: -80px; background: #1e40af; }
+.tech-hero-content {
+  position: relative;
+  padding: 14px 28px;
+  z-index: 1;
+}
+.tech-hero-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+  letter-spacing: 1px;
+}
+.tech-hero-desc {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  margin: 0;
+  line-height: 1.6;
+}
+.hero-title-icon {
+  font-size: 28px;
+  margin-right: 4px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
 
 .page-body {
   background: #fff;
@@ -931,27 +992,4 @@ function exportCorrectResults() {
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* ==================== 子页面功能介绍卡片 ==================== */
-.subpage-hero {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-  border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);
-  position: relative;
-  overflow: hidden;
-}
-.subpage-hero::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
-  border-radius: 50%;
-}
 </style>

@@ -65,11 +65,12 @@ router.get('/api/dict/quick-search', async (req: Request, res: Response) => {
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
     const typeFilter = (req.query.typeFilter as string) || undefined;
     const secondClassFilter = (req.query.secondClassFilter as string) || undefined;
+    const dataCategoryFilter = (req.query.dataCategoryFilter as string) || undefined;
     if (!searchText) {
-      success(res, { items: [], total: 0, typeOptions: [], secondClassOptions: [] });
+      success(res, { items: [], total: 0, typeOptions: [], secondClassOptions: [], dataCategoryOptions: [] });
       return;
     }
-    const result = await dictService.quickSearchDict(searchText, pageNum, pageSize, typeFilter, secondClassFilter);
+    const result = await dictService.quickSearchDict(searchText, pageNum, pageSize, typeFilter, secondClassFilter, dataCategoryFilter);
     success(res, result);
   } catch (err) {
     console.error('Failed to quick search dict:', err);
@@ -243,7 +244,7 @@ router.post('/api/dict/manual-code', async (req: Request, res: Response) => {
   try {
     const userInfo = getUserInfo(req);
     if (!userInfo) {
-      error(res, ErrorCode.AUTH_FAILED, '未获取到用户信息，请重新登录', 401);
+      error(res, ErrorCode.AUTHENTICATION_FAILED, '未获取到用户信息，请重新登录', 401);
       return;
     }
     const { typeCode, secondClassCode, secondClassName, dataCategoryCode, dataCategoryName, dataCode, dataName } = req.body;
@@ -343,7 +344,7 @@ router.post('/api/dict/manual-code/batch', async (req: Request, res: Response) =
   try {
     const userInfo = getUserInfo(req);
     if (!userInfo) {
-      error(res, ErrorCode.AUTH_FAILED, '未获取到用户信息，请重新登录', 401);
+      error(res, ErrorCode.AUTHENTICATION_FAILED, '未获取到用户信息，请重新登录', 401);
       return;
     }
 

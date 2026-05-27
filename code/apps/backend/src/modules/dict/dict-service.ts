@@ -18,7 +18,9 @@ export interface QuickSearchItem {
 export interface QuickSearchResult {
   items: QuickSearchItem[];
   total: number;
+  typeOptions: string[];
   secondClassOptions: Array<{ secondClassCode: string; secondClassName: string; typeCode: string }>;
+  dataCategoryOptions: Array<{ dataCategoryCode: string; dataCategoryName: string }>;
 }
 
 const DICT_TYPE_MAP: Record<string, () => Promise<DictItemResponse[]>> = {
@@ -56,8 +58,8 @@ export async function getDataTypeBySecondClass(typeCode: string, secondClassCode
 }
 
 /** 快捷搜索：根据数据码名称模糊匹配 */
-export async function quickSearchDict(searchText: string, pageNum: number = 1, pageSize: number = 20, typeFilter?: string, secondClassFilter?: string): Promise<QuickSearchResult> {
-  return dictDomain.quickSearchDict(searchText, pageNum, pageSize, typeFilter, secondClassFilter);
+export async function quickSearchDict(searchText: string, pageNum: number = 1, pageSize: number = 20, typeFilter?: string, secondClassFilter?: string, dataCategoryFilter?: string): Promise<QuickSearchResult> {
+  return dictDomain.quickSearchDict(searchText, pageNum, pageSize, typeFilter, secondClassFilter, dataCategoryFilter);
 }
 
 /** 手动新增编码草稿 */

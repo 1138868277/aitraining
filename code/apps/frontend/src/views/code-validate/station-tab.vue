@@ -1,17 +1,15 @@
 <template>
   <div class="station-tab">
     <!-- 顶部横幅 -->
-    <div class="station-hero">
-      <div class="hero-icon">🏭</div>
-      <div class="hero-text">
-        <div class="hero-title">场站管理</div>
-        <div class="hero-subtitle">统一维护新能源场站基本信息，支持新增、编辑、批量导入和导出</div>
+    <div class="tech-hero">
+      <div class="tech-hero-bg">
+        <div class="tech-grid"></div>
+        <div class="tech-glow tech-glow-1"></div>
+        <div class="tech-glow tech-glow-2"></div>
       </div>
-      <div class="hero-stats">
-        <div class="stat-badge">
-          <span class="stat-num">{{ total }}</span>
-          <span class="stat-label">场站总数</span>
-        </div>
+      <div class="tech-hero-content">
+        <h2 class="tech-hero-title"><span class="hero-title-icon">🏭</span> 场站管理</h2>
+        <p class="tech-hero-desc">统一维护新能源场站基本信息，支持新增、编辑、批量导入和导出</p>
       </div>
     </div>
 
@@ -471,97 +469,59 @@ onMounted(() => {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ==================== 顶部横幅 ==================== */
-.station-hero {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 24px;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #1a3a8a 0%, #2563eb 50%, #3b82f6 100%);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25);
+/* ==================== 科技风英雄卡片 ==================== */
+.tech-hero {
   position: relative;
+  border-radius: 14px;
   overflow: hidden;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 50%, #1d4ed8 100%);
 }
-
-.station-hero::before {
-  content: '';
+.tech-hero-bg {
   position: absolute;
-  top: -50%;
-  right: -20%;
+  inset: 0;
+  pointer-events: none;
+}
+.tech-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.tech-glow {
+  position: absolute;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
   border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.3;
 }
-
-.station-hero::after {
-  content: '';
-  position: absolute;
-  bottom: -30%;
-  left: 10%;
-  width: 200px;
-  height: 200px;
-  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
-  border-radius: 50%;
-}
-
-.hero-icon {
-  font-size: 36px;
-  line-height: 1;
+.tech-glow-1 { top: -100px; right: -50px; background: #7dd3fc; }
+.tech-glow-2 { bottom: -120px; left: -80px; background: #1e40af; }
+.tech-hero-content {
   position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-}
-
-.hero-text {
-  flex: 1;
-  position: relative;
+  padding: 14px 28px;
   z-index: 1;
 }
-
-.hero-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 1px;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-
-.hero-subtitle {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
-  margin-top: 4px;
-}
-
-.hero-stats {
-  position: relative;
-  z-index: 1;
-}
-
-.stat-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  padding: 8px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.stat-num {
+.tech-hero-title {
   font-size: 26px;
-  font-weight: 800;
-  color: #ffffff;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  line-height: 1;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+  letter-spacing: 1px;
 }
-
-.stat-label {
+.tech-hero-desc {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255,255,255,0.5);
+  margin: 0;
+  line-height: 1.6;
+}
+.hero-title-icon {
+  font-size: 28px;
+  margin-right: 4px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 
 /* ==================== 工具栏卡片 ==================== */

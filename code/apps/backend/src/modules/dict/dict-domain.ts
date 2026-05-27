@@ -208,6 +208,7 @@ export async function quickSearchDict(
   pageSize: number,
   typeFilter?: string,
   secondClassFilter?: string,
+  dataCategoryFilter?: string,
 ): Promise<{
   items: Array<{
     typeCode: string;
@@ -218,6 +219,7 @@ export async function quickSearchDict(
   total: number;
   typeOptions: string[];
   secondClassOptions: Array<{ secondClassCode: string; secondClassName: string; typeCode: string }>;
+  dataCategoryOptions: Array<{ dataCategoryCode: string; dataCategoryName: string }>;
 }> {
   // 如果输入的是5位数字，按数据类码+数据码精确匹配或数据码名称精确匹配
   const isFiveDigits = /^\d{5}$/.test(searchText);
@@ -238,6 +240,10 @@ export async function quickSearchDict(
     filterClauses.push(`AND second_class_code = $${filterIdx++}`);
     filterParams.push(secondClassFilter);
   }
+  if (dataCategoryFilter) {
+    filterClauses.push(`AND data_category_code = $${filterIdx++}`);
+    filterParams.push(dataCategoryFilter);
+  }
 
   const filterSql = filterClauses.join(' ');
 
@@ -248,19 +254,51 @@ export async function quickSearchDict(
   );
   const total = Number(countResult[0].cnt);
 
-  // 2. 全量类型列表（不限分页）
+  // 构建每个选项查询的筛选 SQL：
+  // 每个选项应用「除自身外的所有筛选条件」，实现独立联动
+  function buildOptFilter(exclude: string): { sql: string; params: any[] } {
+    const clauses: string[] = [];
+    const params: any[] = [];
+    let idx = 2;
+    if (typeFilter && exclude !== 'type') {
+      clauses.push(`AND type_domain_code = $${idx++}`);
+      params.push(typeFilter);
+    }
+    if (secondClassFilter && exclude !== 'secondClass') {
+      clauses.push(`AND second_class_code = $${idx++}`);
+      params.push(secondClassFilter);
+    }
+    if (dataCategoryFilter && exclude !== 'dataCategory') {
+      clauses.push(`AND data_category_code = $${idx++}`);
+      params.push(dataCategoryFilter);
+    }
+    return { sql: clauses.join(' '), params };
+  }
+
+  // 2. 类型选项（应用二级类码+数据类码筛选）
+  const typeOpt = buildOptFilter('type');
   const typeRows = await query<{ typeCode: string }>(
     `SELECT DISTINCT type_domain_code AS "typeCode" FROM ${getSchema()}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND ${searchClause} ORDER BY type_domain_code`,
-    searchParams,
+     WHERE if_delete = '0' AND ${searchClause} ${typeOpt.sql} ORDER BY type_domain_code`,
+    [...searchParams, ...typeOpt.params],
   );
 
-  // 3. 全量二级类码列表（不限分页，含类型信息用于前端联动筛选）
+  // 3. 二级类码选项（应用类型+数据类码筛选）—— 含编码+名称用于区分
+  const scOpt = buildOptFilter('secondClass');
   const secondClassRows = await query<{ secondClassCode: string; secondClassName: string; typeCode: string }>(
     `SELECT DISTINCT second_class_code AS "secondClassCode", second_class_name AS "secondClassName", type_domain_code AS "typeCode"
      FROM ${getSchema()}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND ${searchClause} ORDER BY second_class_code`,
-    searchParams,
+     WHERE if_delete = '0' AND ${searchClause} ${scOpt.sql} ORDER BY second_class_code`,
+    [...searchParams, ...scOpt.params],
+  );
+
+  // 3b. 数据类码选项（应用类型+二级类码筛选）
+  const dcOpt = buildOptFilter('dataCategory');
+  const dataCategoryRows = await query<{ dataCategoryCode: string; dataCategoryName: string }>(
+    `SELECT DISTINCT data_category_code AS "dataCategoryCode", data_category_name AS "dataCategoryName"
+     FROM ${getSchema()}.cec_new_energy_code_dict
+     WHERE if_delete = '0' AND ${searchClause} ${dcOpt.sql} ORDER BY data_category_code`,
+    [...searchParams, ...dcOpt.params],
   );
 
   // 4. 分页数据（带筛选条件）
@@ -279,6 +317,7 @@ export async function quickSearchDict(
     total,
     typeOptions: typeRows.map(r => r.typeCode),
     secondClassOptions: secondClassRows,
+    dataCategoryOptions: dataCategoryRows,
   };
 }
 
