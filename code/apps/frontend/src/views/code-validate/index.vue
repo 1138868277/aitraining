@@ -135,7 +135,7 @@
                   <span class="cell-name-tag">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="增加时间" prop="createTm" width="170" sortable="custom">
+              <el-table-column label="创建时间" prop="createTm" width="170" sortable="custom">
                 <template #default="{ row }">
                   <span class="time-cell">{{ formatTime(row.createTm) }}</span>
                 </template>
