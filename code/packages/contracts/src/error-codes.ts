@@ -37,6 +37,10 @@ export const ErrorCode = {
   REPORT_EXPORT_FAILED: 'REPORT_EXPORT_FAILED',
   MEASUREMENT_FILE_TOO_LARGE: 'MEASUREMENT_FILE_TOO_LARGE',
   MEASUREMENT_NO_VALID_CODES: 'MEASUREMENT_NO_VALID_CODES',
+
+  // 审批模块 (40xxx)
+  APPROVAL_NOT_FOUND: 'APPROVAL_NOT_FOUND',
+  APPROVAL_STATUS_ERROR: 'APPROVAL_STATUS_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -76,4 +80,7 @@ export const ErrorMessage: Record<ErrorCode, string> = {
   [ErrorCode.REPORT_EXPORT_FAILED]: '导出失败，请重试',
   [ErrorCode.MEASUREMENT_FILE_TOO_LARGE]: '文件过大，请上传不超过200MB的Excel文件',
   [ErrorCode.MEASUREMENT_NO_VALID_CODES]: '文件中未找到有效的31位测点编码',
+
+  [ErrorCode.APPROVAL_NOT_FOUND]: '审批记录不存在',
+  [ErrorCode.APPROVAL_STATUS_ERROR]: '审批状态不允许此操作',
 };

@@ -22,6 +22,16 @@
           </div>
           <UserMgmtTab />
         </el-tab-pane>
+        <el-tab-pane v-if="isAdmin" label="审批管理" name="approvalMgmt">
+          <div class="subpage-hero">
+            <div class="hero-icon">📋</div>
+            <div class="hero-text">
+              <div class="hero-title">审批管理</div>
+              <div class="hero-subtitle">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</div>
+            </div>
+          </div>
+          <ApprovalMgmtTab />
+        </el-tab-pane>
       </el-tabs>
     </div>
   </div>
@@ -33,6 +43,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import DatasourceTab from './datasource-tab.vue';
 import UserMgmtTab from './user-mgmt-tab.vue';
+import ApprovalMgmtTab from './approval-mgmt-tab.vue';
 
 const route = useRoute();
 const router = useRouter();

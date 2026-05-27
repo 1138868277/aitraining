@@ -11,6 +11,7 @@ import validateRouter from './modules/code-validation/validate-controller.js';
 import statisticsRouter from './modules/statistics/statistics-controller.js';
 import stationRouter from './modules/station/station-controller.js';
 import datasourceRouter from './modules/datasource/datasource-controller.js';
+import approvalRouter from './modules/approval/approval-controller.js';
 
 export function createApp(): import('express').Express {
   const app = express();
@@ -73,6 +74,7 @@ export function createApp(): import('express').Express {
   app.use(statisticsRouter);
   app.use(stationRouter);
   app.use(datasourceRouter);
+  app.use(approvalRouter);
 
   // 全局错误处理
   app.use(globalErrorHandler);

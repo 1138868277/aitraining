@@ -154,7 +154,12 @@
           </div>
         </el-tab-pane>
 
-        <!-- Tab 3: 场站维护 -->
+        <!-- Tab 3: 数据码审批 -->
+        <el-tab-pane label="数据码审批" name="approval">
+          <CodeApprovalTab />
+        </el-tab-pane>
+
+        <!-- Tab 4: 场站维护 -->
         <el-tab-pane label="场站管理" name="station">
           <StationTab />
         </el-tab-pane>
@@ -171,6 +176,7 @@ import * as XLSX from 'xlsx';
 import * as validateService from '@/services/validate';
 import DictOverviewCard from './dict-overview-card.vue';
 import StationTab from './station-tab.vue';
+import CodeApprovalTab from './code-approval-tab.vue';
 import type { DictTreeNode, ManualStatItem } from '@cec/contracts';
 
 // ========== Tab Switching ==========
