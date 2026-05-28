@@ -10,10 +10,8 @@
         </div>
 
         <div class="region-bar">
-          <span class="region-label">当前区域:</span>
-          <el-select v-model="currentArea" class="region-select" @change="onRegionChange">
-            <el-option v-for="r in regions" :key="r" :label="r" :value="r" />
-          </el-select>
+          <span class="region-label">当前租户:</span>
+          <span class="tenant-name">{{ currentSchema }}</span>
           <div class="region-stats" v-if="overview">
             <span class="stat-item">
               <i class="stat-dot" style="background:#38bdf8"></i>场站 {{ overview.station }}
@@ -52,7 +50,6 @@
                 <!-- 导入场站 -->
                 <template v-if="step.key === 'import-station'">
                   <div class="upload-zone" @dragover.prevent @drop.prevent="onDrop($event, 'station')" @click="triggerUpload('station')">
-                    <input ref="stationInput" type="file" accept=".xlsx,.xls" hidden @change="onFileChange($event, 'station')" />
                     <div class="upload-icon">&#128230;</div>
                     <p class="upload-text">拖拽或点击上传组织机构编码 Excel</p>
                     <p class="upload-hint">需要包含"编码"和"名称"列</p>
@@ -67,7 +64,6 @@
                 <!-- 导入测点 -->
                 <template v-if="step.key === 'import-measure'">
                   <div class="upload-zone" @dragover.prevent @drop.prevent="onDrop($event, 'measure')" @click="triggerUpload('measure')">
-                    <input ref="measureInput" type="file" accept=".xlsx,.xls" hidden @change="onFileChange($event, 'measure')" />
                     <div class="upload-icon">&#128196;</div>
                     <p class="upload-text">拖拽或点击上传时序测点 Excel</p>
                     <p class="upload-hint">需要包含"测点编码"和"测点描述"列</p>
@@ -117,7 +113,6 @@
                 <template v-if="step.key === 'split'">
                   <div class="split-area">
                     <div class="upload-zone" @dragover.prevent @drop.prevent="onDrop($event, 'split')" @click="triggerUpload('split')">
-                      <input ref="splitInput" type="file" accept=".xlsx,.xls" hidden @change="onFileChange($event, 'split')" />
                       <div class="upload-icon">&#128260;</div>
                       <p class="upload-text">上传需要拆分的大文件 Excel</p>
                     </div>
@@ -146,7 +141,7 @@
 import { ref, onMounted, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
-  getRegions, getOverview,
+  getTenant, getOverview,
   importStation as apiImportStation,
   importMeasure as apiImportMeasure,
   generateRules as apiGenerateRules,
@@ -154,8 +149,7 @@ import {
   splitFile as apiSplitFile,
 } from '@/services/time-series-rules';
 
-const currentArea = ref('云南');
-const regions = ref<string[]>([]);
+const currentSchema = ref('');
 const overview = ref<Record<string, number> | null>(null);
 
 const typeLabels: Record<string, string> = { sz: '死值', tb: '跳变', yx: '越限', zd: '中断' };
@@ -175,13 +169,11 @@ const steps = reactive([
 ]);
 
 // ====== 导入场站 ======
-const stationInput = ref<HTMLInputElement>();
 const stationFile = ref<File | null>(null);
 const stationLoading = ref(false);
 const stationResult = ref<number | null>(null);
 
 // ====== 导入测点 ======
-const measureInput = ref<HTMLInputElement>();
 const measureFile = ref<File | null>(null);
 const measureLoading = ref(false);
 const measureResult = ref<number | null>(null);
@@ -195,24 +187,23 @@ const exportLoading = ref<string>('');
 const exportAllLoading = ref(false);
 
 // ====== 拆分 ======
-const splitInput = ref<HTMLInputElement>();
 const splitFile = ref<File | null>(null);
 const splitMaxRows = ref(150000);
 const splitLoading = ref(false);
 const splitResult = ref<{ fileCount: number; files: { name: string; size: number; data: string }[] } | null>(null);
 
 function triggerUpload(type: string) {
-  const map: Record<string, any> = { station: stationInput, measure: measureInput, split: splitInput };
-  map[type]?.value?.click();
-}
-
-function onFileChange(e: Event, type: string) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  if (type === 'station') stationFile.value = file;
-  else if (type === 'measure') measureFile.value = file;
-  else if (type === 'split') splitFile.value = file;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+  input.onchange = (e: any) => {
+    const file = e.target?.files?.[0] as File | undefined;
+    if (!file) return;
+    if (type === 'station') stationFile.value = file;
+    else if (type === 'measure') measureFile.value = file;
+    else if (type === 'split') splitFile.value = file;
+  };
+  input.click();
 }
 
 function onDrop(e: DragEvent, type: string) {
@@ -231,7 +222,7 @@ async function importStation() {
   if (!stationFile.value) return;
   stationLoading.value = true;
   try {
-    const res = await apiImportStation(currentArea.value, stationFile.value);
+    const res = await apiImportStation(stationFile.value!);
     stationResult.value = res.importedCount;
     steps[0].status = 'completed';
     ElMessage.success(`导入 ${res.importedCount} 条场站数据成功`);
@@ -248,7 +239,7 @@ async function importMeasure() {
   if (!measureFile.value) return;
   measureLoading.value = true;
   try {
-    const res = await apiImportMeasure(currentArea.value, measureFile.value);
+    const res = await apiImportMeasure(measureFile.value!);
     measureResult.value = res.importedCount;
     steps[1].status = 'completed';
     ElMessage.success(`导入 ${res.importedCount} 条测点数据成功`);
@@ -265,7 +256,7 @@ async function startGenerate() {
   genLoading.value = true;
   steps[2].status = 'running';
   try {
-    const res = await apiGenerateRules(currentArea.value);
+    const res = await apiGenerateRules();
     genResult.value = res;
     steps[2].status = 'completed';
     ElMessage.success(`生成完成，共 ${res.total} 条规则`);
@@ -280,7 +271,7 @@ async function startGenerate() {
 async function downloadFile(type: string) {
   exportLoading.value = type;
   try {
-    await downloadRuleFile(currentArea.value, type);
+    await downloadRuleFile(type);
     steps[3].status = 'completed';
     ElMessage.success(`${typeLabels[type]}文件下载中`);
   } catch (err: any) {
@@ -293,10 +284,10 @@ async function downloadFile(type: string) {
 async function downloadAll() {
   exportAllLoading.value = true;
   try {
-    const res = await exportAllRules(currentArea.value);
+    const res = await exportAllRules();
     steps[3].status = 'completed';
     for (const f of res.files) {
-      downloadBase64File(f.data, `${currentArea.value}区域_时序稽核质量规则_${typeLabels[f.type]}.xlsx`);
+      downloadBase64File(f.data, `${''}区域_时序稽核质量规则_${typeLabels[f.type]}.xlsx`);
     }
     ElMessage.success(`已下载 ${res.files.length} 个文件`);
   } catch (err: any) {
@@ -328,28 +319,19 @@ function downloadSplit(file: { name: string; data: string }) {
 
 async function refreshOverview() {
   try {
-    overview.value = await getOverview(currentArea.value);
+    overview.value = await getOverview();
   } catch {
     // ignore
   }
 }
 
-async function onRegionChange() {
-  refreshOverview();
-  steps.forEach(s => s.status = 'pending');
-  stationFile.value = null;
-  stationResult.value = null;
-  measureFile.value = null;
-  measureResult.value = null;
-  genResult.value = null;
-  splitFile.value = null;
-  splitResult.value = null;
-}
-
 onMounted(async () => {
   try {
-    regions.value = await getRegions();
-  } catch { regions.value = ['云南', '福建', '广东', '四川', '宁夏', '山东', '甘肃', '乌江', '拉萨', '重庆', '黔源']; }
+    const tenant = await getTenant();
+    currentSchema.value = tenant || '未知';
+  } catch {
+    currentSchema.value = '未知';
+  }
   refreshOverview();
 });
 </script>

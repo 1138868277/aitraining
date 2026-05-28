@@ -1,6 +1,7 @@
 /**
  * 规则生成 SQL 模板
- * __schema__/__通用__ 会被替换为实际模式名
+ * __schema__ → 当前租户 schema
+ * __标准表__ → tsr_standard_list
  */
 
 export interface RuleSqlDef {
@@ -14,7 +15,7 @@ export interface RuleSqlDef {
 function genSzSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
   const scList = secondCodes.map(c => `'${c}'`).join(',');
   return `
-    INSERT INTO __schema__.import_list_sz
+    INSERT INTO __schema__.tsr_import_list_sz
     (module_source, energy_type, standard_name, sz_threshold, sz_windows, sliding_step, begin_time, end_time, measure_name, cd_code)
     WITH cd_data AS (
       SELECT cd_code, cd_name,
@@ -22,12 +23,12 @@ function genSzSql(moduleSource: string, energyType: string, secondCodes: string[
         SUBSTRING(cd_code, 5, 1) AS energy_type,
         RIGHT(cd_code, 12) AS measure_code,
         SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.measure_data
+      FROM __schema__.tsr_measure_data
       WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
         AND SUBSTRING(cd_code, 13, 3) IN (${scList})
     ),
     standard_data AS (
-      SELECT * FROM __通用__.standard_list
+      SELECT * FROM __标准表__
       WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
     ),
     final_data AS (
@@ -36,7 +37,7 @@ function genSzSql(moduleSource: string, energyType: string, secondCodes: string[
         t2.module_source, t2.energy_type, t2.ss_windows, t2.ss_threshold
       FROM cd_data t1
       INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
-      INNER JOIN __schema__.dim_station t3 ON t1.station_code = t3.station_code
+      INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
     )
     SELECT DISTINCT
       module_source, energy_type,
@@ -56,7 +57,7 @@ function genSzSql(moduleSource: string, energyType: string, secondCodes: string[
 function genTbSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
   const scList = secondCodes.map(c => `'${c}'`).join(',');
   return `
-    INSERT INTO __schema__.import_list_tb
+    INSERT INTO __schema__.tsr_import_list_tb
     (module_source, energy_type, standard_name, tb_windows, sliding_step, begin_time, end_time, measure_name, cd_code)
     WITH cd_data AS (
       SELECT cd_code, cd_name,
@@ -64,12 +65,12 @@ function genTbSql(moduleSource: string, energyType: string, secondCodes: string[
         SUBSTRING(cd_code, 5, 1) AS energy_type,
         RIGHT(cd_code, 12) AS measure_code,
         SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.measure_data
+      FROM __schema__.tsr_measure_data
       WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
         AND SUBSTRING(cd_code, 13, 3) IN (${scList})
     ),
     standard_data AS (
-      SELECT * FROM __通用__.standard_list
+      SELECT * FROM __标准表__
       WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
     ),
     final_data AS (
@@ -78,7 +79,7 @@ function genTbSql(moduleSource: string, energyType: string, secondCodes: string[
         t2.module_source, t2.energy_type, t2.tb_windows
       FROM cd_data t1
       INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
-      INNER JOIN __schema__.dim_station t3 ON t1.station_code = t3.station_code
+      INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
     )
     SELECT DISTINCT
       module_source, energy_type,
@@ -97,7 +98,7 @@ function genTbSql(moduleSource: string, energyType: string, secondCodes: string[
 function genYxSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
   const scList = secondCodes.map(c => `'${c}'`).join(',');
   return `
-    INSERT INTO __schema__.import_list_yx
+    INSERT INTO __schema__.tsr_import_list_yx
     (module_source, energy_type, standard_name, lower_range, upper_range, begin_time, end_time, measure_name, cd_code)
     WITH cd_data AS (
       SELECT cd_code, cd_name,
@@ -105,12 +106,12 @@ function genYxSql(moduleSource: string, energyType: string, secondCodes: string[
         SUBSTRING(cd_code, 5, 1) AS energy_type,
         RIGHT(cd_code, 12) AS measure_code,
         SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.measure_data
+      FROM __schema__.tsr_measure_data
       WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
         AND SUBSTRING(cd_code, 13, 3) IN (${scList})
     ),
     standard_data AS (
-      SELECT * FROM __通用__.standard_list
+      SELECT * FROM __标准表__
       WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
     ),
     final_data AS (
@@ -119,7 +120,7 @@ function genYxSql(moduleSource: string, energyType: string, secondCodes: string[
         t2.module_source, t2.energy_type, t2.yx_range
       FROM cd_data t1
       INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
-      INNER JOIN __schema__.dim_station t3 ON t1.station_code = t3.station_code
+      INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
     )
     SELECT DISTINCT
       module_source, energy_type,
@@ -138,7 +139,7 @@ function genYxSql(moduleSource: string, energyType: string, secondCodes: string[
 function genZdSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
   const scList = secondCodes.map(c => `'${c}'`).join(',');
   return `
-    INSERT INTO __schema__.import_list_zd
+    INSERT INTO __schema__.tsr_import_list_zd
     (module_source, energy_type, standard_name, zd_duration, begin_time, end_time, measure_name, cd_code)
     WITH cd_data AS (
       SELECT cd_code, cd_name,
@@ -146,12 +147,12 @@ function genZdSql(moduleSource: string, energyType: string, secondCodes: string[
         SUBSTRING(cd_code, 5, 1) AS energy_type,
         RIGHT(cd_code, 12) AS measure_code,
         SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.measure_data
+      FROM __schema__.tsr_measure_data
       WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
         AND SUBSTRING(cd_code, 13, 3) IN (${scList})
     ),
     standard_data AS (
-      SELECT * FROM __通用__.standard_list
+      SELECT * FROM __标准表__
       WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
     ),
     final_data AS (
@@ -160,7 +161,7 @@ function genZdSql(moduleSource: string, energyType: string, secondCodes: string[
         t2.module_source, t2.energy_type, t2.zd_duration
       FROM cd_data t1
       INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
-      INNER JOIN __schema__.dim_station t3 ON t1.station_code = t3.station_code
+      INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
     )
     SELECT DISTINCT
       module_source, energy_type,

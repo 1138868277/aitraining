@@ -1,22 +1,21 @@
 import api from './api';
 
-/** 获取区域列表 */
-export async function getRegions(): Promise<string[]> {
-  const res = await api.get('/tsr/regions');
-  return res.data;
+/** 获取当前租户信息 */
+export async function getTenant(): Promise<string> {
+  const res = await api.get('/tsr/tenant');
+  return res.data?.schema || '';
 }
 
 /** 获取数据概览 */
-export async function getOverview(area: string): Promise<Record<string, number>> {
-  const res = await api.get('/tsr/overview', { params: { area } });
+export async function getOverview(): Promise<Record<string, number>> {
+  const res = await api.get('/tsr/overview');
   return res.data;
 }
 
 /** 导入场站数据 */
-export async function importStation(area: string, file: File): Promise<{ importedCount: number; area: string }> {
+export async function importStation(file: File): Promise<{ importedCount: number }> {
   const form = new FormData();
   form.append('file', file);
-  form.append('area', area);
   const res = await api.post('/tsr/import/station', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,
@@ -25,10 +24,9 @@ export async function importStation(area: string, file: File): Promise<{ importe
 }
 
 /** 导入测点数据 */
-export async function importMeasure(area: string, file: File): Promise<{ importedCount: number; area: string }> {
+export async function importMeasure(file: File): Promise<{ importedCount: number }> {
   const form = new FormData();
   form.append('file', file);
-  form.append('area', area);
   const res = await api.post('/tsr/import/measure', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,
@@ -37,36 +35,42 @@ export async function importMeasure(area: string, file: File): Promise<{ importe
 }
 
 /** 生成规则 */
-export async function generateRules(area: string): Promise<{
+export async function generateRules(): Promise<{
   total: number;
   details: { module: string; energy: string; type: string; rows: number }[];
 }> {
-  const res = await api.post('/tsr/generate', { area }, { timeout: 300000 });
+  const res = await api.post('/tsr/generate', {}, { timeout: 300000 });
   return res.data;
 }
 
 /** 导出单个规则文件（带认证下载） */
-export async function downloadRuleFile(area: string, type: string): Promise<void> {
+export async function downloadRuleFile(type: string): Promise<void> {
   const typeNames: Record<string, string> = { sz: '死值', tb: '跳变', yx: '越限', zd: '中断' };
   const token = localStorage.getItem('auth_token');
-  const response = await fetch(`/api/tsr/export/${type}?area=${area}`, {
+  const response = await fetch(`/api/tsr/export/${type}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) throw new Error('下载失败');
+
+  // 从 Content-Disposition 提取文件名
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const filenameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+  const filename = filenameMatch ? filenameMatch[1].replace(/['"]/g, '') : `时序稽核质量规则_${typeNames[type]}.xlsx`;
+
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${area}区域_时序稽核质量规则_${typeNames[type]}.xlsx`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-/** 批量导出所有规则文件（base64下载） */
-export async function exportAllRules(area: string): Promise<{
+/** 批量导出所有规则文件 */
+export async function exportAllRules(): Promise<{
   files: { type: string; size: number; data: string }[];
 }> {
-  const res = await api.get('/tsr/export-all', { params: { area }, timeout: 300000 });
+  const res = await api.get('/tsr/export-all', { timeout: 300000 });
   return res.data;
 }
 

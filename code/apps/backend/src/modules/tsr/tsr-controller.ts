@@ -1,39 +1,60 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import * as tsrService from './tsr-service.js';
+import * as domain from './tsr-domain.js';
 import { success, error } from '../../common/response.js';
-import { listRegions, getTsrPool } from './tsr-domain.js';
+import { getPool } from '../../db/index.js';
 
 const router: Router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
-/** 测试 TSR 数据库连接 */
+/** 已初始化的租户集合 */
+const initializedTenants = new Set<string>();
+
+/** 按需初始化当前租户的 TSR 表 */
+async function ensureTenantReady(): Promise<void> {
+  const schema = domain.getCurrentSchema();
+  if (!initializedTenants.has(schema)) {
+    await domain.initTables();
+    await domain.ensureStandardList();
+    initializedTenants.add(schema);
+    console.log(`  ✅ TSR 表就绪: ${schema}`);
+  }
+}
+
+/** 中间件：确保当前租户 TSR 表已初始化 */
+async function tsrInitMiddleware(req: Request, res: Response, next: import('express').NextFunction) {
+  try {
+    await ensureTenantReady();
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+// 所有 TSR 数据接口自动初始化表
+router.use('/api/tsr', tsrInitMiddleware);
+
+/** TSR 数据库连接测试 */
 router.get('/api/tsr/ping', async (_req: Request, res: Response) => {
   try {
-    const pool = getTsrPool();
+    const pool = getPool();
     const q = await pool.query('SELECT 1 AS ok');
-    success(res, { ok: q.rows[0].ok });
+    success(res, { ok: q.rows[0].ok, schema: domain.getCurrentSchema() });
   } catch (err: any) {
     error(res, 'DB_ERROR', err.message, 500);
   }
 });
 
-/** 获取区域列表 */
-router.get('/api/tsr/regions', async (_req: Request, res: Response) => {
-  try {
-    const regions = await listRegions();
-    success(res, regions);
-  } catch (err) {
-    console.error('Failed to list regions:', err);
-    error(res, 'SYSTEM_ERROR', '获取区域列表失败', 500);
-  }
+/** 获取当前租户 schema */
+router.get('/api/tsr/tenant', async (_req: Request, res: Response) => {
+  success(res, { schema: domain.getCurrentSchema() });
 });
 
 /** 获取数据概览 */
-router.get('/api/tsr/overview', async (req: Request, res: Response) => {
+router.get('/api/tsr/overview', async (_req: Request, res: Response) => {
   try {
-    const area = (req.query.area as string) || '云南';
-    const data = await tsrService.getOverview(area);
+    const data = await domain.getOverview('');
     success(res, data);
   } catch (err) {
     console.error('Failed to get overview:', err);
@@ -44,13 +65,12 @@ router.get('/api/tsr/overview', async (req: Request, res: Response) => {
 /** 导入场站数据 */
 router.post('/api/tsr/import/station', upload.single('file'), async (req: Request, res: Response) => {
   try {
-    const area = (req.body.area as string) || '云南';
     if (!req.file) {
       error(res, 'MISSING_PARAMETER', '请上传 Excel 文件', 400);
       return;
     }
-    const count = await tsrService.importStationFromBuffer(area, req.file.buffer);
-    success(res, { importedCount: count, area });
+    const count = await tsrService.importStationFromBuffer('', req.file.buffer);
+    success(res, { importedCount: count, schema: domain.getCurrentSchema() });
   } catch (err: any) {
     console.error('Failed to import station:', err);
     error(res, 'IMPORT_FAILED', err.message || '导入场站数据失败', 500);
@@ -60,13 +80,12 @@ router.post('/api/tsr/import/station', upload.single('file'), async (req: Reques
 /** 导入测点数据 */
 router.post('/api/tsr/import/measure', upload.single('file'), async (req: Request, res: Response) => {
   try {
-    const area = (req.body.area as string) || '云南';
     if (!req.file) {
       error(res, 'MISSING_PARAMETER', '请上传 Excel 文件', 400);
       return;
     }
-    const count = await tsrService.importMeasureFromBuffer(area, req.file.buffer);
-    success(res, { importedCount: count, area });
+    const count = await tsrService.importMeasureFromBuffer('', req.file.buffer);
+    success(res, { importedCount: count, schema: domain.getCurrentSchema() });
   } catch (err: any) {
     console.error('Failed to import measure:', err);
     error(res, 'IMPORT_FAILED', err.message || '导入测点数据失败', 500);
@@ -74,10 +93,9 @@ router.post('/api/tsr/import/measure', upload.single('file'), async (req: Reques
 });
 
 /** 生成规则 */
-router.post('/api/tsr/generate', async (req: Request, res: Response) => {
+router.post('/api/tsr/generate', async (_req: Request, res: Response) => {
   try {
-    const area = (req.body.area as string) || '云南';
-    const result = await tsrService.generateRules(area);
+    const result = await tsrService.generateRules('');
     success(res, result);
   } catch (err: any) {
     console.error('Failed to generate rules:', err);
@@ -88,7 +106,6 @@ router.post('/api/tsr/generate', async (req: Request, res: Response) => {
 /** 导出规则 Excel */
 router.get('/api/tsr/export/:type', async (req: Request, res: Response) => {
   try {
-    const area = (req.query.area as string) || '云南';
     const type = req.params.type as 'sz' | 'tb' | 'yx' | 'zd';
     if (!['sz', 'tb', 'yx', 'zd'].includes(type)) {
       error(res, 'PARAM_FORMAT_ERROR', '无效的导出类型（sz/tb/yx/zd）', 400);
@@ -96,10 +113,11 @@ router.get('/api/tsr/export/:type', async (req: Request, res: Response) => {
     }
 
     const typeNames: Record<string, string> = { sz: '死值', tb: '跳变', yx: '越限', zd: '中断' };
-    const buffer = await tsrService.exportToExcel(area, type);
+    const s = domain.getCurrentSchema();
+    const buffer = await tsrService.exportToExcel('', type);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${area}区域_时序稽核质量规则_${typeNames[type]}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${s}_时序稽核质量规则_${typeNames[type]}.xlsx"`);
     res.send(buffer);
   } catch (err: any) {
     console.error('Failed to export:', err);
@@ -108,15 +126,14 @@ router.get('/api/tsr/export/:type', async (req: Request, res: Response) => {
 });
 
 /** 批量导出所有规则 */
-router.get('/api/tsr/export-all', async (req: Request, res: Response) => {
+router.get('/api/tsr/export-all', async (_req: Request, res: Response) => {
   try {
-    const area = (req.query.area as string) || '云南';
     const types = ['sz', 'tb', 'yx', 'zd'] as const;
     const buffers: { type: string; buffer: Buffer }[] = [];
 
     for (const type of types) {
       try {
-        const buf = await tsrService.exportToExcel(area, type);
+        const buf = await tsrService.exportToExcel('', type);
         buffers.push({ type, buffer: buf });
       } catch {
         // 某个类型无数据时跳过

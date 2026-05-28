@@ -56,7 +56,11 @@ export async function generateRules(area: string): Promise<{ total: number; deta
   let total = 0;
 
   for (const def of sqlDefs) {
-    const rows = await domain.executeSqlInSchema(area, def.sql);
+    const s = domain.getCurrentSchema();
+    const sql = def.sql
+      .replace(/__schema__/g, `"${s}"`)
+      .replace(/__标准表__/g, `"${s}".tsr_standard_list`);
+    const rows = await domain.executeSqlRaw(sql);
     total += rows;
     details.push({ module: def.module, energy: def.energy, type: def.ruleType, rows });
   }
@@ -269,28 +273,3 @@ export function splitExcelBuffer(buffer: Buffer, maxRows: number = 150000): { bu
   return results;
 }
 
-/** 获取区域内各表的数据概览 */
-export async function getOverview(area: string) {
-  const schema = domain.schemaName(area);
-
-  const tables = [
-    { key: 'station', table: 'dim_station' },
-    { key: 'measure', table: 'measure_data' },
-    { key: 'sz', table: 'import_list_sz' },
-    { key: 'tb', table: 'import_list_tb' },
-    { key: 'yx', table: 'import_list_yx' },
-    { key: 'zd', table: 'import_list_zd' },
-  ];
-
-  const result: Record<string, number> = {};
-  const p = domain.getTsrPool();
-  for (const t of tables) {
-    try {
-      const q = await p.query(`SELECT COUNT(*) AS cnt FROM "${schema}".${t.table}`);
-      result[t.key] = parseInt(q.rows[0].cnt, 10);
-    } catch {
-      result[t.key] = -1;
-    }
-  }
-  return result;
-}
