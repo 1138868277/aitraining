@@ -15,8 +15,14 @@
       <el-button :icon="Refresh" circle size="small" title="刷新数据" @click="handleRefresh" />
     </div>
 
+    <!-- 加载中 -->
+    <div v-if="loading" class="loading-wrap">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">数据加载中...</p>
+    </div>
+
     <!-- 概览 -->
-    <div class="overview-stats mb-16" v-if="overview.totalPoints > 0">
+    <div class="overview-stats mb-16" v-if="!loading && overview.totalPoints > 0">
       <div class="overview-stat-card">
         <div class="os-left">
           <div class="os-icon">📋</div>
@@ -48,7 +54,7 @@
     </div>
 
     <!-- 图表区 -->
-    <template v-if="overview.totalPoints > 0">
+    <template v-if="!loading && overview.totalPoints > 0">
       <div class="chart-row mb-16">
         <div class="chart-col">
           <div class="card-default chart-section">
@@ -84,7 +90,7 @@
         </div>
       </div>
     </template>
-    <el-empty v-else-if="!importing" description="请先导入测点数据" />
+    <el-empty v-else-if="!loading && !importing" description="请先导入测点数据" />
   </div>
 </template>
 
@@ -96,6 +102,7 @@ import * as statsService from '@/services/statistics';
 import VChart from 'vue-echarts';
 import 'echarts';
 
+const loading = ref(true);
 const importing = ref(false);
 const imported = ref(false);
 const importStatus = ref<{ importing: boolean; batchId: string | null; totalRows: number; importedRows: number; validRows: number; status: string; message?: string; startTime?: number }>({ importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE', message: '' });
@@ -314,9 +321,7 @@ async function pollStatus() {
       imported.value = true;
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       ElMessage.success(`导入完成，有效编码 ${s.validRows} 条`);
-      loadMeasureOverview();
-      loadMeasureSecondClass();
-      loadMeasureStation();
+      loadAllData();
     } else if (s.status === 'FAILED') {
       importing.value = false;
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -326,9 +331,7 @@ async function pollStatus() {
       imported.value = true;
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       ElMessage.info(s.message || '已终止');
-      loadMeasureOverview();
-      loadMeasureSecondClass();
-      loadMeasureStation();
+      loadAllData();
     }
   } catch {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -351,6 +354,16 @@ async function loadMeasureStation() {
   try { stationItems.value = (await statsService.getMeasureByStation()).items; } catch {}
 }
 
+async function loadAllData() {
+  loading.value = true;
+  await Promise.all([
+    loadMeasureOverview(),
+    loadMeasureSecondClass(),
+    loadMeasureStation(),
+  ]);
+  loading.value = false;
+}
+
 async function clearData() {
   try {
     await ElMessageBox.confirm('确定清空所有导入的测点数据？此操作不可恢复。', '确认', { type: 'warning' });
@@ -366,9 +379,7 @@ async function clearData() {
 }
 
 function handleRefresh() {
-  loadMeasureOverview();
-  loadMeasureSecondClass();
-  loadMeasureStation();
+  loadAllData();
 }
 
 onMounted(async () => {
@@ -384,9 +395,7 @@ onMounted(async () => {
       importStatus.value = s;
     }
   } catch {}
-  loadMeasureOverview();
-  loadMeasureSecondClass();
-  loadMeasureStation();
+  loadAllData();
 });
 </script>
 
@@ -474,4 +483,29 @@ onMounted(async () => {
 .import-status-text.completed { color: #67c23a; }
 .import-status-text.failed { color: #f56c6c; }
 .import-status-text.processing { color: #409eff; }
+
+/* ==================== 加载动画 ==================== */
+.loading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e8ecf1;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.loading-text {
+  margin-top: 16px;
+  font-size: 14px;
+  color: #909399;
+}
 </style>
