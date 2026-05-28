@@ -29,12 +29,14 @@
           <el-menu-item index="/statistics">
             <span class="menu-icon">📊</span>编码看板
           </el-menu-item>
+          <el-menu-item index="/time-series-rules">
+            <span class="menu-icon">⏱️</span>时序规则
+          </el-menu-item>
           <el-menu-item index="/system-settings">
             <span class="menu-icon">⚙️</span>系统配置
           </el-menu-item>
         </el-menu>
         <div class="header-right">
-          <div class="header-time">{{ currentTime }}</div>
           <el-dropdown trigger="click" @command="handleCommand">
             <div class="user-info">
               <el-avatar :size="32" :icon="UserFilled" class="user-avatar" />
@@ -68,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { UserFilled, InfoFilled, SwitchButton } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth';
@@ -80,15 +82,6 @@ const auth = useAuthStore();
 const isLoginPage = computed(() => route.path === '/login');
 const currentRoute = computed(() => route.path);
 
-const currentTime = ref('');
-let timer: ReturnType<typeof setInterval>;
-
-function updateTime() {
-  const now = new Date();
-  const days = ['日', '一', '二', '三', '四', '五', '六'];
-  currentTime.value = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 周${days[now.getDay()]} ${now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-}
-
 function handleCommand(command: string) {
   if (command === 'logout') {
     auth.logout();
@@ -96,11 +89,6 @@ function handleCommand(command: string) {
   }
 }
 
-onMounted(() => {
-  updateTime();
-  timer = setInterval(updateTime, 1000);
-});
-onUnmounted(() => clearInterval(timer));
 </script>
 
 <style>
@@ -277,14 +265,6 @@ body {
   margin-left: auto;
   padding-left: 20px;
   border-left: 1px solid rgba(56, 189, 248, 0.15);
-}
-
-.header-time {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 13px;
-  white-space: nowrap;
-  letter-spacing: 0.3px;
-  font-variant-numeric: tabular-nums;
 }
 
 .user-info {

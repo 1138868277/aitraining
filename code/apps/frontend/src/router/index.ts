@@ -36,6 +36,12 @@ const routes = [
     meta: { title: '编码看板', requiresAuth: true },
   },
   {
+    path: '/time-series-rules',
+    name: 'TimeSeriesRules',
+    component: () => import('@/views/time-series-rules/index.vue'),
+    meta: { title: '时序规则', requiresAuth: true },
+  },
+  {
     path: '/system-settings',
     name: 'SystemSettings',
     component: () => import('@/views/system-settings/index.vue'),
