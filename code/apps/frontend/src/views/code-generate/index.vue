@@ -137,60 +137,6 @@
     <div class="section-card">
       <div class="section-header">
         <span class="card-title">编码生成</span>
-          <el-popover
-            ref="recentPopoverRef"
-            trigger="hover"
-            placement="bottom-end"
-            width="480"
-            popper-class="recent-condition-popover"
-          >
-            <template #reference>
-              <el-button size="small">
-                最近记录
-              </el-button>
-            </template>
-            <div class="recent-conditions-list">
-              <div
-                v-for="(item, index) in recentConditions"
-                :key="item.id"
-                class="recent-condition-item"
-                :class="{ 'is-first': index === 0 }"
-                @click="applyRecentCondition(item)"
-              >
-                <div class="recent-condition-fields">
-                  <div class="recent-field" v-if="item.conditionData.stationCode">
-                    <span class="recent-field-label">场站：</span>
-                    <span class="recent-field-value">{{ item.conditionData.stationCode }}{{ formatName('stationCode', item.conditionData.stationCode) }}</span>
-                  </div>
-                  <div class="recent-field" v-if="item.conditionData.typeCode">
-                    <span class="recent-field-label">发电类型：</span>
-                    <span class="recent-field-value">{{ item.conditionData.typeCode }}{{ formatName('typeCode', item.conditionData.typeCode) }}</span>
-                  </div>
-                  <div class="recent-field" v-if="item.conditionData.secondClassCode">
-                    <span class="recent-field-label">二级类码：</span>
-                    <span class="recent-field-value">{{ item.conditionData.secondClassCode }}{{ formatName('secondClassCode', item.conditionData.secondClassCode) }}</span>
-                  </div>
-                  <div class="recent-field" v-if="item.conditionData.thirdClassCode">
-                    <span class="recent-field-label">三级类码：</span>
-                    <span class="recent-field-value">{{ item.conditionData.thirdClassCode }}{{ formatName('thirdClassCode', item.conditionData.thirdClassCode) }}</span>
-                  </div>
-                  <div class="recent-field" v-if="item.conditionData.dataTypeCode">
-                    <span class="recent-field-label">数据类码：</span>
-                    <span class="recent-field-value">{{ item.conditionData.dataTypeCode }}{{ formatName('dataTypeCode', item.conditionData.dataTypeCode) }}</span>
-                  </div>
-                  <div class="recent-field" v-if="item.conditionData.dataCode">
-                    <span class="recent-field-label">数据码：</span>
-                    <span class="recent-field-value">{{ formatDataCode(item.conditionData.dataCode) }}</span>
-                  </div>
-                </div>
-                <div class="recent-condition-meta">
-                  <span class="recent-condition-time">{{ item.generateTime }}</span>
-                  <el-tag size="small" type="primary" effect="plain" class="apply-tag">点击应用</el-tag>
-                </div>
-              </div>
-              <el-empty v-if="recentConditions.length === 0" description="暂无最近记录" />
-            </div>
-          </el-popover>
       </div>
       <div class="section-body">
       <el-form :model="conditions" label-width="140px" label-position="top">
@@ -626,8 +572,6 @@ function toggleLock(key: string) {
 }
 
 const activeTab = ref('preview');
-const recentConditions = ref<Array<{ id: number; conditionData: Record<string, any>; conditionSummary: string; generateTime: string }>>([]);
-const recentPopoverRef = ref<any>(null);
 const editingIndex = ref<number | null>(null);
 const editingName = ref('');
 const nameInputRef = ref<any>(null);
@@ -1336,9 +1280,6 @@ onMounted(async () => {
     // 触发类型级联加载二级类码
     await onConditionChange('typeCode');
 
-    // 加载最近条件记录
-    loadRecentConditions();
-
     // 加载编码生成列表
     loadCodeList();
     // 加载编码总数
@@ -1562,9 +1503,6 @@ async function handleGenerate() {
       ElMessage.success(`成功生成 ${allResults.length} 个编码`);
     }
 
-    // 生成成功后保存当前条件到最近记录
-    saveCurrentConditions();
-
     activeTab.value = 'preview';
   } catch (err: any) {
     ElMessage.error(err.message || '生成编码失败');
@@ -1616,6 +1554,11 @@ function copyAllPreview() {
     () => ElMessage.success('已复制全部编码'),
     () => ElMessage.warning('复制失败，请手动选择复制'),
   );
+}
+
+/** 查找字典项名称 */
+function findDictName(key: string, code: string): string | undefined {
+  return dictOptions[key]?.find(item => item.code === code)?.name;
 }
 
 /** 格式化上下文值：编码 + 名称（如 "F1 风电"） */
@@ -1696,8 +1639,11 @@ function onTabClick(tab: any) {
   if (tab.props?.name === 'saved' && codeList.value.length === 0) {
     loadCodeList();
   }
+  // 等 DOM 更新 + 浏览器绘制完成后恢复滚动位置，避免标签切换导致页面跳动
   nextTick(() => {
-    window.scrollTo(0, scrollY);
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+    });
   });
 }
 
@@ -1736,153 +1682,8 @@ function cancelEditName() {
   editingName.value = '';
 }
 
-/** 加载最近条件记录 */
-async function loadRecentConditions() {
-  try {
-    const list = await codeService.getRecentConditions();
-    recentConditions.value = (list || []).map((item: any) => ({
-      id: item.id,
-      conditionData: typeof item.condition_data === 'string' ? JSON.parse(item.condition_data) : (item.condition_data || {}),
-      conditionSummary: item.condition_summary || '',
-      generateTime: item.generate_time || '',
-    }));
+/** 复制选中编码 */
 
-    // 预加载最近记录的字典名称（三级类码、数据类码、数据码）
-    if (recentConditions.value.length > 0) {
-      const data = recentConditions.value[0].conditionData;
-      await preloadRecentDicts(data);
-    }
-  } catch {
-    // 静默失败，不影响主功能
-  }
-}
-
-/** 根据最近记录的编码预加载对应的字典列表，使名称能正常显示 */
-async function preloadRecentDicts(data: Record<string, any>) {
-  if (data.secondClassCode) {
-    if (!dictOptions['thirdClassCode']?.length) {
-      try {
-        dictOptions['thirdClassCode'] = await dictService.getCascadedDictItems(data.secondClassCode, data.typeCode);
-      } catch {}
-    }
-    if (!dictOptions['dataTypeCode']?.length) {
-      try {
-        dictOptions['dataTypeCode'] = await dictService.getDataTypeBySecondClass(data.typeCode, data.secondClassCode);
-      } catch {}
-    }
-  }
-  if (data.dataTypeCode && !dictOptions['dataCode']?.length) {
-    try {
-      dictOptions['dataCode'] = await dictService.getDataCodes(data.dataTypeCode, data.secondClassCode, data.typeCode);
-    } catch {}
-  }
-}
-
-/** 查找字典项名称 */
-function findDictName(key: string, code: string): string | undefined {
-  return dictOptions[key]?.find(item => item.code === code)?.name;
-}
-
-/** 显示字典名称（code 有对应 name 时返回 " name"，否则返回空串） */
-function formatName(dictKey: string, code: string): string {
-  const name = findDictName(dictKey, code);
-  return name ? ` ${name}` : '';
-}
-
-/** 显示数据码（支持多选），格式："001 电压" 或 "001 电压、002 频率" */
-function formatDataCode(dataCode: string | string[]): string {
-  const codes = Array.isArray(dataCode) ? dataCode : [dataCode];
-  return codes.map(c => {
-    const name = findDictName('dataCode', c);
-    return name ? `${c} ${name}` : c;
-  }).join('、');
-}
-
-/** 保存当前条件到最近记录（只存编码生成编码，不存名称） */
-async function saveCurrentConditions() {
-  const snapshot: Record<string, any> = {};
-  conditionFields.forEach((field) => {
-    const val = conditions[field.key];
-    if (val !== undefined && val !== null && val !== '') {
-      if (field.multiple && Array.isArray(val) && val.length === 0) return;
-      snapshot[field.key] = val;
-    }
-  });
-  // 保存扩展字段
-  ['secondExtCodeStart', 'secondExtCodeCount', 'thirdExtCodeStart', 'thirdExtCodeCount'].forEach((k) => {
-    if (conditions[k]) snapshot[k] = conditions[k];
-  });
-
-  try {
-    await codeService.saveRecentCondition(snapshot);
-    loadRecentConditions();
-  } catch {
-    // 静默失败
-  }
-}
-
-/** 应用最近条件记录：一键切换所有编码生成 */
-async function applyRecentCondition(item: { conditionData: Record<string, any> }) {
-  const saved = item.conditionData;
-  if (!saved || Object.keys(saved).length === 0) return;
-
-  // 保存锁定的字段值，清空后再恢复
-  const lockedSnapshot: Record<string, any> = {};
-  LOCKABLE_FIELDS.forEach(key => {
-    if (lockedFields[key]) lockedSnapshot[key] = conditions[key];
-  });
-
-  // 1. 清空所有条件
-  conditionFields.forEach((field) => {
-    conditions[field.key] = field.multiple ? [] : '';
-  });
-  ['secondExtCodeStart', 'secondExtCodeCount', 'thirdExtCodeStart', 'thirdExtCodeCount'].forEach((k) => {
-    conditions[k] = '';
-  });
-
-  // 2. 按依赖顺序设置条件并触发级联加载
-  // 2a. 设置独立字段（锁定字段使用原值）
-  conditions.stationCode = lockedFields.stationCode ? lockedSnapshot.stationCode : (saved.stationCode || '');
-  conditions.typeCode = lockedFields.typeCode ? lockedSnapshot.typeCode : (saved.typeCode || '');
-  conditions.projectLineCode = lockedFields.projectLineCode ? lockedSnapshot.projectLineCode : (saved.projectLineCode || '');
-  conditions.prefixNo = lockedFields.prefixNo ? lockedSnapshot.prefixNo : (saved.prefixNo || '');
-  conditions.firstClassCode = lockedFields.firstClassCode ? lockedSnapshot.firstClassCode : (saved.firstClassCode || '');
-
-  // 2b. 触发类型级联（加载二级类码列表）
-  await onConditionChange('typeCode');
-
-  // 2c. 设置二级类码（锁定字段使用原值）
-  conditions.secondClassCode = lockedFields.secondClassCode ? lockedSnapshot.secondClassCode : (saved.secondClassCode || '');
-
-  // 2d. 触发二级类级联（加载三级类码和数据类码列表，会重置扩展码）
-  await onConditionChange('secondClassCode');
-
-  // 2e. 级联后再恢复二级类扩展码
-  conditions.secondExtCodeStart = saved.secondExtCodeStart || '1';
-  conditions.secondExtCodeCount = saved.secondExtCodeCount || '1';
-
-  // 2f. 设置三级类、扩展和数据类字段
-  conditions.thirdClassCode = saved.thirdClassCode || '';
-  conditions.thirdExtCodeStart = saved.thirdExtCodeStart || '0';
-  conditions.thirdExtCodeCount = saved.thirdExtCodeCount || '1';
-  conditions.dataTypeCode = saved.dataTypeCode || '';
-
-  // 2g. 触发数据类码级联（加载数据码列表）
-  await onConditionChange('dataTypeCode');
-
-  // 2h. 设置数据码
-  if (saved.dataCode !== undefined && saved.dataCode !== null) {
-    conditions.dataCode = saved.dataCode;
-  }
-
-  // 清空已生成的编码
-  generatedCodes.value = [];
-
-  // 关闭popover
-  recentPopoverRef.value?.hide?.();
-
-  ElMessage.success('已应用最近条件');
-}
 </script>
 
 <style scoped>
@@ -1962,11 +1763,24 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   gap: 12px;
   padding: 14px 20px;
   margin-bottom: 0;
-  background: #ffffff;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
   border-radius: 10px 10px 0 0;
-  box-shadow: none;
-  border: 1px solid #f0f0f0;
-  border-bottom: none;
+  border: 1px solid #e4e9f2;
+  border-bottom: 1px solid #eef2f8;
+  position: relative;
+}
+.toolbar-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #22d3ee, #8b5cf6);
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 10px 10px 0 0;
 }
 .toolbar-left {
   display: flex;
@@ -1987,17 +1801,28 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   margin-bottom: 16px;
   background: #ffffff;
   border-radius: 0 0 10px 10px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  border: 1px solid #f0f0f0;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+  border: 1px solid #e4e9f2;
   border-top: none;
 }
 
 .card-title {
   font-weight: 700;
   font-size: 15px;
-  padding-left: 10px;
-  border-left: 3px solid #409eff;
+  padding-left: 12px;
   line-height: 1.4;
+  color: #1a2a4a;
+  position: relative;
+}
+.card-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 1px;
+  bottom: 1px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3b82f6, #22d3ee);
 }
 
 .search-input :deep(.el-input__wrapper) {
@@ -2018,16 +1843,29 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 /* ==================== 内容区块卡片 ==================== */
 .section-card {
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-  border: 1px solid #e8ecf1;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+  border: 1px solid #e4e9f2;
   margin-bottom: 16px;
   overflow: hidden;
-  transition: box-shadow 0.2s ease;
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+.section-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #22d3ee, #8b5cf6);
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .section-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
 }
 
 .section-header {
@@ -2035,7 +1873,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   justify-content: space-between;
   align-items: center;
   padding: 14px 20px;
-  border-bottom: 1px solid #eef1f4;
+  border-bottom: 1px solid #eef2f8;
   background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
 }
 
@@ -2137,7 +1975,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #ffffff !important;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%) !important;
 }
 
 /* 类型切换圆片 + 下拉框统一科技风 */
@@ -2232,74 +2070,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   color: #606266;
 }
 
-.recent-conditions-list {
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-.recent-condition-item {
-  padding: 10px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #ebeef5;
-  transition: background-color 0.2s;
-  border-radius: 4px;
-}
-
-.recent-condition-item:last-child {
-  border-bottom: none;
-}
-
-.recent-condition-item:hover {
-  background-color: #f5f7fa;
-}
-
-.recent-condition-item.is-first {
-  background-color: #f0f9eb;
-}
-
-.recent-condition-item.is-first:hover {
-  background-color: #e1f3d8;
-}
-
-.recent-condition-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.recent-field {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.recent-field-label {
-  color: #909399;
-  flex-shrink: 0;
-}
-
-.recent-field-value {
-  color: #303133;
-}
-
-.recent-condition-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-}
-
-.recent-condition-time {
-  font-size: 12px;
-  color: #909399;
-}
-
-.apply-tag {
-  flex-shrink: 0;
-}
-
 .condition-actions {
   margin-top: 20px;
   padding: 16px 0 4px;
@@ -2309,7 +2079,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   border-top: 1px solid #f0f2f5;
   position: relative;
 }
-
 .condition-actions::before {
   content: '';
   position: absolute;
@@ -2320,7 +2089,6 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   background: linear-gradient(90deg, #409eff, #79bbff);
   border-radius: 0 2px 2px 0;
 }
-
 .condition-actions .el-button--primary {
   padding: 10px 28px;
   font-size: 14px;
@@ -2680,21 +2448,40 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
 /* ===== 编码列表（与编码看板同步） ===== */
 .card-default {
   background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  border: 1px solid #e4e9f2;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+.card-default::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #22d3ee, #8b5cf6);
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
+}
+.card-default:hover {
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
 }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #eef2f8;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
 }
 .card-header-title {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: #1a2a4a;
   position: relative;
   padding-left: 12px;
 }
@@ -2706,7 +2493,7 @@ async function applyRecentCondition(item: { conditionData: Record<string, any> }
   bottom: 2px;
   width: 3px;
   border-radius: 2px;
-  background: #409eff;
+  background: linear-gradient(180deg, #3b82f6, #22d3ee);
 }
 .filter-actions {
   display: flex;
