@@ -221,6 +221,9 @@ export function getGenerateProgress() {
 export function clearGenerateProgress() {
   currentGenerateStep = null;
   generateStepsDone.length = 0;
+  // 同时清除进度 Map 中的残留，避免前端轮询读到旧数据
+  const s = getCurrentSchema();
+  progressMap.delete(`${s}:generate`);
 }
 
 // ==================== 导入 ====================

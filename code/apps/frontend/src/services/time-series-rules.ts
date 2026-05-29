@@ -26,7 +26,7 @@ export async function importStation(
     signal,
     onUploadProgress: (e) => {
       if (e.total && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 30));
+        onProgress(Math.round((e.loaded / e.total) * 80));
       }
     },
   });
@@ -47,7 +47,7 @@ export async function importMeasure(
     signal,
     onUploadProgress: (e) => {
       if (e.total && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 30));
+        onProgress(Math.round((e.loaded / e.total) * 80));
       }
     },
   });
@@ -99,10 +99,7 @@ export async function getImportProgress(type: string): Promise<{ total: number; 
   return res.data;
 }
 
-/** 取消导入 */
-export async function cancelImportTask(type: string): Promise<void> {
-  await api.post('/tsr/import/cancel', { type });
-}
+
 
 /** 获取生成规则进度 */
 export async function getGenerateProgress(): Promise<{

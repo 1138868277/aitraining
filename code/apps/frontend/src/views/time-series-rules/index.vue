@@ -10,24 +10,51 @@
         </div>
 
         <div class="region-bar">
-          <span class="region-label">当前租户:</span>
-          <span class="tenant-name">{{ currentSchema }}</span>
-          <div class="region-stats" v-if="overview">
-            <span class="stat-item">
-              <i class="stat-dot" style="background:#38bdf8"></i>场站 {{ overview.station }}
-            </span>
-            <span class="stat-item">
-              <i class="stat-dot" style="background:#a78bfa"></i>测点 {{ overview.measure }}
-            </span>
+          <div class="tenant-display">
+            <div class="tenant-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="tenant-info">
+              <span class="region-label">当前租户</span>
+              <span class="tenant-name">{{ currentSchema }}</span>
+            </div>
           </div>
-          <el-button class="clear-btn" size="small" :loading="clearing" @click="handleClear">清空数据</el-button>
+          <div class="region-stats" v-if="overview">
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-station">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">{{ overview.station }}</span>
+                <span class="stat-label">场站</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-measure">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 12h-4V8"/></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">{{ overview.measure }}</span>
+                <span class="stat-label">测点</span>
+              </div>
+            </div>
+          </div>
+          <el-button class="clear-btn" :loading="clearing" @click="handleClear">清空数据</el-button>
         </div>
 
         <div class="steps-flow">
           <div class="step-item" v-for="(step, idx) in steps" :key="idx">
             <div class="step-connector" v-if="idx > 0" :class="{ active: step.status !== 'pending' }">
-              <div class="connector-line"></div>
-              <div class="connector-arrow">&#9660;</div>
+              <div class="connector-dot top"></div>
+              <div class="connector-line">
+                <div class="connector-fill"></div>
+              </div>
+              <div class="connector-dot bottom"></div>
+              <div class="connector-arrow">
+                <svg viewBox="0 0 22 14" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="11,14 1,3 21,3" />
+                </svg>
+              </div>
             </div>
 
             <div class="step-card" :class="[`step-${step.status}`]">
@@ -60,19 +87,24 @@
                     <span class="file-name">{{ stationFile.name }}</span>
                     <el-button size="small" type="primary" :loading="stationLoading" :disabled="importOngoing" @click="importStation">导入</el-button>
                   </div>
-                  <div v-if="(stationProgress > 0 && stationProgress < 100) || stationPartial" class="tech-progress" :class="{ 'tech-progress-partial': stationPartial }">
-                    <div class="tech-progress-track">
-                      <div class="tech-progress-fill" :style="{ width: stationProgress + '%' }">
-                        <div class="tech-progress-glow"></div>
+                  <!-- 双进度条一行：左1/3上传，右2/3导入 -->
+                  <div v-if="stationProgress < 100 && (stationUploadPercent > 0 || stationProgress > 0)" class="tech-progress-row">
+                    <div class="tech-progress tech-progress-uploading" :class="{ 'tech-progress-done': stationUploadPercent >= 100 }" style="width:33%">
+                      <div class="tech-progress-track">
+                        <div class="tech-progress-fill" :style="{ width: Math.min(stationUploadPercent, 100) + '%' }">
+                          <div class="tech-progress-glow"></div>
+                        </div>
                       </div>
+                      <div class="tech-progress-label">上传 {{ stationUploadPercent >= 100 ? '完成' : stationUploadPercent + '%' }}</div>
                     </div>
-                    <div class="tech-progress-info">
-                      <span class="tech-progress-text">{{ stationProgress }}%</span>
-                      <span v-if="stationTotal > 0" class="tech-progress-count">已导入 {{ stationDone }} / {{ stationTotal }} 条</span>
-                      <span v-if="stationPartial" class="tech-partial-label">已停止</span>
-                      <button v-else class="tech-stop-btn" @click="cancelImport('station')">
-                        <span class="stop-icon">■</span> 停止
-                      </button>
+                    <div class="tech-progress" style="width:67%">
+                      <div class="tech-progress-track">
+                        <div class="tech-progress-fill" :style="{ width: stationProgress + '%' }">
+                          <div class="tech-progress-glow"></div>
+                        </div>
+                      </div>
+                      <div class="tech-progress-label" v-if="stationProgress >= 100">导入完成</div>
+                      <div class="tech-progress-label" v-else>导入 {{ stationProgress }}%</div>
                     </div>
                   </div>
                   <div v-if="stationResult !== null" class="result-msg success">导入成功：{{ stationResult }} 条场站记录</div>
@@ -89,19 +121,24 @@
                     <span class="file-name">{{ measureFile.name }}</span>
                     <el-button size="small" type="primary" :loading="measureLoading" :disabled="importOngoing" @click="importMeasure">导入</el-button>
                   </div>
-                  <div v-if="(measureProgress > 0 && measureProgress < 100) || measurePartial" class="tech-progress" :class="{ 'tech-progress-partial': measurePartial }">
-                    <div class="tech-progress-track">
-                      <div class="tech-progress-fill" :style="{ width: measureProgress + '%' }">
-                        <div class="tech-progress-glow"></div>
+                  <!-- 双进度条一行：左1/3上传，右2/3导入 -->
+                  <div v-if="measureProgress < 100 && (measureUploadPercent > 0 || measureProgress > 0)" class="tech-progress-row">
+                    <div class="tech-progress tech-progress-uploading" :class="{ 'tech-progress-done': measureUploadPercent >= 100 }" style="width:33%">
+                      <div class="tech-progress-track">
+                        <div class="tech-progress-fill" :style="{ width: Math.min(measureUploadPercent, 100) + '%' }">
+                          <div class="tech-progress-glow"></div>
+                        </div>
                       </div>
+                      <div class="tech-progress-label">上传 {{ measureUploadPercent >= 100 ? '完成' : measureUploadPercent + '%' }}</div>
                     </div>
-                    <div class="tech-progress-info">
-                      <span class="tech-progress-text">{{ measureProgress }}%</span>
-                      <span v-if="measureTotal > 0" class="tech-progress-count">已导入 {{ measureDone }} / {{ measureTotal }} 条</span>
-                      <span v-if="measurePartial" class="tech-partial-label">已停止</span>
-                      <button v-else class="tech-stop-btn" @click="cancelImport('measure')">
-                        <span class="stop-icon">■</span> 停止
-                      </button>
+                    <div class="tech-progress" style="width:67%">
+                      <div class="tech-progress-track">
+                        <div class="tech-progress-fill" :style="{ width: measureProgress + '%' }">
+                          <div class="tech-progress-glow"></div>
+                        </div>
+                      </div>
+                      <div class="tech-progress-label" v-if="measureProgress >= 100">导入完成</div>
+                      <div class="tech-progress-label" v-else>导入 {{ measureProgress }}%</div>
                     </div>
                   </div>
                   <div v-if="measureResult !== null" class="result-msg success">导入成功：{{ measureResult }} 条测点记录</div>
@@ -110,7 +147,7 @@
                 <!-- 生成规则 -->
                 <template v-if="step.key === 'generate'">
                   <div class="generate-area">
-                    <el-button v-if="!genLoading" type="primary" size="large" class="gen-btn" @click="startGenerate">
+                    <el-button type="primary" size="large" class="gen-btn" :disabled="genLoading" @click="startGenerate">
                       <span class="gen-btn-icon">&#9889;</span>
                       开始生成稽核规则
                     </el-button>
@@ -184,15 +221,15 @@
                       v-for="t in exportTypes"
                       :key="t.key"
                       class="export-box"
-                      :class="`box-${t.key}`"
+                      :class="[`box-${t.key}`, { 'export-loading': exportLoading === t.key }]"
                       @click="downloadSingle(t.key)"
                     >
-                      <div class="box-icon">{{ t.icon }}</div>
+                      <div class="box-icon"><span v-if="exportLoading === t.key" class="export-spinner"></span><span v-else>{{ t.icon }}</span></div>
                       <div class="box-label">{{ t.label }}</div>
                       <div class="box-desc">完整单文件 · 不分片</div>
                     </div>
-                    <div class="export-box box-all" @click="downloadAll">
-                      <div class="box-icon">📦</div>
+                    <div class="export-box box-all" :class="{ 'export-loading': exportAllLoading }" @click="downloadAll">
+                      <div class="box-icon"><span v-if="exportAllLoading" class="export-spinner"></span><span v-else>📦</span></div>
                       <div class="box-label">打包下载全部</div>
                       <div class="box-desc">4 个完整规则文件</div>
                     </div>
@@ -216,7 +253,7 @@ import {
   importMeasure as apiImportMeasure,
   generateRules as apiGenerateRules,
   downloadOverallExcel, downloadAllOverallZip, saveBlobAsFile,
-  clearAllData, getImportProgress, cancelImportTask,
+  clearAllData, getImportProgress,
   getGenerateProgress,
 } from '@/services/time-series-rules';
 
@@ -242,23 +279,20 @@ const steps = reactive([
 // ====== 导入场站 ======
 const stationFile = ref<File | null>(null);
 const stationLoading = ref(false);
-const stationResult = ref<number | null>(null);
+const stationResult = ref<number | null>(parseInt(localStorage.getItem('tsr_station_result') || '', 10) || null);
 const stationProgress = ref(0);
+const stationUploadPercent = ref(0);
 const stationTotal = ref(0);
 const stationDone = ref(0);
-const stationPartial = ref(false);
-const stationAbort = ref<AbortController | null>(null);
 const stationPollTimer = ref<ReturnType<typeof setInterval> | null>(null);
-
 // ====== 导入测点 ======
 const measureFile = ref<File | null>(null);
 const measureLoading = ref(false);
-const measureResult = ref<number | null>(null);
+const measureResult = ref<number | null>(parseInt(localStorage.getItem('tsr_measure_result') || '', 10) || null);
 const measureProgress = ref(0);
+const measureUploadPercent = ref(0);
 const measureTotal = ref(0);
 const measureDone = ref(0);
-const measurePartial = ref(false);
-const measureAbort = ref<AbortController | null>(null);
 const measurePollTimer = ref<ReturnType<typeof setInterval> | null>(null);
 
 // ====== 生成规则 ======
@@ -269,6 +303,10 @@ const GEN_TIME_KEY = 'tsr_gen_create_time';
 const GEN_RESULT_KEY = 'tsr_gen_result';
 const GEN_DONE_STEPS_KEY = 'tsr_gen_done_steps';
 const GEN_PROGRESS_KEY = 'tsr_gen_progress';
+/** 第4步完成状态持久化 key */
+const STEP4_STATUS_KEY = 'tsr_step4_status';
+const STEP1_STATUS_KEY = 'tsr_step1_status';
+const STEP2_STATUS_KEY = 'tsr_step2_status';
 const genProgressPoll = ref<ReturnType<typeof setInterval> | null>(null);
 const genProgress = ref<{ done: number; total: number; status: string }>({ done: 0, total: 0, status: 'idle' });
 const genCurrentStep = ref<{ module: string; energy: string; ruleType: string; status: string; rows: number } | null>(null);
@@ -298,6 +336,7 @@ const totalRules = computed(() => {
 // ====== 导出 ======
 const exportLoading = ref<string>('');
 const exportAllLoading = ref(false);
+const exportBusy = computed(() => exportLoading.value !== '' || exportAllLoading.value);
 
 function saveGenResult(result: typeof genResult.value) {
   genResult.value = result;
@@ -307,6 +346,7 @@ function saveGenResult(result: typeof genResult.value) {
   // 同时持久化步骤明细和进度，刷新后仍显示
   localStorage.setItem(GEN_DONE_STEPS_KEY, JSON.stringify(genDoneSteps.value));
   localStorage.setItem(GEN_PROGRESS_KEY, JSON.stringify(genProgress.value));
+  localStorage.setItem(STEP4_STATUS_KEY, steps[3].status);
   if (result) {
     localStorage.setItem(GEN_RESULT_KEY, JSON.stringify(result));
   }
@@ -344,17 +384,18 @@ function onDrop(e: DragEvent, type: string) {
 
 async function importStation() {
   if (!stationFile.value || importOngoing.value) return;
+  const uploadStart = Date.now();
+  const MIN_UPLOAD_MS = 2000;
+  const MIN_IMPORT_MS = 2000;
   stationLoading.value = true;
   stationProgress.value = 0;
-  stationPartial.value = false;
+  stationUploadPercent.value = 0;
   stationResult.value = null;
   steps[0].status = 'running';
-  const ctrl = new AbortController();
-  stationAbort.value = ctrl;
 
   const promise = apiImportStation(stationFile.value!, (p) => {
-    stationProgress.value = p;
-  }, ctrl.signal);
+    stationUploadPercent.value = p;
+  });
 
   const pollTimer = setInterval(async () => {
     try {
@@ -362,8 +403,8 @@ async function importStation() {
       if (p.total > 0) {
         stationTotal.value = p.total;
         stationDone.value = p.done;
-        const pct = 30 + Math.round((p.done / p.total) * 65);
-        stationProgress.value = Math.min(pct, 95);
+        stationProgress.value = Math.round((p.done / p.total) * 100);
+        stationUploadPercent.value = 100;
       }
     } catch { /* ignore poll errors */ }
   }, 500);
@@ -371,49 +412,58 @@ async function importStation() {
 
   try {
     const res = await promise;
+
+    // 阶段1: 保证上传进度至少展示 MIN_UPLOAD_MS（从开始算起），不覆盖轮询数据
+    const elapsed = Date.now() - uploadStart;
+    if (elapsed < MIN_UPLOAD_MS) {
+      await new Promise(r => setTimeout(r, MIN_UPLOAD_MS - elapsed));
+    }
+
+    // 阶段2: 停止轮询，上传栏固定100%，导入栏停留在当前轮询值
     clearInterval(pollTimer);
     stationPollTimer.value = null;
+    stationUploadPercent.value = 100;
+
+    // 导入栏最少展示 MIN_IMPORT_MS 再跳100%
+    await new Promise(r => setTimeout(r, MIN_IMPORT_MS));
+
     stationProgress.value = 100;
     stationResult.value = res.importedCount;
     steps[0].status = 'completed';
+    localStorage.setItem(STEP1_STATUS_KEY, 'completed');
+    localStorage.setItem('tsr_station_result', String(res.importedCount));
     ElMessage.success(`导入 ${res.importedCount} 条场站数据成功`);
     refreshOverview();
   } catch (err: any) {
     clearInterval(pollTimer);
     stationPollTimer.value = null;
-    if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-      stationPartial.value = true;
-      steps[0].status = 'partial';
-      ElMessage.info(`已导入 ${stationDone.value} / ${stationTotal.value} 条（已停止）`);
-    } else {
-      steps[0].status = 'error';
-      stationProgress.value = 0;
-      ElMessage.error(err.message || '导入失败');
-    }
+    steps[0].status = 'error';
+    stationProgress.value = 0;
+    ElMessage.error(err.message || '导入失败');
+    localStorage.setItem(STEP1_STATUS_KEY, steps[0].status);
   } finally {
     stationLoading.value = false;
-    stationAbort.value = null;
-    if (!stationPartial.value) {
-      stationProgress.value = 0;
-    }
+    stationProgress.value = 0;
+    stationUploadPercent.value = 0;
   }
 }
 
 async function importMeasure() {
   if (!measureFile.value || importOngoing.value) return;
+  const uploadStart = Date.now();
+  const MIN_UPLOAD_MS = 2000;
+  const MIN_IMPORT_MS = 2000;
   measureLoading.value = true;
   measureProgress.value = 0;
+  measureUploadPercent.value = 0;
   measureTotal.value = 0;
   measureDone.value = 0;
-  measurePartial.value = false;
   measureResult.value = null;
   steps[1].status = 'running';
-  const ctrl = new AbortController();
-  measureAbort.value = ctrl;
 
   const promise = apiImportMeasure(measureFile.value!, (p) => {
-    measureProgress.value = p;
-  }, ctrl.signal);
+    measureUploadPercent.value = p;
+  });
 
   const pollTimer = setInterval(async () => {
     try {
@@ -421,8 +471,8 @@ async function importMeasure() {
       if (p.total > 0) {
         measureTotal.value = p.total;
         measureDone.value = p.done;
-        const pct = 30 + Math.round((p.done / p.total) * 65);
-        measureProgress.value = Math.min(pct, 95);
+        measureProgress.value = Math.round((p.done / p.total) * 100);
+        measureUploadPercent.value = 100;
       }
     } catch { /* ignore poll errors */ }
   }, 500);
@@ -430,70 +480,39 @@ async function importMeasure() {
 
   try {
     const res = await promise;
+
+    // 阶段1: 保证上传进度至少展示 MIN_UPLOAD_MS
+    const elapsed = Date.now() - uploadStart;
+    if (elapsed < MIN_UPLOAD_MS) {
+      await new Promise(r => setTimeout(r, MIN_UPLOAD_MS - elapsed));
+    }
+
+    // 阶段2: 停止轮询，上传栏固定100%，导入栏停留在当前轮询值
     clearInterval(pollTimer);
     measurePollTimer.value = null;
+    measureUploadPercent.value = 100;
+
+    // 导入栏最少展示 MIN_IMPORT_MS 再跳100%
+    await new Promise(r => setTimeout(r, MIN_IMPORT_MS));
+
     measureProgress.value = 100;
     measureResult.value = res.importedCount;
     steps[1].status = 'completed';
+    localStorage.setItem(STEP2_STATUS_KEY, 'completed');
+    localStorage.setItem('tsr_measure_result', String(res.importedCount));
     ElMessage.success(`导入 ${res.importedCount} 条测点数据成功`);
     refreshOverview();
   } catch (err: any) {
     clearInterval(pollTimer);
     measurePollTimer.value = null;
-    if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-      measurePartial.value = true;
-      steps[1].status = 'partial';
-      ElMessage.info(`已导入 ${measureDone.value} / ${measureTotal.value} 条（已停止）`);
-    } else {
-      steps[1].status = 'error';
-      measureProgress.value = 0;
-      ElMessage.error(err.message || '导入失败');
-    }
+    steps[1].status = 'error';
+    measureProgress.value = 0;
+    ElMessage.error(err.message || '导入失败');
+    localStorage.setItem(STEP2_STATUS_KEY, steps[1].status);
   } finally {
     measureLoading.value = false;
-    measureAbort.value = null;
-    if (!measurePartial.value) {
-      measureProgress.value = 0;
-    }
-  }
-}
-
-async function cancelImport(type: string) {
-  // 先等待后端取消信号写入成功，再处理前端状态
-  try {
-    await cancelImportTask(type);
-  } catch {}
-
-  if (type === 'station') {
-    // 有 HTTP 请求则取消请求（初始导入），catch 块处理后续状态
-    if (stationAbort.value) {
-      stationAbort.value.abort();
-      return;
-    }
-    // 没有 HTTP 请求（刷新后恢复的轮询模式），直接清理轮询并标记停止
-    if (stationPollTimer.value) {
-      clearInterval(stationPollTimer.value);
-      stationPollTimer.value = null;
-    }
-    if (steps[0].status === 'running' && !stationPartial.value) {
-      stationPartial.value = true;
-      steps[0].status = 'partial';
-      ElMessage.info(`已导入 ${stationDone.value} / ${stationTotal.value} 条（已停止）`);
-    }
-  } else if (type === 'measure') {
-    if (measureAbort.value) {
-      measureAbort.value.abort();
-      return;
-    }
-    if (measurePollTimer.value) {
-      clearInterval(measurePollTimer.value);
-      measurePollTimer.value = null;
-    }
-    if (steps[1].status === 'running' && !measurePartial.value) {
-      measurePartial.value = true;
-      steps[1].status = 'partial';
-      ElMessage.info(`已导入 ${measureDone.value} / ${measureTotal.value} 条（已停止）`);
-    }
+    measureProgress.value = 0;
+    measureUploadPercent.value = 0;
   }
 }
 
@@ -524,19 +543,13 @@ async function startGenerate() {
   genDoneSteps.value = [];
   steps[2].status = 'running';
 
-  // 启动进度轮询
+  // 启动进度轮询（仅更新显示，不干预完成流程）
   const pollTimer = setInterval(async () => {
     try {
       const p = await getGenerateProgress();
       genProgress.value = { done: p.done, total: p.total, status: p.status };
       genCurrentStep.value = p.currentStep || null;
       genDoneSteps.value = p.doneSteps || [];
-
-      if (p.status === 'completed') {
-        clearInterval(pollTimer);
-        genProgressPoll.value = null;
-        genCurrentStep.value = null;
-      }
     } catch { /* ignore poll errors */ }
   }, 1000);
   genProgressPoll.value = pollTimer;
@@ -555,8 +568,9 @@ async function startGenerate() {
     }));
     genProgress.value = { done: res.details.length, total: res.details.length, status: 'completed' };
     genCurrentStep.value = null;
-    saveGenResult(res);
     steps[2].status = 'completed';
+    steps[3].status = 'completed';
+    saveGenResult(res);
     ElMessage.success(`生成完成，共 ${res.total} 条规则`);
   } catch (err: any) {
     clearInterval(pollTimer);
@@ -570,6 +584,7 @@ async function startGenerate() {
 }
 
 async function downloadSingle(type: string) {
+  if (exportBusy.value) return;
   exportLoading.value = type;
   const label = typeLabels[type] || type;
   try {
@@ -585,6 +600,7 @@ async function downloadSingle(type: string) {
 }
 
 async function downloadAll() {
+  if (exportBusy.value) return;
   exportAllLoading.value = true;
   try {
     const blob = await downloadAllOverallZip();
@@ -617,10 +633,8 @@ async function handleClear() {
     // 重置步骤状态
     steps.forEach(s => { s.status = 'pending'; });
     stationResult.value = null;
-    stationPartial.value = false;
     stationProgress.value = 0;
     measureResult.value = null;
-    measurePartial.value = false;
     measureProgress.value = 0;
     genResult.value = null;
     genCreateTime.value = '';
@@ -632,6 +646,11 @@ async function handleClear() {
     localStorage.removeItem(GEN_TIME_KEY);
     localStorage.removeItem(GEN_DONE_STEPS_KEY);
     localStorage.removeItem(GEN_PROGRESS_KEY);
+    localStorage.removeItem(STEP4_STATUS_KEY);
+    localStorage.removeItem(STEP1_STATUS_KEY);
+    localStorage.removeItem(STEP2_STATUS_KEY);
+    localStorage.removeItem('tsr_station_result');
+    localStorage.removeItem('tsr_measure_result');
     await refreshOverview();
   } catch (err: any) {
     ElMessage.error(err.message || '清空失败');
@@ -708,6 +727,12 @@ function restoreGenResult() {
     } catch { /* ignore corrupt data */ }
   }
 
+  // 恢复第4步完成状态
+  const step4Status = localStorage.getItem(STEP4_STATUS_KEY);
+  if (step4Status === 'completed') {
+    steps[3].status = 'completed';
+  }
+
   // 恢复进度状态
   const savedProgress = localStorage.getItem(GEN_PROGRESS_KEY);
   if (savedProgress) {
@@ -782,18 +807,6 @@ async function checkOngoingImport(type: 'station' | 'measure') {
               ElMessage.success(`导入 ${p2.total} 条测点数据成功`);
             }
             refreshOverview();
-          } else if (p2.status === 'cancelled') {
-            clearInterval(pollTimer);
-            if (type === 'station') {
-              stationPollTimer.value = null;
-              stationPartial.value = true;
-              steps[0].status = 'partial';
-            } else {
-              measurePollTimer.value = null;
-              measurePartial.value = true;
-              steps[1].status = 'partial';
-            }
-            ElMessage.info(`已导入 ${p2.done} / ${p2.total} 条（已停止）`);
           } else if (p2.status === 'processing' && p2.total > 0) {
             updateProgress(p2.total, p2.done);
           }
@@ -803,21 +816,6 @@ async function checkOngoingImport(type: 'station' | 'measure') {
       }, 500);
       if (type === 'station') stationPollTimer.value = pollTimer;
       else measurePollTimer.value = pollTimer;
-    } else if (p.status === 'cancelled' && p.total > 0) {
-      // 导入已被取消
-      if (type === 'station') {
-        stationPartial.value = true;
-        stationDone.value = p.done;
-        stationTotal.value = p.total;
-        stationProgress.value = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
-        steps[0].status = 'partial';
-      } else {
-        measurePartial.value = true;
-        measureDone.value = p.done;
-        measureTotal.value = p.total;
-        measureProgress.value = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
-        steps[1].status = 'partial';
-      }
     } else if (p.status === 'completed' && p.total > 0) {
       // 导入已全部完成
       if (type === 'station') {
@@ -852,6 +850,19 @@ async function checkOngoingImport(type: 'station' | 'measure') {
 }
 
 onMounted(async () => {
+  // 优先从 localStorage 恢复状态，避免 API 延迟导致闪白
+  if (localStorage.getItem(STEP1_STATUS_KEY) === 'completed') {
+    steps[0].status = 'completed';
+    const v = localStorage.getItem('tsr_station_result');
+    if (v) stationResult.value = parseInt(v, 10);
+  }
+  if (localStorage.getItem(STEP2_STATUS_KEY) === 'completed') {
+    steps[1].status = 'completed';
+    const v = localStorage.getItem('tsr_measure_result');
+    if (v) measureResult.value = parseInt(v, 10);
+  }
+  restoreGenResult();
+
   try {
     const tenant = await getTenant();
     currentSchema.value = tenant || '未知';
@@ -889,18 +900,29 @@ onMounted(async () => {
 .pipeline-header {
   position: relative;
   text-align: center;
-  padding: 32px 20px 24px;
+  padding: 36px 20px 28px;
   overflow: hidden;
+}
+
+.pipeline-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
 }
 
 .pipeline-glow {
   position: absolute;
-  top: -60px;
+  top: -80px;
   left: 50%;
   transform: translateX(-50%);
-  width: 500px;
-  height: 200px;
-  background: radial-gradient(ellipse, rgba(56, 189, 248, 0.12) 0%, transparent 70%);
+  width: 600px;
+  height: 240px;
+  background: radial-gradient(ellipse, rgba(56, 189, 248, 0.1) 0%, rgba(99, 102, 241, 0.04) 40%, transparent 70%);
   pointer-events: none;
 }
 
@@ -909,91 +931,292 @@ onMounted(async () => {
   font-weight: 700;
   color: #1a2a4a;
   margin: 0 0 8px;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   position: relative;
 }
 
 .pipeline-title::after {
   content: '';
   display: block;
-  width: 50px;
+  width: 60px;
   height: 3px;
-  margin: 10px auto 0;
-  background: linear-gradient(90deg, #38bdf8, #3b82f6);
+  margin: 12px auto 0;
+  background: linear-gradient(90deg, #38bdf8, #818cf8, #38bdf8);
+  background-size: 200% 100%;
   border-radius: 2px;
+  animation: title-glow 3s ease-in-out infinite;
+}
+
+@keyframes title-glow {
+  0%, 100% { background-position: 0% 0; opacity: 0.6; }
+  50% { background-position: 100% 0; opacity: 1; }
 }
 
 .pipeline-desc {
   font-size: 14px;
   color: #6b7a8f;
   margin: 0;
+  position: relative;
 }
 
 /* ==================== 区域选择栏 ==================== */
 .region-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
-  margin: 0 0 24px;
-  background: linear-gradient(135deg, #f0f7ff, #e8f4fd);
-  border-radius: 12px;
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  gap: 16px;
+  padding: 16px 28px;
+  margin: 0 0 28px;
+  background: linear-gradient(135deg, #0b1424 0%, #162240 50%, #0f1f3a 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.15), inset 0 0 60px rgba(56, 189, 248, 0.03);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 顶部扫描线 */
+.region-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.6), #38bdf8, rgba(56, 189, 248, 0.6), transparent);
+  animation: bar-scan 3s ease-in-out infinite;
+}
+
+@keyframes bar-scan {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* 网格背景 */
+.region-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+/* 租户区状态指示灯 */
+.tenant-display::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -14px;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+  50% { opacity: 0.5; box-shadow: 0 0 12px rgba(34, 197, 94, 0.3); }
 }
 
 .region-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a2a4a;
-  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.tenant-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+  background: linear-gradient(90deg, #fff, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tenant-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+/* 租户图标外框 */
+.tenant-display .tenant-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(99, 102, 241, 0.1));
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.08), inset 0 0 12px rgba(99, 102, 241, 0.05);
+  position: relative;
+}
+
+.tenant-display .tenant-icon::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), transparent, rgba(99, 102, 241, 0.2));
+  z-index: -1;
+}
+
+.tenant-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
 }
 
 .region-select { width: 130px; }
 
 .region-stats {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   margin-left: auto;
+  margin-right: 20px;
 }
 
-.stat-item {
-  font-size: 13px;
-  color: #4a5a6a;
+.stat-card {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 10px;
+  padding: 8px 18px 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.stat-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.05), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stat-card:hover::after {
+  opacity: 1;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(56, 189, 248, 0.03);
+  transform: translateY(-1px);
+}
+
+.stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.stat-icon-station {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.08));
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.06);
+}
+
+.stat-icon-measure {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.25), rgba(167, 139, 250, 0.08));
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.15);
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.06);
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.stat-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+  background: linear-gradient(180deg, #fff 60%, rgba(255, 255, 255, 0.7));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 
 .clear-btn {
   margin-left: auto;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 22px !important;
-  border-radius: 8px !important;
-  color: #f87171 !important;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.03)) !important;
-  border: 1px solid rgba(239, 68, 68, 0.25) !important;
-  letter-spacing: 1px;
-  text-shadow: 0 0 6px rgba(239, 68, 68, 0.15);
-  transition: all 0.25s ease;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 32px !important;
+  border-radius: 10px !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  border: none !important;
+  letter-spacing: 2px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);
 }
 
 .clear-btn::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.08), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
   transform: translateX(-100%);
-  transition: transform 0.5s ease;
+  transition: transform 0.6s ease;
 }
 
 .clear-btn:hover::before {
@@ -1001,10 +1224,15 @@ onMounted(async () => {
 }
 
 .clear-btn:hover {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.06)) !important;
-  border-color: rgba(239, 68, 68, 0.5) !important;
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.2), inset 0 0 12px rgba(239, 68, 68, 0.05) !important;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #f87171, #ef4444) !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.05) !important;
+  transform: translateY(-2px);
+}
+
+.clear-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3) !important;
 }
 
 /* ==================== 步骤流 ==================== */
@@ -1019,34 +1247,90 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 0;
+  padding: 24px 0;
   position: relative;
   z-index: 1;
 }
 
+/* 端点圆点 */
+.connector-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d0d5dd;
+  transition: all 0.5s;
+  flex-shrink: 0;
+}
+.connector-dot.top { margin-bottom: 2px; }
+.connector-dot.bottom { margin-top: 2px; }
+
+.step-connector.active .connector-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+}
+
+/* 圆管轨道 */
 .connector-line {
-  width: 2px;
-  height: 28px;
-  background: linear-gradient(to bottom, #d0d5dd, #d0d5dd);
-  transition: all 0.5s ease;
-  border-radius: 1px;
+  width: 10px;
+  height: 24px;
+  border-radius: 5px;
+  background: #f0f2f5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background 0.5s;
+  position: relative;
+  overflow: hidden;
 }
 
 .step-connector.active .connector-line {
-  background: linear-gradient(to bottom, #38bdf8, #3b82f6);
-  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.08);
 }
 
+/* 轨道内填充线 */
+.connector-fill {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: #d0d5dd;
+  transition: all 0.5s;
+}
+
+.step-connector.active .connector-fill {
+  background: linear-gradient(to bottom, #38bdf8, #818cf8);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  animation: flow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes flow-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* 箭头 */
 .connector-arrow {
-  font-size: 10px;
-  color: #d0d5dd;
-  line-height: 1;
-  margin-top: 2px;
-  transition: color 0.3s;
+  margin-top: 3px;
+  width: 20px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.step-connector.active .connector-arrow {
-  color: #3b82f6;
+.connector-arrow svg {
+  width: 20px;
+  height: 12px;
+  display: block;
+}
+
+.connector-arrow svg polygon {
+  fill: #c8d0d8;
+  transition: all 0.4s;
+}
+
+.step-connector.active .connector-arrow svg polygon {
+  fill: #818cf8;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.5));
 }
 
 /* ==================== 步骤卡片 ==================== */
@@ -1259,6 +1543,42 @@ onMounted(async () => {
 }
 
 /* ==================== 科技风进度条 ==================== */
+/* 双进度条一行 */
+.tech-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.tech-progress-row .tech-progress {
+  margin-top: 0;
+}
+
+.tech-progress-label {
+  font-size: 11px;
+  color: #7a9bb5;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tech-progress-uploading .tech-progress-label {
+  color: #f59e0b;
+}
+
+.tech-progress-uploading.tech-progress-done .tech-progress-label {
+  color: #10b981;
+}
+
+
+
+/* 上传完成标记 */
+.tech-progress-done .tech-progress-fill {
+  background: linear-gradient(90deg, #10b981, #059669, #10b981) !important;
+  background-size: 200% 100% !important;
+}
+
 .tech-progress {
   margin-top: 12px;
   padding: 14px 16px;
@@ -1296,6 +1616,21 @@ onMounted(async () => {
   background: rgba(56, 189, 248, 0.5);
   filter: blur(6px);
   border-radius: 50%;
+}
+
+/* 上传阶段颜色（橙色） */
+.tech-progress-uploading .tech-progress-fill {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24);
+  background-size: 200% 100%;
+}
+
+.tech-progress-uploading .tech-progress-glow {
+  background: rgba(251, 191, 36, 0.5);
+}
+
+.tech-progress-uploading .tech-progress-text {
+  color: #f59e0b;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
 }
 
 @keyframes progressScan {
@@ -1406,13 +1741,46 @@ onMounted(async () => {
 }
 
 .gen-btn {
-  font-size: 16px;
-  padding: 12px 36px;
-  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 16px 48px !important;
+  border-radius: 12px !important;
+  letter-spacing: 2px;
+  border: none !important;
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4) !important;
+  transition: all 0.3s ease !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.gen-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.gen-btn:hover::before {
+  transform: translateX(100%);
+}
+
+.gen-btn:hover {
+  background: linear-gradient(135deg, #60a5fa, #3b82f6) !important;
+  box-shadow: 0 6px 30px rgba(59, 130, 246, 0.55) !important;
+  transform: translateY(-2px) !important;
+}
+
+.gen-btn:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.3) !important;
 }
 
 .gen-btn-icon {
-  margin-right: 8px;
+  margin-right: 10px;
+  font-size: 20px;
 }
 
 .gen-hint {
@@ -1748,6 +2116,26 @@ onMounted(async () => {
   background: linear-gradient(135deg, #d1fae5, #a7f3d0);
   border-color: #10b981;
   color: #065f46;
+}
+
+.export-loading {
+  opacity: 0.7;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.export-spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: export-spin 0.7s linear infinite;
+}
+
+@keyframes export-spin {
+  to { transform: rotate(360deg); }
 }
 
 </style>

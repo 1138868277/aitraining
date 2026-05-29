@@ -2,7 +2,7 @@
  * 规则生成 SQL 模板
  * __schema__ → 当前租户 schema
  * __标准表__ → tsr_standard_list
- * 与 Python 脚本 (00 批量处理脚本/sql_scripts/) 保持逻辑一致
+ * 完全对标 Python 脚本 (sql_scripts/) 的 SQL 逻辑
  */
 
 export interface RuleSqlDef {
@@ -12,180 +12,111 @@ export interface RuleSqlDef {
   sql: string;
 }
 
-// ==================== 辅助函数 ====================
-
-/** 根据能源类型返回 energy_type 过滤表达式 */
+/** 能源过滤：风电统一用 F/Y01，光伏统一用 G/Y02 */
 function energyFilter(energy: string): string {
   return energy === '光伏'
-    ? "(energy_type = 'G' OR energy_type = 'Y02')"
-    : "(energy_type = 'F' OR energy_type = 'Y01')";
+    ? "(SUBSTRING(cd_code,5,1)='G' OR SUBSTRING(cd_code,5,3)='Y02')"
+    : "(SUBSTRING(cd_code,5,1)='F' OR SUBSTRING(cd_code,5,3)='Y01')";
 }
 
-/** 根据能源类型返回时间区间 */
+/** 时间区间：光伏 8:00-18:00，其他 0:00-23:59 */
 function timeRange(energy: string): { begin: string; end: string } {
   return energy === '光伏'
     ? { begin: '8:00', end: '18:00' }
     : { begin: '0:00', end: '23:59' };
 }
 
-/**
- * 构建 cd_data CTE
- * 分级诊断/光伏 特殊处理：
- *   - right(cd_code,5) as measure_code
- *   - second_code='002' 时额外过滤 substring(cd_code,20,3) in ('003','005')
- *   - UNION ALL 合并 002 和 004
- */
-function cdDataCte(moduleSource: string, energy: string, secondCodes: string[]): string {
-  const scList = secondCodes.map(c => `'${c}'`).join(',');
-  const ef = energyFilter(energy);
-
-  // 分级诊断/光伏：特殊 UNION ALL 结构
-  if (moduleSource === '分级诊断' && energy === '光伏') {
-    const parts: string[] = [];
-    for (const sc of secondCodes) {
-      let extraFilter = '';
-      if (sc === '002') {
-        extraFilter = `\n        AND extra_code IN ('003', '005') -- 组串式逆变器和直流汇流箱`;
-      }
-      parts.push(`
-        SELECT cd_code, cd_name,
-          LEFT(cd_code, 4) AS station_code,
-          SUBSTRING(cd_code, 5, 1) AS energy_type,
-          RIGHT(cd_code, 5) AS measure_code,
-          SUBSTRING(cd_code, 13, 3) AS second_code
-        FROM __schema__.tsr_measure_data
-        WHERE ${ef}
-          AND second_code = '${sc}'${extraFilter}`);
-    }
-    return parts.join('    UNION ALL\n');
-  }
-
-  // 标准 cd_data
-  return `
-      SELECT cd_code, cd_name, station_code, energy_type, measure_code, second_code
-      FROM __schema__.tsr_measure_data
-      WHERE ${ef}
-        AND second_code IN (${scList})`;
-}
-
-/** 规则名后缀 */
-function ruleSuffix(ruleType: string): string {
+/** 规则后缀 */
+function ruleLabel(ruleType: string): string {
   const map: Record<string, string> = { sz: '死值', tb: '跳变', yx: '越限', zd: '中断' };
   return map[ruleType] || ruleType;
 }
 
-// ==================== SQL 生成 ====================
+/**
+ * 构建 cd_data CTE
+ * 分级诊断/光伏：特殊 UNION ALL + right(cd_code,5)，完全对标 Python 脚本
+ */
+function cdDataSql(moduleSource: string, energy: string, secondCodes: string[]): string {
+  const ef = energyFilter(energy);
+  const scList = secondCodes.map(c => `'${c}'`).join(',');
 
-/** 生成 import_list_sz 的 SQL（死值规则） */
-function genSzSql(moduleSource: string, energy: string, secondCodes: string[]): string {
-  const tr = timeRange(energy);
+  // 分级诊断/光伏：对标 Python 脚本的 UNION ALL + right(cd_code,5) + extra_code 过滤
+  if (moduleSource === '分级诊断' && energy === '光伏') {
+    return `
+      SELECT cd_code, cd_name,
+        LEFT(cd_code,4) AS station_code,
+        SUBSTRING(cd_code,5,1) AS energy_type,
+        RIGHT(cd_code,5) AS measure_code,
+        SUBSTRING(cd_code,13,3) AS second_code
+      FROM __schema__.tsr_measure_data
+      WHERE ${ef}
+        AND SUBSTRING(cd_code,13,3)='002'
+        AND SUBSTRING(cd_code,20,3) IN ('003','005')
+      UNION ALL
+      SELECT cd_code, cd_name,
+        LEFT(cd_code,4) AS station_code,
+        SUBSTRING(cd_code,5,1) AS energy_type,
+        RIGHT(cd_code,5) AS measure_code,
+        SUBSTRING(cd_code,13,3) AS second_code
+      FROM __schema__.tsr_measure_data
+      WHERE ${ef}
+        AND SUBSTRING(cd_code,13,3)='004'`;
+  }
+
+  // 其他：标准 cd_data，用 pre-computed 列
   return `
-    INSERT INTO __schema__.tsr_import_list_sz
-    (module_source, energy_type, standard_name, sz_threshold, sz_windows, sliding_step, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
-    ),
-    standard_data AS (
-      SELECT * FROM __标准表__
-      WHERE module_source = '${moduleSource}' AND energy_type = '${energy}'
-    ),
-    final_data AS (
-      SELECT t1.cd_name, t1.cd_code, t3.station_name,
-        t2.second_name, t2.measure_code, t2.measure_name,
-        t2.module_source, t2.energy_type, t2.ss_windows, t2.ss_threshold
-      FROM cd_data t1
-      INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
-      INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
-    )
-    SELECT DISTINCT
-      module_source, energy_type,
-      CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_死值') AS standard_name,
-      COALESCE(NULLIF(ss_threshold, '')::FLOAT, 0) AS sz_threshold,
-      NULLIF(ss_windows, '')::FLOAT AS sz_windows,
-      NULLIF(ss_windows, '')::FLOAT / 2 AS sliding_step,
-      '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
-      measure_name, cd_code
-    FROM final_data
-    WHERE ss_windows != ''
-    ORDER BY measure_name
-    RETURNING standard_name;
-  `.trim();
+      SELECT cd_code, cd_name, station_code, energy_type, measure_code, second_code
+      FROM __schema__.tsr_measure_data
+      WHERE ${ef}
+        AND SUBSTRING(cd_code,13,3) IN (${scList})`;
 }
 
-/** 生成 import_list_tb 的 SQL（跳变规则） */
-function genTbSql(moduleSource: string, energy: string, secondCodes: string[]): string {
+/** 生成完整的 rule SQL */
+function genRuleSql(moduleSource: string, energy: string, ruleType: string, secondCodes: string[]): string {
+  const label = ruleLabel(ruleType);
   const tr = timeRange(energy);
-  return `
-    INSERT INTO __schema__.tsr_import_list_tb
-    (module_source, energy_type, standard_name, tb_windows, sliding_step, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
-    ),
-    standard_data AS (
-      SELECT * FROM __标准表__
-      WHERE module_source = '${moduleSource}' AND energy_type = '${energy}'
-    ),
-    final_data AS (
-      SELECT t1.cd_name, t1.cd_code, t3.station_name,
-        t2.second_name, t2.measure_code, t2.measure_name,
-        t2.module_source, t2.energy_type, t2.tb_windows
-      FROM cd_data t1
-      INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
-      INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
-    )
-    SELECT DISTINCT
-      module_source, energy_type,
-      CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_跳变') AS standard_name,
-      NULLIF(tb_windows, '')::FLOAT AS tb_windows,
-      NULLIF(tb_windows, '')::FLOAT / 2 AS sliding_step,
-      '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
-      measure_name, cd_code
-    FROM final_data
-    WHERE tb_windows != ''
-    ORDER BY measure_name
-    RETURNING standard_name;
-  `.trim();
-}
+  const table = `tsr_import_list_${ruleType}`;
 
-/** 生成 import_list_yx 的 SQL（越限规则） */
-function genYxSql(moduleSource: string, energy: string, secondCodes: string[]): string {
-  const tr = timeRange(energy);
-  return `
-    INSERT INTO __schema__.tsr_import_list_yx
-    (module_source, energy_type, standard_name, lower_range, upper_range, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
-    ),
-    standard_data AS (
-      SELECT * FROM __标准表__
-      WHERE module_source = '${moduleSource}' AND energy_type = '${energy}'
-    ),
-    final_data AS (
-      SELECT t1.cd_name, t1.cd_code, t3.station_name,
-        t2.second_name, t2.measure_code, t2.measure_name,
-        t2.module_source, t2.energy_type, t2.yx_range
-      FROM cd_data t1
-      INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
-      INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
-    )
-    SELECT DISTINCT
-      module_source, energy_type,
-      CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_越限') AS standard_name,
-      SPLIT_PART(REPLACE(REPLACE(yx_range, '[', ''), ']', ''), ',', 1)::FLOAT AS lower_range,
-      SPLIT_PART(REPLACE(REPLACE(yx_range, '[', ''), ']', ''), ',', 2)::FLOAT AS upper_range,
-      '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
-      measure_name, cd_code
-    FROM final_data
-    WHERE yx_range LIKE '[%,%]'
-    ORDER BY measure_name
-    RETURNING standard_name;
-  `.trim();
-}
+  // 每类规则特有的字段
+  let selectFields: string;
+  let whereField: string;
 
-/** 生成 import_list_zd 的 SQL（中断规则） */
-function genZdSql(moduleSource: string, energy: string, secondCodes: string[]): string {
-  const tr = timeRange(energy);
+  switch (ruleType) {
+    case 'sz':
+      selectFields = `
+      COALESCE(ss_threshold::FLOAT,0) AS sz_threshold,
+      ss_windows::FLOAT AS sz_windows,
+      ss_windows::FLOAT/2 AS sliding_step,`;
+      whereField = 'ss_windows';
+      break;
+    case 'tb':
+      selectFields = `
+      tb_windows::FLOAT AS tb_windows,
+      tb_windows::FLOAT AS sliding_step,`;
+      whereField = 'tb_windows';
+      break;
+    case 'yx':
+      selectFields = `
+      SPLIT_PART(REPLACE(REPLACE(yx_range,'[',''),']',''),',',2)::FLOAT AS upper_range,
+      SPLIT_PART(REPLACE(REPLACE(yx_range,'[',''),']',''),',',1)::FLOAT AS lower_range,`;
+      whereField = `yx_range LIKE '[%,%]'`;
+      break;
+    case 'zd':
+      selectFields = `
+      zd_duration::FLOAT AS zd_duration,`;
+      whereField = 'zd_duration';
+      break;
+    default:
+      throw new Error(`Unknown rule type: ${ruleType}`);
+  }
+
+  // 越限的 WHERE 条件直接写在字段里
+  const whereClause = ruleType === 'yx' ? whereField : `${whereField} != ''`;
+
   return `
-    INSERT INTO __schema__.tsr_import_list_zd
-    (module_source, energy_type, standard_name, zd_duration, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
+    INSERT INTO __schema__.${table}
+    (module_source, energy_type, standard_name, ${ruleType === 'yx' ? 'upper_range, lower_range' : ruleType === 'zd' ? 'zd_duration' : ruleType === 'sz' ? 'sz_threshold, sz_windows, sliding_step' : 'tb_windows, sliding_step'}, begin_time, end_time, measure_name, cd_code)
+    WITH cd_data AS (${cdDataSql(moduleSource, energy, secondCodes)}
     ),
     standard_data AS (
       SELECT * FROM __标准表__
@@ -194,51 +125,44 @@ function genZdSql(moduleSource: string, energy: string, secondCodes: string[]): 
     final_data AS (
       SELECT t1.cd_name, t1.cd_code, t3.station_name,
         t2.second_name, t2.measure_code, t2.measure_name,
-        t2.module_source, t2.energy_type, t2.zd_duration
+        t2.module_source, t2.energy_type,
+        tb_windows, ss_windows, ss_threshold, yx_range, zd_duration
       FROM cd_data t1
       INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
       INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
     )
     SELECT DISTINCT
       module_source, energy_type,
-      CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_中断') AS standard_name,
-      NULLIF(zd_duration, '')::FLOAT AS zd_duration,
+      CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_${label}') AS standard_name,
+      ${selectFields}
       '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
       measure_name, cd_code
     FROM final_data
-    WHERE zd_duration != ''
+    WHERE ${whereClause}
     ORDER BY measure_name
-    RETURNING standard_name;
-  `.trim();
+    RETURNING standard_name;`.trim();
 }
 
 export function getAllRuleSqls(): RuleSqlDef[] {
-  const configs: { module: string; energy: string; secondCodes: Record<string, string[]> }[] = [
-    {
-      module: '分级诊断', energy: '风电',
-      secondCodes: { sz: ['002'], tb: ['002'], yx: ['002'], zd: ['002'] },
-    },
-    {
-      module: '分级诊断', energy: '光伏',
-      secondCodes: { sz: ['002'], tb: ['002'], yx: ['002'], zd: ['002'] },
-    },
-    {
-      module: '功率预测', energy: '风电',
-      secondCodes: { sz: ['001', '002', '004'], tb: ['001', '002', '004'], yx: ['001', '002', '004'], zd: ['001', '002', '004'] },
-    },
-    {
-      module: '功率预测', energy: '光伏',
-      secondCodes: { sz: ['001', '002', '004'], tb: ['001', '002', '004'], yx: ['001', '002', '004'], zd: ['001', '002', '004'] },
-    },
+  const configs: { module: string; energy: string; secondCodes: string[] }[] = [
+    { module: '分级诊断', energy: '风电', secondCodes: ['002'] },
+    { module: '分级诊断', energy: '光伏', secondCodes: ['002', '004'] },
+    { module: '功率预测', energy: '风电', secondCodes: ['001', '002', '004'] },
+    { module: '功率预测', energy: '光伏', secondCodes: ['001', '002', '004'] },
   ];
 
+  const ruleTypes = ['sz', 'tb', 'yx', 'zd'] as const;
   const results: RuleSqlDef[] = [];
 
   for (const cfg of configs) {
-    results.push({ module: cfg.module, energy: cfg.energy, ruleType: 'sz', sql: genSzSql(cfg.module, cfg.energy, cfg.secondCodes.sz) });
-    results.push({ module: cfg.module, energy: cfg.energy, ruleType: 'tb', sql: genTbSql(cfg.module, cfg.energy, cfg.secondCodes.tb) });
-    results.push({ module: cfg.module, energy: cfg.energy, ruleType: 'yx', sql: genYxSql(cfg.module, cfg.energy, cfg.secondCodes.yx) });
-    results.push({ module: cfg.module, energy: cfg.energy, ruleType: 'zd', sql: genZdSql(cfg.module, cfg.energy, cfg.secondCodes.zd) });
+    for (const rt of ruleTypes) {
+      results.push({
+        module: cfg.module,
+        energy: cfg.energy,
+        ruleType: rt,
+        sql: genRuleSql(cfg.module, cfg.energy, rt, cfg.secondCodes),
+      });
+    }
   }
 
   return results;
