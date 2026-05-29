@@ -217,7 +217,7 @@
                 <!-- 导出文件 -->
                 <template v-if="step.key === 'export'">
                   <div class="export-section">
-                    <div class="split-section-title">总体文件（完整单文件 · 不分片）</div>
+                    <div class="split-section-title">整体下载（完整单文件 · 不分片）</div>
                     <div class="export-grid">
                       <div
                         v-for="t in exportTypes"
@@ -239,7 +239,7 @@
                   </div>
                   <!-- 分批导出 -->
                   <div class="export-split-section">
-                    <div class="split-section-title">分批下载（大文件自动拆分）</div>
+                    <div class="split-section-title">分批下载（分批多文件 · 每个不超过3M）</div>
                     <div class="export-grid">
                       <div
                         v-for="t in splitExportTypes"
