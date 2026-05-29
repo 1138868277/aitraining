@@ -4,6 +4,8 @@ import * as tsrService from './tsr-service.js';
 import * as domain from './tsr-domain.js';
 import { success, error } from '../../common/response.js';
 import { getPool } from '../../db/index.js';
+import { getCurrentTenantId } from '../../db/tenant-context.js';
+import { getTenantById } from '../../config/tenants.js';
 
 const router: Router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
@@ -16,6 +18,7 @@ async function ensureTenantReady(): Promise<void> {
   const schema = domain.getCurrentSchema();
   if (!initializedTenants.has(schema)) {
     await domain.initTables();
+    await domain.migrateMeasureDataColumns();
     await domain.ensureStandardList();
     initializedTenants.add(schema);
     console.log(`  ✅ TSR 表就绪: ${schema}`);
@@ -46,9 +49,15 @@ router.get('/api/tsr/ping', async (_req: Request, res: Response) => {
   }
 });
 
-/** 获取当前租户 schema */
+/** 获取当前租户信息 */
 router.get('/api/tsr/tenant', async (_req: Request, res: Response) => {
-  success(res, { schema: domain.getCurrentSchema() });
+  const tenantId = getCurrentTenantId();
+  const tenant = tenantId ? getTenantById(tenantId) : undefined;
+  success(res, {
+    schema: domain.getCurrentSchema(),
+    tenantId,
+    displayName: tenant?.displayName || domain.getCurrentSchema(),
+  });
 });
 
 /** 获取数据概览 */
@@ -59,6 +68,37 @@ router.get('/api/tsr/overview', async (_req: Request, res: Response) => {
   } catch (err) {
     console.error('Failed to get overview:', err);
     error(res, 'SYSTEM_ERROR', '获取数据概览失败', 500);
+  }
+});
+
+/** 获取导入进度 */
+router.get('/api/tsr/import/progress', async (req: Request, res: Response) => {
+  const s = domain.getCurrentSchema();
+  const type = (req.query.type as string) || 'station';
+  const progress = domain.getProgress(`${s}:${type}`);
+  success(res, progress);
+});
+
+/** 取消导入 */
+router.post('/api/tsr/import/cancel', async (req: Request, res: Response) => {
+  const s = domain.getCurrentSchema();
+  const type = (req.body.type as string) || 'station';
+  domain.requestCancel(`${s}:${type}`);
+  success(res, { cancelled: true });
+});
+
+/** 清空所有数据 */
+router.post('/api/tsr/clear', async (_req: Request, res: Response) => {
+  try {
+    await domain.truncateAllData();
+    // 清除内存中的导入进度记录
+    const s = domain.getCurrentSchema();
+    domain.clearProgress(`${s}:station`);
+    domain.clearProgress(`${s}:measure`);
+    success(res, { cleared: true });
+  } catch (err: any) {
+    console.error('Failed to clear data:', err);
+    error(res, 'CLEAR_FAILED', err.message || '清空数据失败', 500);
   }
 });
 
@@ -73,7 +113,7 @@ router.post('/api/tsr/import/station', upload.single('file'), async (req: Reques
     success(res, { importedCount: count, schema: domain.getCurrentSchema() });
   } catch (err: any) {
     console.error('Failed to import station:', err);
-    error(res, 'IMPORT_FAILED', err.message || '导入场站数据失败', 500);
+    error(res, 'IMPORT_FAILED', err.message || '导入场站数据失败', 400);
   }
 });
 
@@ -88,13 +128,14 @@ router.post('/api/tsr/import/measure', upload.single('file'), async (req: Reques
     success(res, { importedCount: count, schema: domain.getCurrentSchema() });
   } catch (err: any) {
     console.error('Failed to import measure:', err);
-    error(res, 'IMPORT_FAILED', err.message || '导入测点数据失败', 500);
+    error(res, 'IMPORT_FAILED', err.message || '导入测点数据失败', 400);
   }
 });
 
 /** 生成规则 */
 router.post('/api/tsr/generate', async (_req: Request, res: Response) => {
   try {
+    domain.clearGenerateProgress();
     const result = await tsrService.generateRules('');
     success(res, result);
   } catch (err: any) {
@@ -103,7 +144,61 @@ router.post('/api/tsr/generate', async (_req: Request, res: Response) => {
   }
 });
 
-/** 导出规则 Excel */
+/** 生成规则进度 */
+router.get('/api/tsr/generate/progress', async (_req: Request, res: Response) => {
+  const s = domain.getCurrentSchema();
+  const progress = domain.getProgress(`${s}:generate`);
+  const stepInfo = domain.getGenerateProgress();
+  success(res, {
+    total: progress.total,
+    done: progress.done,
+    status: progress.status,
+    currentStep: stepInfo.current,
+    doneSteps: stepInfo.done,
+  });
+});
+
+/** 导出单个规则类型的总体 Excel 文件（完整单文件，不分片） */
+router.get('/api/tsr/export/overall/:type', async (req: Request, res: Response) => {
+  try {
+    const type = req.params.type as 'sz' | 'tb' | 'yx' | 'zd';
+    if (!['sz', 'tb', 'yx', 'zd'].includes(type)) {
+      error(res, 'PARAM_FORMAT_ERROR', '无效的导出类型（sz/tb/yx/zd）', 400);
+      return;
+    }
+
+    const { buffer, name } = await tsrService.exportSingleOverallToExcel('', type);
+
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
+      'Content-Length': buffer.length,
+    });
+    res.send(buffer);
+  } catch (err: any) {
+    console.error('Failed to export overall type:', err);
+    error(res, 'EXPORT_FAILED', err.message || '导出失败', 500);
+  }
+});
+
+/** 导出全部4种规则类型的总体文件 ZIP（打包下载全部） */
+router.get('/api/tsr/export/overall', async (_req: Request, res: Response) => {
+  try {
+    const zipBuffer = await tsrService.exportOverallToZip('');
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent('时序规则结果_总体.zip')}"`,
+      'Content-Length': zipBuffer.length,
+    });
+    res.send(zipBuffer);
+  } catch (err: any) {
+    console.error('Failed to export overall:', err);
+    error(res, 'EXPORT_FAILED', err.message || '总体导出失败', 500);
+  }
+});
+
+/** 导出规则 ZIP（含时序规则结果/01 死值/split_N.xlsx 结构） */
 router.get('/api/tsr/export/:type', async (req: Request, res: Response) => {
   try {
     const type = req.params.type as 'sz' | 'tb' | 'yx' | 'zd';
@@ -112,12 +207,14 @@ router.get('/api/tsr/export/:type', async (req: Request, res: Response) => {
       return;
     }
 
-    const typeNames: Record<string, string> = { sz: '死值', tb: '跳变', yx: '越限', zd: '中断' };
-    const s = domain.getCurrentSchema();
-    const buffer = await tsrService.exportToExcel('', type);
+    const maxRows = parseInt(req.query.maxRows as string, 10) || 150000;
+    const { buffer, name } = await tsrService.exportSingleToZip('', type, maxRows);
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${s}_时序稽核质量规则_${typeNames[type]}.xlsx"`);
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
+      'Content-Length': buffer.length,
+    });
     res.send(buffer);
   } catch (err: any) {
     console.error('Failed to export:', err);
@@ -125,60 +222,20 @@ router.get('/api/tsr/export/:type', async (req: Request, res: Response) => {
   }
 });
 
-/** 批量导出所有规则 */
+/** 批量导出全部规则为单个 ZIP */
 router.get('/api/tsr/export-all', async (_req: Request, res: Response) => {
   try {
-    const types = ['sz', 'tb', 'yx', 'zd'] as const;
-    const buffers: { type: string; buffer: Buffer }[] = [];
+    const zipBuffer = await tsrService.exportAllToZip('');
 
-    for (const type of types) {
-      try {
-        const buf = await tsrService.exportToExcel('', type);
-        buffers.push({ type, buffer: buf });
-      } catch {
-        // 某个类型无数据时跳过
-      }
-    }
-
-    if (buffers.length === 0) {
-      error(res, 'EXPORT_FAILED', '没有可导出的规则数据', 400);
-      return;
-    }
-
-    success(res, {
-      files: buffers.map(b => ({
-        type: b.type,
-        size: b.buffer.length,
-        data: b.buffer.toString('base64'),
-      })),
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent('时序规则结果.zip')}"`,
+      'Content-Length': zipBuffer.length,
     });
+    res.send(zipBuffer);
   } catch (err: any) {
     console.error('Failed to export all:', err);
     error(res, 'EXPORT_FAILED', err.message || '批量导出失败', 500);
-  }
-});
-
-/** 拆分文件 */
-router.post('/api/tsr/split', upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    if (!req.file) {
-      error(res, 'MISSING_PARAMETER', '请上传需要拆分的 Excel 文件', 400);
-      return;
-    }
-    const maxRows = parseInt(req.body.maxRows as string, 10) || 150000;
-    const results = tsrService.splitExcelBuffer(req.file.buffer, maxRows);
-
-    success(res, {
-      fileCount: results.length,
-      files: results.map(r => ({
-        name: r.name,
-        size: r.buffer.length,
-        data: r.buffer.toString('base64'),
-      })),
-    });
-  } catch (err: any) {
-    console.error('Failed to split file:', err);
-    error(res, 'SPLIT_FAILED', err.message || '拆分文件失败', 500);
   }
 });
 

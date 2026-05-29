@@ -2,6 +2,7 @@
  * 规则生成 SQL 模板
  * __schema__ → 当前租户 schema
  * __标准表__ → tsr_standard_list
+ * 与 Python 脚本 (00 批量处理脚本/sql_scripts/) 保持逻辑一致
  */
 
 export interface RuleSqlDef {
@@ -11,25 +12,81 @@ export interface RuleSqlDef {
   sql: string;
 }
 
-/** 生成 import_list_sz 的 SQL（死值规则） */
-function genSzSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
+// ==================== 辅助函数 ====================
+
+/** 根据能源类型返回 energy_type 过滤表达式 */
+function energyFilter(energy: string): string {
+  return energy === '光伏'
+    ? "(energy_type = 'G' OR energy_type = 'Y02')"
+    : "(energy_type = 'F' OR energy_type = 'Y01')";
+}
+
+/** 根据能源类型返回时间区间 */
+function timeRange(energy: string): { begin: string; end: string } {
+  return energy === '光伏'
+    ? { begin: '8:00', end: '18:00' }
+    : { begin: '0:00', end: '23:59' };
+}
+
+/**
+ * 构建 cd_data CTE
+ * 分级诊断/光伏 特殊处理：
+ *   - right(cd_code,5) as measure_code
+ *   - second_code='002' 时额外过滤 substring(cd_code,20,3) in ('003','005')
+ *   - UNION ALL 合并 002 和 004
+ */
+function cdDataCte(moduleSource: string, energy: string, secondCodes: string[]): string {
   const scList = secondCodes.map(c => `'${c}'`).join(',');
+  const ef = energyFilter(energy);
+
+  // 分级诊断/光伏：特殊 UNION ALL 结构
+  if (moduleSource === '分级诊断' && energy === '光伏') {
+    const parts: string[] = [];
+    for (const sc of secondCodes) {
+      let extraFilter = '';
+      if (sc === '002') {
+        extraFilter = `\n        AND extra_code IN ('003', '005') -- 组串式逆变器和直流汇流箱`;
+      }
+      parts.push(`
+        SELECT cd_code, cd_name,
+          LEFT(cd_code, 4) AS station_code,
+          SUBSTRING(cd_code, 5, 1) AS energy_type,
+          RIGHT(cd_code, 5) AS measure_code,
+          SUBSTRING(cd_code, 13, 3) AS second_code
+        FROM __schema__.tsr_measure_data
+        WHERE ${ef}
+          AND second_code = '${sc}'${extraFilter}`);
+    }
+    return parts.join('    UNION ALL\n');
+  }
+
+  // 标准 cd_data
+  return `
+      SELECT cd_code, cd_name, station_code, energy_type, measure_code, second_code
+      FROM __schema__.tsr_measure_data
+      WHERE ${ef}
+        AND second_code IN (${scList})`;
+}
+
+/** 规则名后缀 */
+function ruleSuffix(ruleType: string): string {
+  const map: Record<string, string> = { sz: '死值', tb: '跳变', yx: '越限', zd: '中断' };
+  return map[ruleType] || ruleType;
+}
+
+// ==================== SQL 生成 ====================
+
+/** 生成 import_list_sz 的 SQL（死值规则） */
+function genSzSql(moduleSource: string, energy: string, secondCodes: string[]): string {
+  const tr = timeRange(energy);
   return `
     INSERT INTO __schema__.tsr_import_list_sz
     (module_source, energy_type, standard_name, sz_threshold, sz_windows, sliding_step, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (
-      SELECT cd_code, cd_name,
-        LEFT(cd_code, 4) AS station_code,
-        SUBSTRING(cd_code, 5, 1) AS energy_type,
-        RIGHT(cd_code, 12) AS measure_code,
-        SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.tsr_measure_data
-      WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
-        AND SUBSTRING(cd_code, 13, 3) IN (${scList})
+    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
     ),
     standard_data AS (
       SELECT * FROM __标准表__
-      WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
+      WHERE module_source = '${moduleSource}' AND energy_type = '${energy}'
     ),
     final_data AS (
       SELECT t1.cd_name, t1.cd_code, t3.station_name,
@@ -42,36 +99,29 @@ function genSzSql(moduleSource: string, energyType: string, secondCodes: string[
     SELECT DISTINCT
       module_source, energy_type,
       CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_死值') AS standard_name,
-      COALESCE(ss_threshold::FLOAT, 0) AS sz_threshold,
-      ss_windows::FLOAT AS sz_windows,
-      ss_windows::FLOAT / 2 AS sliding_step,
-      '0:00' AS begin_time, '23:59' AS end_time,
+      COALESCE(NULLIF(ss_threshold, '')::FLOAT, 0) AS sz_threshold,
+      NULLIF(ss_windows, '')::FLOAT AS sz_windows,
+      NULLIF(ss_windows, '')::FLOAT / 2 AS sliding_step,
+      '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
       measure_name, cd_code
     FROM final_data
     WHERE ss_windows != ''
-    ORDER BY measure_name;
+    ORDER BY measure_name
+    RETURNING standard_name;
   `.trim();
 }
 
 /** 生成 import_list_tb 的 SQL（跳变规则） */
-function genTbSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
-  const scList = secondCodes.map(c => `'${c}'`).join(',');
+function genTbSql(moduleSource: string, energy: string, secondCodes: string[]): string {
+  const tr = timeRange(energy);
   return `
     INSERT INTO __schema__.tsr_import_list_tb
     (module_source, energy_type, standard_name, tb_windows, sliding_step, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (
-      SELECT cd_code, cd_name,
-        LEFT(cd_code, 4) AS station_code,
-        SUBSTRING(cd_code, 5, 1) AS energy_type,
-        RIGHT(cd_code, 12) AS measure_code,
-        SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.tsr_measure_data
-      WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
-        AND SUBSTRING(cd_code, 13, 3) IN (${scList})
+    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
     ),
     standard_data AS (
       SELECT * FROM __标准表__
-      WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
+      WHERE module_source = '${moduleSource}' AND energy_type = '${energy}'
     ),
     final_data AS (
       SELECT t1.cd_name, t1.cd_code, t3.station_name,
@@ -84,35 +134,28 @@ function genTbSql(moduleSource: string, energyType: string, secondCodes: string[
     SELECT DISTINCT
       module_source, energy_type,
       CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_跳变') AS standard_name,
-      tb_windows::FLOAT AS tb_windows,
-      tb_windows::FLOAT / 2 AS sliding_step,
-      '0:00' AS begin_time, '23:59' AS end_time,
+      NULLIF(tb_windows, '')::FLOAT AS tb_windows,
+      NULLIF(tb_windows, '')::FLOAT / 2 AS sliding_step,
+      '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
       measure_name, cd_code
     FROM final_data
     WHERE tb_windows != ''
-    ORDER BY measure_name;
+    ORDER BY measure_name
+    RETURNING standard_name;
   `.trim();
 }
 
 /** 生成 import_list_yx 的 SQL（越限规则） */
-function genYxSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
-  const scList = secondCodes.map(c => `'${c}'`).join(',');
+function genYxSql(moduleSource: string, energy: string, secondCodes: string[]): string {
+  const tr = timeRange(energy);
   return `
     INSERT INTO __schema__.tsr_import_list_yx
     (module_source, energy_type, standard_name, lower_range, upper_range, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (
-      SELECT cd_code, cd_name,
-        LEFT(cd_code, 4) AS station_code,
-        SUBSTRING(cd_code, 5, 1) AS energy_type,
-        RIGHT(cd_code, 12) AS measure_code,
-        SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.tsr_measure_data
-      WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
-        AND SUBSTRING(cd_code, 13, 3) IN (${scList})
+    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
     ),
     standard_data AS (
       SELECT * FROM __标准表__
-      WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
+      WHERE module_source = '${moduleSource}' AND energy_type = '${energy}'
     ),
     final_data AS (
       SELECT t1.cd_name, t1.cd_code, t3.station_name,
@@ -125,35 +168,28 @@ function genYxSql(moduleSource: string, energyType: string, secondCodes: string[
     SELECT DISTINCT
       module_source, energy_type,
       CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_越限') AS standard_name,
-      SPLIT_PART(yx_range, ',', 1)::FLOAT AS lower_range,
-      SPLIT_PART(yx_range, ',', 2)::FLOAT AS upper_range,
-      '0:00' AS begin_time, '23:59' AS end_time,
+      SPLIT_PART(REPLACE(REPLACE(yx_range, '[', ''), ']', ''), ',', 1)::FLOAT AS lower_range,
+      SPLIT_PART(REPLACE(REPLACE(yx_range, '[', ''), ']', ''), ',', 2)::FLOAT AS upper_range,
+      '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
       measure_name, cd_code
     FROM final_data
-    WHERE yx_range != ''
-    ORDER BY measure_name;
+    WHERE yx_range LIKE '[%,%]'
+    ORDER BY measure_name
+    RETURNING standard_name;
   `.trim();
 }
 
 /** 生成 import_list_zd 的 SQL（中断规则） */
-function genZdSql(moduleSource: string, energyType: string, secondCodes: string[]): string {
-  const scList = secondCodes.map(c => `'${c}'`).join(',');
+function genZdSql(moduleSource: string, energy: string, secondCodes: string[]): string {
+  const tr = timeRange(energy);
   return `
     INSERT INTO __schema__.tsr_import_list_zd
     (module_source, energy_type, standard_name, zd_duration, begin_time, end_time, measure_name, cd_code)
-    WITH cd_data AS (
-      SELECT cd_code, cd_name,
-        LEFT(cd_code, 4) AS station_code,
-        SUBSTRING(cd_code, 5, 1) AS energy_type,
-        RIGHT(cd_code, 12) AS measure_code,
-        SUBSTRING(cd_code, 13, 3) AS second_code
-      FROM __schema__.tsr_measure_data
-      WHERE (SUBSTRING(cd_code, 5, 1) = 'F' OR SUBSTRING(cd_code, 5, 3) = 'Y01')
-        AND SUBSTRING(cd_code, 13, 3) IN (${scList})
+    WITH cd_data AS (${cdDataCte(moduleSource, energy, secondCodes)}
     ),
     standard_data AS (
       SELECT * FROM __标准表__
-      WHERE module_source = '${moduleSource}' AND energy_type = '${energyType}'
+      WHERE module_source = '${moduleSource}' AND energy_type = '${energy}'
     ),
     final_data AS (
       SELECT t1.cd_name, t1.cd_code, t3.station_name,
@@ -166,12 +202,13 @@ function genZdSql(moduleSource: string, energyType: string, secondCodes: string[
     SELECT DISTINCT
       module_source, energy_type,
       CONCAT(station_name, '_', module_source, '_', second_name, '_', measure_name, '_中断') AS standard_name,
-      zd_duration::FLOAT AS zd_duration,
-      '0:00' AS begin_time, '23:59' AS end_time,
+      NULLIF(zd_duration, '')::FLOAT AS zd_duration,
+      '${tr.begin}' AS begin_time, '${tr.end}' AS end_time,
       measure_name, cd_code
     FROM final_data
     WHERE zd_duration != ''
-    ORDER BY measure_name;
+    ORDER BY measure_name
+    RETURNING standard_name;
   `.trim();
 }
 

@@ -23,6 +23,10 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
+    // 二进制下载流直接返回原始 response
+    if (response.config.responseType === 'blob') {
+      return response;
+    }
     const { data } = response;
     if (data.code !== 0) {
       return Promise.reject(new Error(data.message || '请求失败'));
@@ -30,6 +34,9 @@ api.interceptors.response.use(
     return data;
   },
   (error) => {
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
     if (error.response) {
       const { status, data } = error.response;
       if (status === 500) {
