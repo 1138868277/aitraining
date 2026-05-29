@@ -60,10 +60,14 @@
           <div class="card-default chart-section">
             <div class="card-header">
               <span class="card-header-title">二级类码分布</span>
-              <el-radio-group v-model="secondClassType" size="small">
-                <el-radio-button value="wind">风电</el-radio-button>
-                <el-radio-button value="solar">光伏</el-radio-button>
-              </el-radio-group>
+              <div class="tech-filter-group">
+                <button :class="['tech-filter-btn', { active: secondClassType === 'wind' }]" @click="secondClassType='wind'">
+                  <span class="tfb-dot" style="background:#3b82f6"></span>风电
+                </button>
+                <button :class="['tech-filter-btn', { active: secondClassType === 'solar' }]" @click="secondClassType='solar'">
+                  <span class="tfb-dot" style="background:#f59e0b"></span>光伏
+                </button>
+              </div>
             </div>
             <div class="card-body chart-body">
               <template v-if="secondClassItems.length > 0">
@@ -161,12 +165,18 @@ const secondClassData = computed((): any => {
       axisPointer: { type: 'shadow' },
       formatter: (params: any) => {
         const p = params[0];
-        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+        return `<div style="font-weight:600;color:#303133;margin-bottom:4px;">${p.axisValue}</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;"></span>
+                  <span style="color:#909399;">数量：</span>
+                  <span style="color:#303133;font-weight:700;">${p.value}</span>
+                </div>`;
       },
-      backgroundColor: 'rgba(255,255,255,0.95)',
+      backgroundColor: 'rgba(255,255,255,0.96)',
       borderColor: '#e8e8e8',
       borderWidth: 1,
-      textStyle: { fontSize: 12, color: '#303133' },
+      extraCssText: 'box-shadow:0 4px 12px rgba(0,0,0,0.06);border-radius:8px;',
+      textStyle: { fontSize: 12, color: '#606266' },
     },
     grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
@@ -188,27 +198,29 @@ const secondClassData = computed((): any => {
       data: items.map(i => i.value),
       barMaxWidth: 26,
       barMinHeight: 8,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      animationDelay: (idx: number) => idx * 40,
       label: {
         show: true,
         position: 'right',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         color: '#303133',
         formatter: (p: any) => `${p.value}`,
       },
       itemStyle: {
-        borderRadius: [0, 6, 6, 0],
+        borderRadius: [0, 4, 4, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#7c9cf5' },
-            { offset: 0.5, color: '#5a7de8' },
-            { offset: 1, color: '#3b5fc9' },
+            { offset: 0, color: '#3b82f6' },
+            { offset: 1, color: '#22d3ee' },
           ],
         },
-        shadowBlur: 8,
-        shadowColor: 'rgba(59, 95, 201, 0.2)',
-        shadowOffsetX: 2,
+        shadowBlur: 4,
+        shadowColor: 'rgba(59,130,246,0.15)',
+        shadowOffsetX: 1,
       },
     }],
   };
@@ -223,12 +235,18 @@ const stationData = computed((): any => {
       axisPointer: { type: 'shadow' },
       formatter: (params: any) => {
         const p = params[0];
-        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+        return `<div style="font-weight:600;color:#303133;margin-bottom:4px;">${p.axisValue}</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b5cf6;"></span>
+                  <span style="color:#909399;">数量：</span>
+                  <span style="color:#303133;font-weight:700;">${p.value}</span>
+                </div>`;
       },
-      backgroundColor: 'rgba(255,255,255,0.95)',
+      backgroundColor: 'rgba(255,255,255,0.96)',
       borderColor: '#e8e8e8',
       borderWidth: 1,
-      textStyle: { fontSize: 12, color: '#303133' },
+      extraCssText: 'box-shadow:0 4px 12px rgba(0,0,0,0.06);border-radius:8px;',
+      textStyle: { fontSize: 12, color: '#606266' },
     },
     grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
@@ -241,7 +259,7 @@ const stationData = computed((): any => {
     yAxis: {
       type: 'category',
       data: items.map(i => i.name),
-      axisLabel: { fontSize: 12, fontWeight: 600, color: '#303133' },
+      axisLabel: { fontSize: 11, fontWeight: 600, color: '#303133' },
       axisLine: { show: false },
       axisTick: { show: false },
     },
@@ -250,27 +268,29 @@ const stationData = computed((): any => {
       data: items.map(i => i.value),
       barMaxWidth: 26,
       barMinHeight: 8,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      animationDelay: (idx: number) => idx * 40,
       label: {
         show: true,
         position: 'right',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         color: '#303133',
         formatter: (p: any) => `${p.value}`,
       },
       itemStyle: {
-        borderRadius: [0, 6, 6, 0],
+        borderRadius: [0, 4, 4, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#5ad8a6' },
-            { offset: 0.5, color: '#36c27d' },
-            { offset: 1, color: '#1fa86a' },
+            { offset: 0, color: '#8b5cf6' },
+            { offset: 1, color: '#22d3ee' },
           ],
         },
-        shadowBlur: 8,
-        shadowColor: 'rgba(31, 168, 106, 0.2)',
-        shadowOffsetX: 2,
+        shadowBlur: 4,
+        shadowColor: 'rgba(139,92,246,0.15)',
+        shadowOffsetX: 1,
       },
     }],
   };
@@ -472,6 +492,52 @@ onMounted(async () => {
 .chart-section { height: 100%; }
 .chart-container-h { height: 360px; width: 100%; }
 .chart-scroll-wrap { overflow-y: auto; max-height: 420px; }
+
+/* ==================== 科技风切换按钮 ==================== */
+.tech-filter-group {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(59, 130, 246, 0.06);
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.1);
+}
+.tech-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  outline: none;
+  white-space: nowrap;
+}
+.tech-filter-btn:hover {
+  color: #303133;
+  background: rgba(59, 130, 246, 0.08);
+}
+.tech-filter-btn.active {
+  color: #3b82f6;
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04));
+  box-shadow: 0 1px 4px rgba(59,130,246,0.12);
+}
+.tfb-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transition: box-shadow 0.25s ease;
+}
+.tech-filter-btn.active .tfb-dot {
+  box-shadow: 0 0 6px currentColor;
+}
 
 /* ==================== 导入栏 ==================== */
 .import-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 14px 16px; background: #fafbff; border: 1px solid #eef0f6; border-radius: 8px; }

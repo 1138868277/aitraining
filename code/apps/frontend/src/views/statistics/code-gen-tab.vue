@@ -1,34 +1,45 @@
 <template>
   <div class="tab-content">
-    <!-- 概览卡片 -->
-    <div class="overview-stats mb-16">
-      <div class="overview-stat-card stat-card-total">
-        <div class="os-left">
-          <div class="os-icon">📋</div>
-          <div class="os-label">累计生成</div>
-        </div>
-        <div class="os-value">{{ overview.totalCodes }}</div>
+    <!-- 概览 -->
+    <div class="card-default mb-16">
+      <div class="card-header">
+        <span class="card-header-title">概览</span>
       </div>
-      <div class="overview-stat-card stat-card-today">
-        <div class="os-left">
-          <div class="os-icon">📅</div>
-          <div class="os-label">今日生成</div>
+      <div class="card-body">
+        <div class="tech-metrics">
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#764ba2;background:rgba(118,75,162,0.1)">📋</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#764ba2">{{ overview.totalCodes }}</div>
+              <div class="tmc-label">累计生成</div>
+            </div>
+            <div class="tmc-glow" style="background:#764ba2"></div>
+          </div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#3b82f6;background:rgba(59,130,246,0.1)">📅</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#3b82f6">{{ overview.todayCodes }}</div>
+              <div class="tmc-label">今日生成</div>
+            </div>
+            <div class="tmc-glow" style="background:#3b82f6"></div>
+          </div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#06b6d4;background:rgba(6,182,212,0.1)">📆</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#06b6d4">{{ overview.thisWeekCodes }}</div>
+              <div class="tmc-label">本周生成</div>
+            </div>
+            <div class="tmc-glow" style="background:#06b6d4"></div>
+          </div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#10b981;background:rgba(16,185,129,0.1)">📊</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#10b981">{{ overview.thisMonthCodes }}</div>
+              <div class="tmc-label">本月生成</div>
+            </div>
+            <div class="tmc-glow" style="background:#10b981"></div>
+          </div>
         </div>
-        <div class="os-value">{{ overview.todayCodes }}</div>
-      </div>
-      <div class="overview-stat-card stat-card-week">
-        <div class="os-left">
-          <div class="os-icon">📆</div>
-          <div class="os-label">本周生成</div>
-        </div>
-        <div class="os-value">{{ overview.thisWeekCodes }}</div>
-      </div>
-      <div class="overview-stat-card stat-card-month">
-        <div class="os-left">
-          <div class="os-icon">📊</div>
-          <div class="os-label">本月生成</div>
-        </div>
-        <div class="os-value">{{ overview.thisMonthCodes }}</div>
       </div>
     </div>
 
@@ -38,34 +49,38 @@
         <span class="card-header-title">类型分布</span>
       </div>
       <div class="card-body">
-        <div class="overview-stats">
-          <div class="overview-stat-card stat-card-wind">
-            <div class="os-left">
-              <div class="os-icon">🌀</div>
-              <div class="os-label">风电</div>
+        <div class="tech-metrics">
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#3b82f6;background:rgba(59,130,246,0.1)">🌀</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#3b82f6">{{ typeStats.windCount }}</div>
+              <div class="tmc-label">风电</div>
             </div>
-            <div class="os-value">{{ typeStats.windCount }}</div>
+            <div class="tmc-glow" style="background:#3b82f6"></div>
           </div>
-          <div class="overview-stat-card stat-card-solar">
-            <div class="os-left">
-              <div class="os-icon">☀️</div>
-              <div class="os-label">光伏</div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#f59e0b;background:rgba(245,158,11,0.1)">☀️</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#f59e0b">{{ typeStats.solarCount }}</div>
+              <div class="tmc-label">光伏</div>
             </div>
-            <div class="os-value">{{ typeStats.solarCount }}</div>
+            <div class="tmc-glow" style="background:#f59e0b"></div>
           </div>
-          <div class="overview-stat-card stat-card-hydro">
-            <div class="os-left">
-              <div class="os-icon">🌊</div>
-              <div class="os-label">水电</div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#06b6d4;background:rgba(6,182,212,0.1)">🌊</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#06b6d4">{{ typeStats.hydroCount }}</div>
+              <div class="tmc-label">水电</div>
             </div>
-            <div class="os-value">{{ typeStats.hydroCount }}</div>
+            <div class="tmc-glow" style="background:#06b6d4"></div>
           </div>
-          <div class="overview-stat-card stat-card-other">
-            <div class="os-left">
-              <div class="os-icon">🔄</div>
-              <div class="os-label">不区分类型</div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#909399;background:rgba(144,147,153,0.1)">🔄</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#909399">{{ typeStats.otherCount }}</div>
+              <div class="tmc-label">不区分类型</div>
             </div>
-            <div class="os-value">{{ typeStats.otherCount }}</div>
+            <div class="tmc-glow" style="background:#909399"></div>
           </div>
         </div>
       </div>
@@ -77,11 +92,17 @@
         <div class="card-default chart-section">
           <div class="card-header">
             <span class="card-header-title">二级类码分布</span>
-            <el-radio-group v-model="secondClassType" size="small" @change="loadSecondClass">
-              <el-radio-button value="wind">风电</el-radio-button>
-              <el-radio-button value="solar">光伏</el-radio-button>
-              <el-radio-button value="hydro">水电</el-radio-button>
-            </el-radio-group>
+            <div class="tech-filter-group">
+              <button :class="['tech-filter-btn', { active: secondClassType === 'wind' }]" @click="secondClassType='wind';loadSecondClass()">
+                <span class="tfb-dot" style="background:#3b82f6"></span>风电
+              </button>
+              <button :class="['tech-filter-btn', { active: secondClassType === 'solar' }]" @click="secondClassType='solar';loadSecondClass()">
+                <span class="tfb-dot" style="background:#f59e0b"></span>光伏
+              </button>
+              <button :class="['tech-filter-btn', { active: secondClassType === 'hydro' }]" @click="secondClassType='hydro';loadSecondClass()">
+                <span class="tfb-dot" style="background:#06b6d4"></span>水电
+              </button>
+            </div>
           </div>
           <div class="card-body chart-body">
             <div class="chart-container-h"><v-chart v-if="secondClassData" :option="secondClassData" autoresize /></div>
@@ -234,12 +255,18 @@ const secondClassData = computed(() => {
       axisPointer: { type: 'shadow' },
       formatter: (params: any) => {
         const p = params[0];
-        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+        return `<div style="font-weight:600;color:#303133;margin-bottom:4px;">${p.axisValue}</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;"></span>
+                  <span style="color:#909399;">数量：</span>
+                  <span style="color:#303133;font-weight:700;">${p.value}</span>
+                </div>`;
       },
-      backgroundColor: 'rgba(255,255,255,0.95)',
+      backgroundColor: 'rgba(255,255,255,0.96)',
       borderColor: '#e8e8e8',
       borderWidth: 1,
-      textStyle: { fontSize: 12, color: '#303133' },
+      extraCssText: 'box-shadow:0 4px 12px rgba(0,0,0,0.06);border-radius:8px;',
+      textStyle: { fontSize: 12, color: '#606266' },
     },
     grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
@@ -261,27 +288,29 @@ const secondClassData = computed(() => {
       data: items.map(i => i.value),
       barMaxWidth: 26,
       barMinHeight: 8,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      animationDelay: (idx: number) => idx * 40,
       label: {
         show: true,
         position: 'right',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         color: '#303133',
         formatter: (p: any) => `${p.value}`,
       },
       itemStyle: {
-        borderRadius: [0, 6, 6, 0],
+        borderRadius: [0, 4, 4, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#7c9cf5' },
-            { offset: 0.5, color: '#5a7de8' },
-            { offset: 1, color: '#3b5fc9' },
+            { offset: 0, color: '#3b82f6' },
+            { offset: 1, color: '#22d3ee' },
           ],
         },
-        shadowBlur: 8,
-        shadowColor: 'rgba(59, 95, 201, 0.2)',
-        shadowOffsetX: 2,
+        shadowBlur: 4,
+        shadowColor: 'rgba(59,130,246,0.15)',
+        shadowOffsetX: 1,
       },
     }],
   };
@@ -296,12 +325,18 @@ const stationData = computed(() => {
       axisPointer: { type: 'shadow' },
       formatter: (params: any) => {
         const p = params[0];
-        return `<strong>${p.axisValue}</strong><br/>数量：<strong>${p.value}</strong>`;
+        return `<div style="font-weight:600;color:#303133;margin-bottom:4px;">${p.axisValue}</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b5cf6;"></span>
+                  <span style="color:#909399;">数量：</span>
+                  <span style="color:#303133;font-weight:700;">${p.value}</span>
+                </div>`;
       },
-      backgroundColor: 'rgba(255,255,255,0.95)',
+      backgroundColor: 'rgba(255,255,255,0.96)',
       borderColor: '#e8e8e8',
       borderWidth: 1,
-      textStyle: { fontSize: 12, color: '#303133' },
+      extraCssText: 'box-shadow:0 4px 12px rgba(0,0,0,0.06);border-radius:8px;',
+      textStyle: { fontSize: 12, color: '#606266' },
     },
     grid: { left: '3%', right: '12%', bottom: '3%', top: '3%', containLabel: true },
     xAxis: {
@@ -323,27 +358,29 @@ const stationData = computed(() => {
       data: items.map(i => i.value),
       barMaxWidth: 26,
       barMinHeight: 8,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      animationDelay: (idx: number) => idx * 40,
       label: {
         show: true,
         position: 'right',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         color: '#303133',
         formatter: (p: any) => `${p.value}`,
       },
       itemStyle: {
-        borderRadius: [0, 6, 6, 0],
+        borderRadius: [0, 4, 4, 0],
         color: {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#5ad8a6' },
-            { offset: 0.5, color: '#36c27d' },
-            { offset: 1, color: '#1fa86a' },
+            { offset: 0, color: '#8b5cf6' },
+            { offset: 1, color: '#22d3ee' },
           ],
         },
-        shadowBlur: 8,
-        shadowColor: 'rgba(31, 168, 106, 0.2)',
-        shadowOffsetX: 2,
+        shadowBlur: 4,
+        shadowColor: 'rgba(139,92,246,0.15)',
+        shadowOffsetX: 1,
       },
     }],
   };
@@ -633,33 +670,88 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .mb-16 { margin-bottom: 16px; }
 
-/* ==================== 概览统计卡片 ==================== */
-.overview-stats { display: flex; gap: 12px; }
-.overview-stat-card {
+/* ==================== 科技风指标卡片（与字典查询风格一致） ==================== */
+.tech-metrics { display: flex; gap: 12px; }
+.tech-metric-card {
   flex: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 14px;
-  padding: 14px 12px;
-  background: #fafbff;
-  border-radius: 8px;
-  border: 1px solid #eef0f6;
-  transition: all 0.25s ease;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #f0f2f5;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.overview-stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+.tech-metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.08);
 }
-.os-left {
+.tmc-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  opacity: 0.6;
+}
+.tmc-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
 }
-.os-icon { font-size: 24px; line-height: 1; }
-.os-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
-.os-label { font-size: 12px; color: #909399; white-space: nowrap; }
+.tmc-body { flex: 1; }
+.tmc-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.tmc-label { font-size: 12px; color: #909399; margin-top: 2px; }
+
+/* ==================== 科技风筛选按钮 ==================== */
+.tech-filter-group {
+  display: flex;
+  background: rgba(59,130,246,0.06);
+  border-radius: 8px;
+  padding: 3px;
+  border: 1px solid rgba(59,130,246,0.1);
+}
+.tech-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #909399;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.tech-filter-btn:hover { color: #606266; }
+.tech-filter-btn.active {
+  background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(6,182,212,0.08));
+  color: #2563eb;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.12);
+}
+.tfb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+.tech-filter-btn.active .tfb-dot {
+  box-shadow: 0 0 6px currentColor;
+}
 
 /* ==================== 通用卡片 ==================== */
 .card-default {
