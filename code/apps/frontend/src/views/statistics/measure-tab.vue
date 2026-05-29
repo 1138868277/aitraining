@@ -22,34 +22,45 @@
     </div>
 
     <!-- 概览 -->
-    <div class="overview-stats mb-16" v-if="!loading && overview.totalPoints > 0">
-      <div class="overview-stat-card">
-        <div class="os-left">
-          <div class="os-icon">📋</div>
-          <div class="os-label">总测点数</div>
-        </div>
-        <div class="os-value">{{ overview.totalPoints }}</div>
+    <div class="card-default mb-16" v-if="!loading && overview.totalPoints > 0">
+      <div class="card-header">
+        <span class="card-header-title">概览</span>
       </div>
-      <div class="overview-stat-card">
-        <div class="os-left">
-          <div class="os-icon">🌀</div>
-          <div class="os-label">风电</div>
+      <div class="card-body">
+        <div class="tech-metrics">
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#3b82f6;background:rgba(59,130,246,0.1)">📋</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#3b82f6">{{ overview.totalPoints }}</div>
+              <div class="tmc-label">总测点数</div>
+            </div>
+            <div class="tmc-glow" style="background:#3b82f6"></div>
+          </div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#f59e0b;background:rgba(245,158,11,0.1)">🌀</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#f59e0b">{{ overview.windCount }}</div>
+              <div class="tmc-label">风电</div>
+            </div>
+            <div class="tmc-glow" style="background:#f59e0b"></div>
+          </div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#06b6d4;background:rgba(6,182,212,0.1)">☀️</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#06b6d4">{{ overview.solarCount }}</div>
+              <div class="tmc-label">光伏</div>
+            </div>
+            <div class="tmc-glow" style="background:#06b6d4"></div>
+          </div>
+          <div class="tech-metric-card">
+            <div class="tmc-icon" style="color:#909399;background:rgba(144,147,153,0.1)">🔄</div>
+            <div class="tmc-body">
+              <div class="tmc-value" style="color:#909399">{{ overview.otherCount }}</div>
+              <div class="tmc-label">其他</div>
+            </div>
+            <div class="tmc-glow" style="background:#909399"></div>
+          </div>
         </div>
-        <div class="os-value" style="color:#409eff">{{ overview.windCount }}</div>
-      </div>
-      <div class="overview-stat-card">
-        <div class="os-left">
-          <div class="os-icon">☀️</div>
-          <div class="os-label">光伏</div>
-        </div>
-        <div class="os-value" style="color:#67c23a">{{ overview.solarCount }}</div>
-      </div>
-      <div class="overview-stat-card">
-        <div class="os-left">
-          <div class="os-icon">🔄</div>
-          <div class="os-label">其他</div>
-        </div>
-        <div class="os-value" style="color:#e6a23c">{{ overview.otherCount }}</div>
       </div>
     </div>
 
@@ -424,52 +435,85 @@ onMounted(async () => {
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .mb-16 { margin-bottom: 16px; }
 
-/* ==================== 概览统计卡片 ==================== */
-.overview-stats { display: flex; gap: 12px; }
-.overview-stat-card {
+/* ==================== 科技风指标卡片 ==================== */
+.tech-metrics { display: flex; gap: 12px; }
+.tech-metric-card {
   flex: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 14px;
-  padding: 14px 12px;
-  background: #fafbff;
-  border-radius: 8px;
-  border: 1px solid #eef0f6;
-  transition: all 0.25s ease;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #f0f2f5;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.overview-stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+.tech-metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.08);
 }
-.os-left {
+.tmc-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  opacity: 0.6;
+}
+.tmc-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
 }
-.os-icon { font-size: 24px; line-height: 1; }
-.os-value { font-size: 28px; font-weight: 700; line-height: 1.2; color: #303133; }
-.os-label { font-size: 12px; color: #909399; white-space: nowrap; }
+.tmc-body { flex: 1; }
+.tmc-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.tmc-label { font-size: 12px; color: #909399; margin-top: 2px; }
 
-/* ==================== 通用卡片 ==================== */
+/* ==================== 通用卡片（科技风） ==================== */
 .card-default {
   background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  border: 1px solid #e4e9f2;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+.card-default::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #22d3ee, #8b5cf6);
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
+}
+.card-default:hover {
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
 }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #eef2f8;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
 }
 .card-header-title {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: #1a2a4a;
   position: relative;
   padding-left: 12px;
 }
@@ -481,7 +525,7 @@ onMounted(async () => {
   bottom: 2px;
   width: 3px;
   border-radius: 2px;
-  background: #409eff;
+  background: linear-gradient(180deg, #3b82f6, #22d3ee);
 }
 .card-body { padding: 16px; }
 .chart-body { padding: 8px 16px 16px; }

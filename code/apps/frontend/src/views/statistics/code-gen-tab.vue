@@ -8,20 +8,20 @@
       <div class="card-body">
         <div class="tech-metrics">
           <div class="tech-metric-card">
-            <div class="tmc-icon" style="color:#764ba2;background:rgba(118,75,162,0.1)">📋</div>
+            <div class="tmc-icon" style="color:#3b82f6;background:rgba(59,130,246,0.1)">📋</div>
             <div class="tmc-body">
-              <div class="tmc-value" style="color:#764ba2">{{ overview.totalCodes }}</div>
+              <div class="tmc-value" style="color:#3b82f6">{{ overview.totalCodes }}</div>
               <div class="tmc-label">累计生成</div>
             </div>
-            <div class="tmc-glow" style="background:#764ba2"></div>
+            <div class="tmc-glow" style="background:#3b82f6"></div>
           </div>
           <div class="tech-metric-card">
-            <div class="tmc-icon" style="color:#3b82f6;background:rgba(59,130,246,0.1)">📅</div>
+            <div class="tmc-icon" style="color:#f59e0b;background:rgba(245,158,11,0.1)">📅</div>
             <div class="tmc-body">
-              <div class="tmc-value" style="color:#3b82f6">{{ overview.todayCodes }}</div>
+              <div class="tmc-value" style="color:#f59e0b">{{ overview.todayCodes }}</div>
               <div class="tmc-label">今日生成</div>
             </div>
-            <div class="tmc-glow" style="background:#3b82f6"></div>
+            <div class="tmc-glow" style="background:#f59e0b"></div>
           </div>
           <div class="tech-metric-card">
             <div class="tmc-icon" style="color:#06b6d4;background:rgba(6,182,212,0.1)">📆</div>
@@ -32,12 +32,12 @@
             <div class="tmc-glow" style="background:#06b6d4"></div>
           </div>
           <div class="tech-metric-card">
-            <div class="tmc-icon" style="color:#10b981;background:rgba(16,185,129,0.1)">📊</div>
+            <div class="tmc-icon" style="color:#909399;background:rgba(144,147,153,0.1)">📊</div>
             <div class="tmc-body">
-              <div class="tmc-value" style="color:#10b981">{{ overview.thisMonthCodes }}</div>
+              <div class="tmc-value" style="color:#909399">{{ overview.thisMonthCodes }}</div>
               <div class="tmc-label">本月生成</div>
             </div>
-            <div class="tmc-glow" style="background:#10b981"></div>
+            <div class="tmc-glow" style="background:#909399"></div>
           </div>
         </div>
       </div>
@@ -753,24 +753,43 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
   box-shadow: 0 0 6px currentColor;
 }
 
-/* ==================== 通用卡片 ==================== */
+/* ==================== 通用卡片（科技风） ==================== */
 .card-default {
   background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  border: 1px solid #e4e9f2;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+.card-default::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #22d3ee, #8b5cf6);
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
+}
+.card-default:hover {
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
 }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #eef2f8;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
 }
 .card-header-title {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: #1a2a4a;
   position: relative;
   padding-left: 12px;
 }
@@ -782,7 +801,7 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
   bottom: 2px;
   width: 3px;
   border-radius: 2px;
-  background: #409eff;
+  background: linear-gradient(180deg, #3b82f6, #22d3ee);
 }
 .card-body { padding: 16px; }
 .chart-body { padding: 8px 16px 16px; }
