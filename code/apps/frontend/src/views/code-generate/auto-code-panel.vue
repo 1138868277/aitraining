@@ -1,188 +1,167 @@
 <template>
-  <div class="auto-code-panel">
-    <!-- 科技风步骤条 -->
-    <div class="tech-steps-wrapper">
-      <el-steps :active="step" align-center finish-status="success" class="tech-steps">
-        <el-step title="上传文件" />
-        <el-step title="列映射" />
-        <el-step title="编码配置" />
-        <el-step title="匹配结果" />
-      </el-steps>
-    </div>
-
-    <!-- 步骤1：上传Excel -->
-    <div v-if="step === 0" class="step-body">
-      <div class="upload-zone-card">
-        <el-upload drag accept=".xlsx,.xls" :auto-upload="false" :show-file-list="false" :on-change="handleFileChange" class="tech-upload">
-          <div class="upload-inner">
-            <div class="upload-icon-wrap">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
+  <div class="auto-panel">
+    <div class="panel-bg-layer"></div>
+    <div class="panel-content">
+      <div class="cyber-steps">
+        <div class="steps-track">
+          <div class="steps-progress" :style="{ width: ((step / 3) * 100) + '%' }"></div>
+        </div>
+        <div class="steps-nav">
+          <div v-for="(s, i) in steps" :key="i" class="step-item" :class="{ active: step === i, done: step > i }" @click="step = Math.max(0, Math.min(3, i))">
+            <div class="step-dot">
+              <svg v-if="step > i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              <span v-else>{{ i + 1 }}</span>
             </div>
-            <div class="upload-title">拖拽或点击上传 Excel 文件</div>
-            <div class="upload-hint">支持 .xlsx / .xls 格式，测点名称列必须有</div>
+            <div class="step-label">{{ s }}</div>
           </div>
-        </el-upload>
-      </div>
-
-      <div v-if="previewRows.length > 0" class="preview-section">
-        <div class="preview-header">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-          <span>数据预览</span>
-          <span class="preview-badge">前10行，共 {{ totalRows }} 行</span>
         </div>
-        <el-table :data="previewRows" stripe size="small" max-height="300" border class="tech-table">
-          <el-table-column v-for="col in previewCols" :key="col" :prop="col" :label="col" min-width="120" />
-        </el-table>
       </div>
 
-      <div class="step-footer">
-        <button class="btn-prev" disabled style="visibility:hidden">上一步</button>
-        <button class="btn-next" :disabled="previewRows.length === 0" @click="step = 1">
-          <span>下一步</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- 步骤2：列映射 -->
-    <div v-if="step === 1" class="step-body">
-      <div class="mapping-alert">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <span>将Excel列映射到系统字段。场站名称/二级类码/三级类码/数据类码/数据码用于匹配字典编码，测点名称用于提取扩展码。</span>
-      </div>
-      <el-table :data="mappingList" stripe size="small" style="width:100%" class="tech-table" border>
-        <el-table-column label="Excel列名" prop="colName" width="200" />
-        <el-table-column label="映射到系统字段" width="320">
-          <template #default="{ row, $index }">
-            <el-select v-model="row.mapping" placeholder="请选择" filterable style="width:100%">
-              <el-option label="— 不导入 —" value="" />
-              <el-option v-for="opt in fieldOptions" :key="opt.value" :label="opt.label" :value="opt.value" :disabled="isFieldUsed(opt.value, $index)" />
-            </el-select>
-          </template>
-        </el-table-column>
-        <el-table-column label="说明" min-width="200">
-          <template #default="{ row }">
-            <span class="mapping-hint">{{ fieldHint(row.mapping) }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="step-footer">
-        <button class="btn-prev" @click="step = 0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>上一步</span>
-        </button>
-        <button class="btn-next" :disabled="!hasRequiredMapping" @click="step = 2">
-          <span>下一步</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- 步骤3：编码配置 -->
-    <div v-if="step === 2" class="step-body">
-      <div class="config-card">
-        <div class="config-card-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          编码参数配置
+      <!-- Step 0: Upload -->
+      <div v-if="step === 0" class="step-body">
+        <div class="upload-section">
+          <div class="upload-zone" :class="{ 'has-file': previewRows.length > 0 }" @dragover.prevent @drop.prevent="onDrop">
+            <input ref="fileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileInputChange" />
+            <div class="upload-glow"></div>
+            <div class="upload-icon">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="upload-title">上传 Excel 文件</div>
+            <div class="upload-desc">拖拽文件到此处，或点击选择文件</div>
+            <div class="upload-formats">支持 .xlsx / .xls</div>
+            <button class="cyber-btn" @click="triggerFileInput">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              <span>选择文件</span>
+            </button>
+          </div>
         </div>
-        <el-form :model="codeConfig" label-position="top" class="config-form">
-          <el-row :gutter="20">
-            <el-col :span="6">
-              <el-form-item label="类型编码（5-6位）" required>
-                <el-select v-model="codeConfig.typeCode" placeholder="请选择" filterable style="width:100%">
-                  <el-option v-for="t in typeOptions" :key="t.code" :label="t.code + ' ' + t.name" :value="t.code" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="6">
-              <el-form-item label="项目期号&amp;并网线路（7-9位）">
-                <el-input v-model="codeConfig.projectLineCode" placeholder="默认111" maxlength="3" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="6">
-              <el-form-item label="前缀号（10位）">
-                <el-input v-model="codeConfig.prefixNo" placeholder="默认0" maxlength="1" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="6">
-              <el-form-item label="一级类码（11-12位）">
-                <el-input v-model="codeConfig.firstClassCode" placeholder="默认B1" maxlength="2" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-        </el-form>
-      </div>
 
-      <div class="step-footer" style="margin-top:20px">
-        <button class="btn-prev" @click="step = 1">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>上一步</span>
-        </button>
-        <button class="btn-generate-action" :disabled="!codeConfig.typeCode" :class="{ loading: matching }" @click="startMatch">
-          <span v-if="matching" class="btn-spinner"></span>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span>{{ matching ? '匹配中...' : '开始匹配并生成编码' }}</span>
-          <span class="btn-glow"></span>
-        </button>
-      </div>
-    </div>
-
-    <!-- 步骤4：结果 -->
-    <div v-if="step === 3" class="step-body">
-      <div class="result-toolbar">
-        <div class="result-toolbar-left">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          <span class="result-title">匹配结果</span>
-          <span class="result-badge success">成功 {{ successCount }} 条</span>
-          <span v-if="failCount > 0" class="result-badge fail">失败 {{ failCount }} 条</span>
+        <div v-if="previewRows.length > 0" class="preview-box">
+          <div class="preview-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            <span>数据预览</span>
+            <span class="preview-count">{{ totalRows }} 行</span>
+          </div>
+          <div class="preview-table-wrap">
+            <table class="cyber-table">
+              <thead><tr><th>#</th><th v-for="col in previewCols" :key="col">{{ col }}</th></tr></thead>
+              <tbody>
+                <tr v-for="(row, ri) in previewRows" :key="ri">
+                  <td class="row-num">{{ ri + 1 }}</td>
+                  <td v-for="col in previewCols" :key="col">{{ row[col] }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="step-footer">
+            <div></div>
+            <button class="cyber-btn primary" :disabled="previewRows.length === 0" @click="step = 1">
+              <span>下一步</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
         </div>
-        <div class="result-toolbar-right">
-          <button class="btn-clear-small" @click="resetAll">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            重新导入
+      </div>
+
+      <!-- Step 1: Mapping -->
+      <div v-if="step === 1" class="step-body">
+        <div class="info-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>将 Excel 列映射到系统字段，测点名称为必填</span>
+        </div>
+        <div class="mapping-table-wrap">
+          <table class="cyber-table mapping-table">
+            <thead><tr><th>Excel 列名</th><th>映射到系统字段</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr v-for="(item, idx) in mappingList" :key="idx">
+                <td class="col-name">{{ item.colName }}</td>
+                <td>
+                  <select v-model="item.mapping" class="cyber-select">
+                    <option value="">— 不导入 —</option>
+                    <option v-for="opt in fieldOptions" :key="opt.value" :value="opt.value" :disabled="isFieldUsed(opt.value, idx)">{{ opt.label }}</option>
+                  </select>
+                </td>
+                <td class="col-hint">{{ fieldHint(item.mapping) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="step-footer">
+          <button class="cyber-btn" @click="step = 0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            <span>上一步</span>
           </button>
-          <button class="btn-generate-small" :disabled="successCount === 0" @click="sendToPreview">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            发送到编码结果 ({{ successCount }}条)
+          <button class="cyber-btn primary" :disabled="!hasRequiredMapping" @click="step = 2">
+            <span>下一步</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
       </div>
 
-      <el-table :data="resultRows" stripe size="small" max-height="400" style="width:100%" class="tech-table" border
-        :row-class-name="resultRowClass">
-        <el-table-column type="index" label="序号" width="60" align="center" fixed />
-        <el-table-column prop="name" label="测点名称" min-width="180" />
-        <el-table-column label="编码" width="310">
-          <template #default="{ row }">
-            <span v-if="row.generatedCode" class="code-value">{{ row.generatedCode.code }}</span>
-            <el-tag v-else type="danger" size="small">匹配失败</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="编码名称" min-width="180">
-          <template #default="{ row }">
-            <span v-if="row.generatedCode" class="code-name">{{ row.generatedCode.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="80" align="center">
-          <template #default="{ row }">
-            <span v-if="row.allMatched" class="status-dot success"></span>
-            <span v-else class="status-dot fail"></span>
-            <span :class="row.allMatched ? 'status-text-success' : 'status-text-fail'">
-              {{ row.allMatched ? '成功' : '失败' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="失败原因" min-width="200">
-          <template #default="{ row }">
-            <span v-if="row.error" class="error-text">{{ row.error }}</span>
-            <span v-else-if="!row.allMatched" class="warn-text">{{ failedFields(row) }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- Step 2: Config -->
+      <div v-if="step === 2" class="step-body">
+        <div class="config-grid">
+          <div class="config-field">
+            <label class="field-label">项目期号 &amp; 并网线路（第 7-9 位）</label>
+            <input v-model="codeConfig.projectLineCode" placeholder="默认 111" maxlength="3" class="cyber-input" />
+          </div>
+          <div class="config-field">
+            <label class="field-label">前缀号（第 10 位）</label>
+            <input v-model="codeConfig.prefixNo" placeholder="默认 0" maxlength="1" class="cyber-input" />
+          </div>
+          <div class="config-field">
+            <label class="field-label">一级类码（第 11-12 位）</label>
+            <input v-model="codeConfig.firstClassCode" placeholder="默认 B1" maxlength="2" class="cyber-input" />
+          </div>
+        </div>
+        <div class="step-footer" style="margin-top:24px">
+          <button class="cyber-btn" @click="step = 1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            <span>上一步</span>
+          </button>
+          <button class="cyber-btn primary pulse" :class="{ loading: matching }" @click="startMatch" :disabled="matching">
+            <span v-if="matching" class="spinner"></span>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>{{ matching ? '匹配中...' : '开始匹配并生成编码' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Results -->
+      <div v-if="step === 3" class="step-body">
+        <div class="result-bar">
+          <div class="result-left">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span class="result-title">匹配结果</span>
+            <span class="tag tag-success">成功 {{ successCount }}</span>
+            <span v-if="failCount > 0" class="tag tag-fail">失败 {{ failCount }}</span>
+          </div>
+          <div class="result-right">
+            <button class="cyber-btn sm" @click="resetAll">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              重新导入
+            </button>
+            <button class="cyber-btn primary sm" :disabled="successCount === 0" @click="sendToPreview">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              发送到编码结果 ({{ successCount }})
+            </button>
+          </div>
+        </div>
+        <div class="result-table-wrap">
+          <table class="cyber-table result-table">
+            <thead><tr><th>序号</th><th>测点编码</th><th>测点描述</th><th>状态</th><th>失败原因</th></tr></thead>
+            <tbody>
+              <tr v-for="(row, ri) in resultRows" :key="ri" :class="{ 'row-fail': !row.allMatched }">
+                <td class="row-num">{{ ri + 1 }}</td>
+                <td><span v-if="row.generatedCode" class="code-cell">{{ row.generatedCode.code }}</span><span v-else class="text-dim">—</span></td>
+                <td class="text-desc">{{ row.name }}</td>
+                <td><span class="status-tag" :class="row.allMatched ? 'ok' : 'no'">{{ row.allMatched ? '成功' : '失败' }}</span></td>
+                <td class="text-fail">{{ row.error || (row.allMatched ? '' : failedFields(row)) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -191,12 +170,13 @@
 import { ref, reactive, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx';
-import * as dictService from '@/services/dict';
 import { autoGenerate, type ImportRow, type AutoCodeConfig, type AutoCodeRowResult } from '@/services/auto-code';
 
 const emit = defineEmits<{
   (e: 'success', codes: Array<{ code: string; name: string; generateTime: string }>): void;
 }>();
+
+const steps = ['上传文件', '列映射', '编码配置', '匹配结果'];
 
 const step = ref(0);
 const excelData = ref<any[][]>([]);
@@ -204,9 +184,9 @@ const previewRows = ref<any[]>([]);
 const previewCols = ref<string[]>([]);
 const totalRows = ref(0);
 const mappingList = ref<Array<{ colName: string; mapping: string }>>([]);
-const typeOptions = ref<Array<{ code: string; name: string }>>([]);
 const matching = ref(false);
 const resultRows = ref<AutoCodeRowResult[]>([]);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 const codeConfig = reactive<AutoCodeConfig>({
   typeCode: '',
@@ -246,16 +226,57 @@ function isFieldUsed(value: string, skipIndex: number): boolean {
   return mappingList.value.some((m, i) => i !== skipIndex && m.mapping === value);
 }
 
-async function loadTypeOptions() {
-  try {
-    const items = await dictService.getDictItems('type');
-    typeOptions.value = items;
-    if (items.length > 0 && !codeConfig.typeCode) {
-      codeConfig.typeCode = items[0].code;
-    }
-  } catch {
-    typeOptions.value = [];
-  }
+function triggerFileInput() {
+  fileInput.value?.click();
+}
+
+function onFileInputChange(e: Event) {
+  const target = e.target as HTMLInputElement;
+  if (target.files?.length) handleFile(target.files[0]);
+}
+
+function onDrop(e: DragEvent) {
+  if (e.dataTransfer?.files.length) handleFile(e.dataTransfer.files[0]);
+}
+
+function handleFile(file: File) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const data = new Uint8Array(e.target!.result as ArrayBuffer);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+    if (json.length < 2) { ElMessage.warning('文件为空或只有表头'); return; }
+    const headers = json[0].map((h: any) => String(h || ''));
+    const rows = json.slice(1).filter((r: any[]) => r.some(c => c !== undefined && c !== null && c !== ''));
+    excelData.value = rows;
+    previewCols.value = headers;
+    totalRows.value = rows.length;
+    previewRows.value = rows.slice(0, 10).map((r: any[]) => {
+      const obj: Record<string, any> = {};
+      headers.forEach((h: string, i: number) => { obj[h] = r[i]; });
+      return obj;
+    });
+    autoGuessMapping(headers);
+    ElMessage.success(`读取到 ${rows.length} 行数据`);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function autoGuessMapping(headers: string[]) {
+  const guessMap: Record<string, string> = {
+    '名称': 'name', '测点名称': 'name', '测点描述': 'name', '描述': 'name',
+    '场站名称': 'stationName', '场站': 'stationName',
+    '二级类码': 'secondClassName', '二级类码名称': 'secondClassName',
+    '三级类码': 'thirdClassName', '三级类码名称': 'thirdClassName',
+    '数据类码': 'dataTypeName', '数据类码名称': 'dataTypeName',
+    '数据码': 'dataName', '数据码名称': 'dataName',
+    '项目期号': 'projectLineCode', '项目期号&并网线路': 'projectLineCode',
+  };
+  mappingList.value = headers.map(h => ({
+    colName: h,
+    mapping: guessMap[h] || '',
+  }));
 }
 
 function resetAll() {
@@ -272,55 +293,6 @@ function resetAll() {
   codeConfig.firstClassCode = 'B1';
 }
 
-function handleFileChange(file: any) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const data = new Uint8Array(e.target!.result as ArrayBuffer);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-
-    if (json.length < 2) {
-      ElMessage.warning('文件为空或只有表头');
-      return;
-    }
-
-    const headers = json[0].map((h: any) => String(h || ''));
-    const rows = json.slice(1).filter((r: any[]) => r.some(c => c !== undefined && c !== null && c !== ''));
-    excelData.value = rows;
-    previewCols.value = headers;
-    totalRows.value = rows.length;
-
-    previewRows.value = rows.slice(0, 10).map((r: any[]) => {
-      const obj: Record<string, any> = {};
-      headers.forEach((h: string, i: number) => { obj[h] = r[i]; });
-      return obj;
-    });
-
-    autoGuessMapping(headers);
-    ElMessage.success(`读取到 ${rows.length} 行数据`);
-    loadTypeOptions();
-  };
-  reader.readAsArrayBuffer(file.raw);
-}
-
-function autoGuessMapping(headers: string[]) {
-  const guessMap: Record<string, string> = {
-    '名称': 'name', '测点名称': 'name', '测点描述': 'name', '描述': 'name',
-    '场站名称': 'stationName', '场站': 'stationName',
-    '二级类码': 'secondClassName', '二级类码名称': 'secondClassName',
-    '三级类码': 'thirdClassName', '三级类码名称': 'thirdClassName',
-    '数据类码': 'dataTypeName', '数据类码名称': 'dataTypeName',
-    '数据码': 'dataName', '数据码名称': 'dataName',
-    '项目期号': 'projectLineCode', '项目期号&并网线路': 'projectLineCode',
-  };
-
-  mappingList.value = headers.map(h => ({
-    colName: h,
-    mapping: guessMap[h] || '',
-  }));
-}
-
 async function startMatch() {
   matching.value = true;
   try {
@@ -333,7 +305,6 @@ async function startMatch() {
       });
       return item as ImportRow;
     });
-
     const res = await autoGenerate(rows, { ...codeConfig });
     resultRows.value = res.results;
     step.value = 3;
@@ -347,10 +318,6 @@ async function startMatch() {
 const successCount = computed(() => resultRows.value.filter(r => r.allMatched && r.generatedCode).length);
 const failCount = computed(() => resultRows.value.length - successCount.value);
 
-function resultRowClass({ row }: { row: AutoCodeRowResult }) {
-  return row.allMatched ? '' : 'error-row';
-}
-
 function failedFields(row: AutoCodeRowResult): string {
   return row.matched
     .filter(f => f.status === 'not_found')
@@ -359,171 +326,38 @@ function failedFields(row: AutoCodeRowResult): string {
 }
 
 function sendToPreview() {
-  const codes = resultRows.value
-    .filter(r => r.generatedCode)
-    .map(r => r.generatedCode!);
+  const codes = resultRows.value.filter(r => r.generatedCode).map(r => r.generatedCode!);
   emit('success', codes);
   resetAll();
 }
 </script>
 
 <style scoped>
-/* ===== 科技风步骤条 ===== */
-.tech-steps-wrapper {
-  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
-  border-radius: 10px;
-  padding: 24px 20px 20px;
-  margin-bottom: 20px;
-  border: 1px solid #e4e9f2;
+/* ===== Light theme for auto-code panel ===== */
+.auto-panel {
   position: relative;
-  max-width: 680px;
-  margin-left: auto;
-  margin-right: auto;
-}
-.tech-steps-wrapper::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #3b82f6, #22d3ee, #8b5cf6);
-  opacity: 0.5;
-  border-radius: 10px 10px 0 0;
-}
-.tech-steps :deep(.el-step__title) {
-  font-size: 13px;
-  font-weight: 600;
-}
-.tech-steps :deep(.el-step__head.is-finish) {
-  color: #3b82f6;
-  border-color: #3b82f6;
-}
-.tech-steps :deep(.el-step__head.is-process) {
-  color: #2563eb;
-  border-color: #2563eb;
-}
-.tech-steps :deep(.el-step__icon) {
-  border-width: 2px;
-  font-weight: 700;
-}
-
-/* ===== 上传区域 ===== */
-.upload-zone-card {
-  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
-  border: 2px dashed #c4d4f0;
-  border-radius: 12px;
-  padding: 4px;
-  transition: all 0.3s ease;
-  max-width: 500px;
-  margin: 0 auto;
-}
-.upload-zone-card:hover {
-  border-color: #3b82f6;
-  background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 100%);
-  box-shadow: 0 4px 16px rgba(59,130,246,0.08);
-}
-.tech-upload :deep(.el-upload-dragger) {
-  border: none !important;
-  background: transparent !important;
-  border-radius: 10px;
-  padding: 32px 20px;
-}
-.upload-inner {
-  text-align: center;
-}
-.upload-icon-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #e8f0fe, #dbeafe);
-  margin-bottom: 12px;
-  transition: transform 0.3s ease;
-}
-.upload-zone-card:hover .upload-icon-wrap {
-  transform: scale(1.05);
-}
-.upload-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1a2a4a;
-  margin-bottom: 6px;
-}
-.upload-hint {
-  font-size: 12px;
-  color: #909399;
-}
-
-/* ===== 预览区域 ===== */
-.preview-section {
-  margin-top: 20px;
-}
-.preview-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a2a4a;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
-  border-radius: 8px;
-  border: 1px solid #e4e9f2;
-}
-.preview-badge {
-  font-size: 12px;
-  font-weight: 400;
-  color: #909399;
-  margin-left: 4px;
-}
-
-/* ===== 科技风表格 ===== */
-.tech-table {
-  border-radius: 8px;
+  min-height: 400px;
+  padding: 24px 28px;
+  margin: -20px;
+  background: #fafcff;
   overflow: hidden;
 }
-.tech-table :deep(.el-table__header th) {
-  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%) !important;
-  color: #1d40af !important;
-  font-weight: 600 !important;
-  font-size: 13px;
+.panel-bg-layer {
+  display: none;
 }
-.tech-table :deep(.el-table__body tr:hover td) {
-  background-color: #f0f5ff !important;
+.panel-content {
+  position: relative;
+  z-index: 1;
 }
-
-/* ===== 映射提示 ===== */
-.mapping-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 100%);
-  border-radius: 8px;
-  border: 1px solid #dbeafe;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: #475569;
-  line-height: 1.6;
-}
-.mapping-hint {
-  font-size: 12px;
-  color: #909399;
-}
-
-/* ===== 配置卡片 ===== */
-.config-card {
+.cyber-steps {
+  margin-bottom: 24px;
+  padding: 20px 24px 16px;
   background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
-  border-radius: 10px;
   border: 1px solid #e4e9f2;
-  padding: 20px;
+  border-radius: 10px;
   position: relative;
 }
-.config-card::before {
+.cyber-steps::before {
   content: '';
   position: absolute;
   top: 0;
@@ -534,30 +368,313 @@ function sendToPreview() {
   opacity: 0.4;
   border-radius: 10px 10px 0 0;
 }
-.config-card-title {
+.steps-track {
+  height: 2px;
+  background: #e4e9f2;
+  border-radius: 2px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.steps-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #818cf8);
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 0 6px rgba(59,130,246,0.3);
+}
+.steps-nav {
+  display: flex;
+  justify-content: space-between;
+}
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  position: relative;
+  flex: 1;
+}
+.step-item::before {
+  content: '';
+  position: absolute;
+  top: -22px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background 0.3s;
+}
+.step-item.active::before,
+.step-item.done::before {
+  background: linear-gradient(90deg, #3b82f6, #818cf8);
+}
+.step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  border: 2px solid #d1d9e6;
+  color: #94a3b8;
+  background: #fff;
+  transition: all 0.3s ease;
+}
+.step-item.active .step-dot {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #eef2ff;
+  box-shadow: 0 0 8px rgba(59,130,246,0.2);
+}
+.step-item.done .step-dot {
+  border-color: #10b981;
+  color: #10b981;
+  background: #ecfdf5;
+}
+.step-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  transition: color 0.3s;
+}
+.step-item.active .step-label { color: #3b82f6; }
+.step-item.done .step-label { color: #10b981; }
+.step-body { min-height: 200px; }
+.upload-section { display: flex; justify-content: center; margin-bottom: 20px; }
+.upload-zone {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  padding: 40px 20px 36px;
+  text-align: center;
+  border: 2px dashed #d1d9e6;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.upload-zone:hover {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 100%);
+  box-shadow: 0 4px 16px rgba(59,130,246,0.08);
+}
+.upload-zone.has-file { border-color: #10b981; border-style: solid; }
+.upload-glow { display: none; }
+.upload-icon { margin-bottom: 12px; transition: transform 0.3s; }
+.upload-zone:hover .upload-icon { transform: translateY(-4px); }
+.upload-title { font-size: 16px; font-weight: 600; color: #1a2a4a; margin-bottom: 6px; }
+.upload-desc { font-size: 13px; color: #64748b; margin-bottom: 4px; }
+.upload-formats { font-size: 11px; color: #94a3b8; margin-bottom: 16px; }
+.preview-box {
+  margin-top: 20px;
+  background: #fff;
+  border: 1px solid #e4e9f2;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+}
+.preview-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  padding: 12px 16px;
+  font-size: 13px;
   font-weight: 600;
   color: #1a2a4a;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
   border-bottom: 1px solid #eef2f8;
 }
-.config-form :deep(.el-form-item__label) {
+.preview-count {
+  font-size: 11px;
+  font-weight: 400;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+.preview-table-wrap { overflow-x: auto; padding: 0; }
+.info-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+}
+.cyber-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cyber-table thead th {
+  padding: 10px 14px;
+  text-align: left;
   font-weight: 600;
+  font-size: 12px;
+  color: #1d40af;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+  border-bottom: 1px solid #eef2f8;
+}
+.cyber-table tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid #f0f2f5;
+  color: #334155;
+  transition: background 0.15s;
+}
+.cyber-table tbody tr:hover td {
+  background: #f0f5ff !important;
+}
+.cyber-table tbody tr:last-child td { border-bottom: none; }
+.row-num { color: #94a3b8 !important; font-size: 12px; width: 40px; text-align: center; }
+.col-name { font-weight: 500; color: #1a2a4a !important; }
+.col-hint { color: #94a3b8 !important; font-size: 12px; }
+.text-desc { color: #1a2a4a; }
+.text-dim { color: #94a3b8; }
+.text-fail { color: #dc2626 !important; font-size: 12px; }
+.mapping-table-wrap {
+  background: #fff;
+  border: 1px solid #e4e9f2;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+}
+.result-table-wrap {
+  background: #fff;
+  border: 1px solid #e4e9f2;
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 460px;
+  overflow-y: auto;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+}
+.cyber-select {
+  width: 100%;
+  padding: 7px 10px;
   font-size: 13px;
   color: #1a2a4a;
-  padding-bottom: 4px;
+  background: #fff;
+  border: 1px solid #d1d9e6;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
 }
-
-/* ===== 步骤底部 ===== */
-.step-body {
-  min-height: 150px;
-  max-width: 900px;
-  margin: 0 auto;
+.cyber-select:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+.cyber-select option { background: #fff; color: #1a2a4a; }
+.cyber-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #1a2a4a;
+  background: #fff;
+  border: 1px solid #d1d9e6;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s;
 }
+.cyber-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.1);
+}
+.cyber-input::placeholder { color: #94a3b8; }
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+  border: 1px solid #e4e9f2;
+  border-radius: 10px;
+  position: relative;
+}
+.config-grid::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+  opacity: 0.3;
+}
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a2a4a;
+  margin-bottom: 8px;
+}
+.result-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+  border: 1px solid #e4e9f2;
+  border-radius: 10px;
+}
+.result-left { display: flex; align-items: center; gap: 10px; }
+.result-right { display: flex; align-items: center; gap: 8px; }
+.result-title { font-size: 14px; font-weight: 600; color: #1a2a4a; }
+.tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+.tag-success {
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+.tag-fail {
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+.status-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 4px;
+}
+.status-tag.ok {
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+.status-tag.no {
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+.code-cell {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  color: #2563eb;
+  background: #eef2ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  border: 1px solid #dbeafe;
+}
+.row-fail td { background: #fef2f2 !important; }
 .step-footer {
   display: flex;
   justify-content: space-between;
@@ -566,16 +683,14 @@ function sendToPreview() {
   padding-top: 16px;
   border-top: 1px solid #f0f2f5;
 }
-
-/* ===== 科技风按钮 ===== */
-.btn-prev {
+.cyber-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 9px 20px;
   font-size: 13px;
   font-weight: 500;
-  border: 1px solid rgba(100, 116, 139, 0.2);
+  border: 1px solid rgba(100,116,139,0.2);
   border-radius: 8px;
   cursor: pointer;
   outline: none;
@@ -583,234 +698,49 @@ function sendToPreview() {
   color: #64748b;
   background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   transition: all 0.25s ease;
+  white-space: nowrap;
 }
-.btn-prev:hover:not(:disabled) {
-  border-color: rgba(100, 116, 139, 0.35);
+.cyber-btn:hover:not(:disabled) {
+  border-color: rgba(100,116,139,0.35);
   background: linear-gradient(135deg, #f1f5f9, #e9edf2);
-  transform: translateY(-1px);
   color: #475569;
+  transform: translateY(-1px);
 }
-.btn-prev:disabled {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.btn-next {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 24px;
-  font-size: 13px;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  outline: none;
-  line-height: 1;
+.cyber-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.cyber-btn.primary {
   color: #fff;
   background: linear-gradient(135deg, #3b82f6, #2563eb);
-  box-shadow: 0 3px 10px rgba(59,130,246,0.25);
-  transition: all 0.25s ease;
-}
-.btn-next:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59,130,246,0.35);
-}
-.btn-next:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.btn-generate-action {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 28px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
   border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  outline: none;
-  line-height: 1;
-  color: #fff;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 30%, #60a5fa 50%, #2563eb 70%, #3b82f6 100%);
-  background-size: 300% 100%;
-  background-position: 0% 50%;
-  box-shadow: 0 3px 12px rgba(59,130,246,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
-  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(59,130,246,0.25);
+  position: relative;
   overflow: hidden;
-  animation: btnShimmer 2.5s ease-in-out infinite;
 }
-@keyframes btnShimmer {
-  0%   { background-position: 0% 50%; box-shadow: 0 3px 12px rgba(59,130,246,0.3); }
-  50%  { background-position: 100% 50%; box-shadow: 0 3px 20px rgba(59,130,246,0.5), 0 0 30px rgba(59,130,246,0.15); }
-  100% { background-position: 0% 50%; box-shadow: 0 3px 12px rgba(59,130,246,0.3); }
-}
-.btn-generate-action:hover:not(:disabled) {
+.cyber-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 6px 20px rgba(59,130,246,0.35);
+  color: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(59,130,246,0.5);
-  animation: none;
 }
-.btn-generate-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
-  background: linear-gradient(135deg, #94a3b8, #64748b);
-  animation: none;
+.cyber-btn.primary.pulse {
+  animation: btnPulse 2.5s ease-in-out infinite;
 }
-.btn-generate-action .btn-glow {
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 3px 10px rgba(59,130,246,0.25); }
+  50% { box-shadow: 0 4px 24px rgba(59,130,246,0.45), 0 0 40px rgba(59,130,246,0.1); }
 }
-.btn-generate-action:hover:not(:disabled) .btn-glow {
-  opacity: 1;
-}
-.btn-generate-action.loading {
-  pointer-events: none;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-.btn-spinner {
-  width: 16px;
-  height: 16px;
+.cyber-btn.sm { padding: 7px 14px; font-size: 12px; }
+.cyber-btn.loading { pointer-events: none; }
+.spinner {
+  width: 14px;
+  height: 14px;
   border: 2px solid rgba(255,255,255,0.3);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ===== 结果工具栏 ===== */
-.result-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
-  border-radius: 8px;
-  border: 1px solid #e4e9f2;
-}
-.result-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.result-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a2a4a;
-}
-.result-badge {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 2px 10px;
-  border-radius: 10px;
-}
-.result-badge.success {
-  background: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
-}
-.result-badge.fail {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-.result-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-clear-small {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 16px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid rgba(100,116,139,0.2);
-  border-radius: 6px;
-  cursor: pointer;
-  color: #64748b;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  transition: all 0.2s ease;
-}
-.btn-clear-small:hover {
-  border-color: rgba(100,116,139,0.35);
-  background: linear-gradient(135deg, #f1f5f9, #e9edf2);
-  color: #475569;
-}
-
-.btn-generate-small {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 18px;
-  font-size: 12px;
-  font-weight: 600;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: #fff;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  box-shadow: 0 2px 8px rgba(59,130,246,0.2);
-  transition: all 0.2s ease;
-}
-.btn-generate-small:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(59,130,246,0.3);
-}
-.btn-generate-small:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-/* ===== 编码展示 ===== */
-.code-value {
-  font-family: monospace;
-  font-size: 13px;
-  color: #2563eb;
-  background: #eef2ff;
-  padding: 2px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.3px;
-}
-.code-name {
-  font-size: 13px;
-  color: #1a2a4a;
-}
-
-/* ===== 状态指示 ===== */
-.status-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-right: 4px;
-  vertical-align: middle;
-}
-.status-dot.success { background: #059669; }
-.status-dot.fail { background: #dc2626; }
-.status-text-success { color: #059669; font-size: 12px; font-weight: 500; }
-.status-text-fail { color: #dc2626; font-size: 12px; font-weight: 500; }
-.error-text { color: #dc2626; font-size: 12px; }
-.warn-text { color: #d97706; font-size: 12px; }
 </style>
 
 <style>

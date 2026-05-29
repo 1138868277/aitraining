@@ -26,7 +26,7 @@ router.post('/api/auto-code/generate', async (req: Request, res: Response) => {
     }
 
     const autoConfig: AutoCodeConfig = {
-      typeCode: config.typeCode || 'F1',
+      typeCode: config.typeCode || '',
       projectLineCode: config.projectLineCode || '111',
       prefixNo: config.prefixNo || '0',
       firstClassCode: config.firstClassCode || 'B1',

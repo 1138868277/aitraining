@@ -154,7 +154,7 @@
       <div class="section-body" style="padding-top:0">
       <el-tabs v-model="genMode" class="code-gen-tabs">
         <el-tab-pane label="手动编码" name="manual">
-        <el-form :model="conditions" label-position="top">
+        <div class="manual-panel"><el-form :model="conditions" label-position="top">
         <el-row :gutter="20">
           <el-col :span="6" v-for="field in conditionFields" :key="field.key" class="filter-item" :class="'fi-' + field.key">
             <el-form-item :label="field.label" :required="field.required">
@@ -297,7 +297,7 @@
           预计生成 {{ expectedCodeCount }} 个编码
         </span>
       </div>
-      </el-tab-pane>
+      </div></el-tab-pane>
       <el-tab-pane label="自动编码" name="auto">
         <AutoCodePanel @success="onAutoCodeSuccess" />
       </el-tab-pane>
@@ -2008,6 +2008,13 @@ function cancelEditName() {
 
 .section-body {
   padding: 20px 20px 16px;
+}
+.manual-panel {
+  margin: -20px;
+  padding: 20px;
+}
+.code-gen-tabs :deep(.el-tabs__content) {
+  min-height: 360px;
 }
 
 .section-body .el-form {

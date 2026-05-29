@@ -5,7 +5,7 @@ const sessionId = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toStri
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 30000,
+  timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
     'x-session-id': sessionId,

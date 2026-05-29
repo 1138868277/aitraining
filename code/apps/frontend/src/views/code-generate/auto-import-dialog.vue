@@ -60,24 +60,17 @@
     <div v-if="step === 2" class="step-body">
       <el-form :model="codeConfig" label-width="140px" label-position="top">
         <el-row :gutter="20">
-          <el-col :span="6">
-            <el-form-item label="类型编码（5-6位）" required>
-              <el-select v-model="codeConfig.typeCode" placeholder="请选择" filterable style="width:100%">
-                <el-option v-for="t in typeOptions" :key="t.code" :label="t.name" :value="t.code" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-form-item label="项目期号&并网线路（7-9位）">
               <el-input v-model="codeConfig.projectLineCode" placeholder="默认111" maxlength="3" />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-form-item label="前缀号（10位）">
               <el-input v-model="codeConfig.prefixNo" placeholder="默认0" maxlength="1" />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-form-item label="一级类码（11-12位）">
               <el-input v-model="codeConfig.firstClassCode" placeholder="默认B1" maxlength="2" />
             </el-form-item>
@@ -138,11 +131,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Upload } from '@element-plus/icons-vue';
 import * as XLSX from 'xlsx';
-import * as dictService from '@/services/dict';
 import { autoGenerate, type ImportRow, type AutoCodeConfig, type AutoCodeRowResult } from '@/services/auto-code';
 
 const emit = defineEmits<{
@@ -159,17 +151,12 @@ const dialogVisible = computed({
   set: (val) => emit('update:modelValue', val),
 });
 
-watch(dialogVisible, (val) => {
-  if (val) loadTypeOptions();
-});
-
 const step = ref(0);
 const excelData = ref<any[][]>([]);
 const previewRows = ref<any[]>([]);
 const previewCols = ref<string[]>([]);
 const totalRows = ref(0);
 const mappingList = ref<Array<{ colName: string; mapping: string }>>([]);
-const typeOptions = ref<Array<{ code: string; name: string }>>([]);
 const matching = ref(false);
 const resultRows = ref<AutoCodeRowResult[]>([]);
 
@@ -179,18 +166,6 @@ const codeConfig = reactive<AutoCodeConfig>({
   prefixNo: '0',
   firstClassCode: 'B1',
 });
-
-async function loadTypeOptions() {
-  try {
-    const items = await dictService.getDictItems('type');
-    typeOptions.value = items;
-    if (items.length > 0 && !codeConfig.typeCode) {
-      codeConfig.typeCode = items[0].code;
-    }
-  } catch {
-    typeOptions.value = [];
-  }
-}
 
 const fieldOptions = [
   { value: 'name', label: '测点名称' },
