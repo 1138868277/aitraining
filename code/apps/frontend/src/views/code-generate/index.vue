@@ -55,12 +55,23 @@
         <div v-if="quickSearchText.trim()" class="card-default mb-16" style="border-top: none;">
           <div class="card-header quick-filter-header">
             <div style="display:flex;align-items:center;gap:8px;">
-              <el-radio-group v-model="quickSearchTypeFilter" size="small" class="type-radio-group" @change="onQuickSearchFilterChange">
+              <el-radio-group v-model="quickSearchTypeFilter" size="small" class="type-radio-group" @change="onQuickSearchFilterChange" :disabled="quickSearchLocked">
                 <el-radio-button value="">全部</el-radio-button>
                 <el-radio-button value="F">风电 F</el-radio-button>
                 <el-radio-button value="G">光伏 G</el-radio-button>
                 <el-radio-button value="S">水电 S</el-radio-button>
               </el-radio-group>
+              <button
+                class="quick-search-lock-btn"
+                :class="{ 'is-locked': quickSearchLocked }"
+                @click="toggleQuickSearchLock"
+              >
+                <span class="lock-icon">
+                  <svg v-if="quickSearchLocked" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg>
+                  <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg>
+                </span>
+                {{ quickSearchLocked ? '已锁定' : '锁定' }}
+              </button>
             </div>
           </div>
           <template v-if="quickSearchResults.length > 0">
@@ -68,27 +79,27 @@
               :data="quickSearchResults"
               stripe
               style="width: 100%"
-              class="styled-table"
-              max-height="360"
-              size="small"
+              class="styled-table quick-search-table"
+              max-height="480"
+              size="default"
               v-loading="quickSearchLoading"
               element-loading-text="搜索中..."
               :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
               @filter-change="onQuickSearchHeaderFilterChange"
               ref="quickSearchTableRef"
             >
-              <el-table-column label="类型域" align="center">
+              <el-table-column label="类型域" align="center" width="200">
                 <template #default="{ row }">
                   <el-tag size="small" effect="plain">{{ row.typeCode }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="二级类码" column-key="quickSecondClassCode" :filters="quickSearchSecondClassFilterOptions" filter-placement="bottom">
+              <el-table-column label="二级类码" column-key="quickSecondClassCode" :filters="quickSearchSecondClassFilterOptions" filter-placement="bottom" width="300">
                 <template #default="{ row }">
                   <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.secondClassCode }}</el-tag>
                   <span class="cell-name">{{ row.secondClassName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="数据类码">
+              <el-table-column label="数据类码" width="270">
                 <template #default="{ row }">
                   <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCategoryCode }}</el-tag>
                   <span class="cell-name">{{ row.dataCategoryName }}</span>
@@ -975,7 +986,12 @@ const quickSearchPageSize = ref(20);
 const quickSearchTypeFilter = ref('');
 const quickSearchSecondClassFilter = ref<string[]>([]);
 const quickSearchTypeOptions = ref<string[]>([]);
+const quickSearchLocked = ref(false);
 let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function toggleQuickSearchLock() {
+  quickSearchLocked.value = !quickSearchLocked.value;
+}
 
 const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
 
@@ -998,6 +1014,12 @@ const quickSearchSecondClassFilterCodes = computed(() => {
 /** 表头筛选变化 → 重新搜索（传给后端过滤） */
 function onQuickSearchHeaderFilterChange(filters: Record<string, any[]>) {
   if ('quickSecondClassCode' in filters) {
+    // 锁定状态下忽略二级类码筛选变更
+    if (quickSearchLocked.value) {
+      // 恢复为锁定的筛选值
+      quickSearchTableRef.value?.clearFilter('quickSecondClassCode');
+      return;
+    }
     quickSearchSecondClassFilter.value = filters.quickSecondClassCode || [];
     // 如果是用户主动点击筛选（非 clearFilter 触发的），重新搜索
     if (quickSearchSearched.value) {
@@ -1007,6 +1029,7 @@ function onQuickSearchHeaderFilterChange(filters: Record<string, any[]>) {
 }
 
 function onQuickSearchFilterChange() {
+  if (quickSearchLocked.value) return;
   // 类型切换后清除二级类码筛选并重新搜索
   quickSearchSecondClassFilter.value = [];
   quickSearchTableRef.value?.clearFilter('quickSecondClassCode');
@@ -1091,17 +1114,21 @@ function onQuickSearchInput() {
     quickSearchSearched.value = false;
     quickSearchTotal.value = 0;
     quickSearchPageNum.value = 1;
-    quickSearchTypeFilter.value = '';
-    quickSearchSecondClassFilter.value = [];
-    quickSearchSecondClassOptions.value = [];
-    quickSearchTypeOptions.value = [];
+    if (!quickSearchLocked.value) {
+      quickSearchTypeFilter.value = '';
+      quickSearchSecondClassFilter.value = [];
+      quickSearchSecondClassOptions.value = [];
+      quickSearchTypeOptions.value = [];
+    }
     return;
   }
   quickSearchTimer = setTimeout(async () => {
     quickSearchSearched.value = true;
-    quickSearchTypeFilter.value = '';
-    quickSearchSecondClassFilter.value = [];
-    quickSearchTableRef.value?.clearFilter();
+    if (!quickSearchLocked.value) {
+      quickSearchTypeFilter.value = '';
+      quickSearchSecondClassFilter.value = [];
+      quickSearchTableRef.value?.clearFilter();
+    }
     await doQuickSearch();
     if (quickSearchResults.value.length > 0) {
       saveRecentSearchTag(text);
@@ -1114,6 +1141,7 @@ function onQuickSearchClear() {
   quickSearchSearched.value = false;
   quickSearchTotal.value = 0;
   quickSearchPageNum.value = 1;
+  quickSearchLocked.value = false;
   quickSearchTypeFilter.value = '';
   quickSearchSecondClassFilter.value = [];
   quickSearchSecondClassOptions.value = [];
@@ -1982,14 +2010,27 @@ function cancelEditName() {
   background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%) !important;
 }
 
-/* 类型切换圆片 + 下拉框统一科技风 */
+/* ===== 科技风类型切换 ===== */
 :deep(.type-radio-group) {
   display: inline-flex;
   align-items: center;
-  background: rgba(20, 28, 52, 0.08);
-  border-radius: 6px;
-  height: 32px;
-  padding: 0;
+  background: linear-gradient(135deg, rgba(30, 58, 95, 0.06), rgba(59, 130, 246, 0.08));
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 8px;
+  height: 34px;
+  padding: 2px;
+  position: relative;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.06), inset 0 1px 1px rgba(255,255,255,0.6);
+}
+:deep(.type-radio-group::before) {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.2), transparent);
+  pointer-events: none;
 }
 :deep(.type-radio-group .el-radio-button) {
   padding: 0 !important;
@@ -1997,27 +2038,113 @@ function cancelEditName() {
 :deep(.type-radio-group .el-radio-button__inner) {
   background: transparent !important;
   border: none !important;
-  border-radius: 5px !important;
-  color: rgba(30, 50, 100, 0.55) !important;
+  border-radius: 6px !important;
+  color: rgba(30, 58, 95, 0.5) !important;
   font-size: 12px !important;
   font-weight: 500 !important;
-  padding: 0 12px !important;
-  height: 26px !important;
-  line-height: 26px !important;
-  transition: all 0.25s ease !important;
+  padding: 0 14px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   box-shadow: none !important;
-  letter-spacing: 0.3px !important;
-  margin: 3px;
+  letter-spacing: 0.5px !important;
+  margin: 1px;
+  position: relative;
+  cursor: pointer;
 }
 :deep(.type-radio-group .el-radio-button__inner:hover) {
-  color: #409eff !important;
-  background: rgba(64, 158, 255, 0.08) !important;
+  color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.06) !important;
 }
 :deep(.type-radio-group .el-radio-button.is-active .el-radio-button__inner) {
-  background: linear-gradient(135deg, #fff, #f0f5ff) !important;
-  color: #1a5ec7 !important;
-  font-weight: 700 !important;
-  box-shadow: 0 1px 4px rgba(64, 158, 255, 0.15) !important;
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+  letter-spacing: 0.8px !important;
+}
+/* 为每个类型按钮赋予不同的高亮色 */
+:deep(.type-radio-group .el-radio-button:first-child.is-active .el-radio-button__inner) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+:deep(.type-radio-group .el-radio-button:nth-child(2).is-active .el-radio-button__inner) {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+}
+:deep(.type-radio-group .el-radio-button:nth-child(3).is-active .el-radio-button__inner) {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+}
+:deep(.type-radio-group .el-radio-button:nth-child(4).is-active .el-radio-button__inner) {
+  background: linear-gradient(135deg, #06b6d4, #0891b2) !important;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3) !important;
+}
+/* 禁用状态 */
+:deep(.type-radio-group.is-disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+:deep(.type-radio-group.is-disabled .el-radio-button__inner) {
+  cursor: not-allowed !important;
+}
+
+/* ===== 科技风锁定按钮 ===== */
+.quick-search-lock-btn {
+  flex-shrink: 0;
+  min-width: 64px;
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 7px;
+  letter-spacing: 0.3px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  background: linear-gradient(135deg, #f0f5ff, #e8f0fe);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+.quick-search-lock-btn:hover {
+  background: linear-gradient(135deg, #e8f0fe, #dce8fa);
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
+  transform: translateY(-1px);
+}
+.quick-search-lock-btn:active {
+  transform: translateY(0);
+}
+/* 锁定状态 */
+.quick-search-lock-btn.is-locked {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #b45309;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.15);
+}
+.quick-search-lock-btn.is-locked:hover {
+  background: linear-gradient(135deg, #fde68a, #fcd34d);
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 3px 12px rgba(245, 158, 11, 0.2);
+  transform: translateY(-1px);
+}
+/* 锁图标 */
+.quick-search-lock-btn .lock-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: transform 0.3s ease;
+}
+.quick-search-lock-btn.is-locked .lock-icon {
+  transform: scale(1.1);
 }
 /* 统一与下拉框同高度 */
 :deep(.tech-select) {
@@ -2518,8 +2645,24 @@ function cancelEditName() {
   border-top: 1px solid #f5f5f5;
 }
 .cell-name {
-  color: #909399;
-  font-size: 12px;
+  color: #303133;
+  font-size: 14px;
+  margin-left: 6px;
+}
+
+/* 快速检索结果表格字体加大 */
+.quick-search-table :deep(.el-table__cell) {
+  padding: 8px 6px !important;
+}
+.quick-search-table :deep(.el-table__cell .cell) {
+  font-size: 14px;
+  color: #303133;
+}
+.quick-search-table :deep(.el-tag) {
+  font-size: 13px !important;
+  height: 26px !important;
+  line-height: 24px !important;
+  padding: 0 8px !important;
 }
 .code-count-tag {
   margin-right: 6px;
