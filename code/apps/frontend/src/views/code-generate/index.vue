@@ -484,17 +484,17 @@ interface ConditionField {
 }
 
 const conditionFields: ConditionField[] = [
-  { key: 'stationCode', label: '场站', required: true, disabled: () => false, type: 'select' },
-  { key: 'typeCode', label: '类型', required: true, disabled: () => false, type: 'select', quickOptions: ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'S1', 'Y0'] },
-  { key: 'projectLineCode', label: '项目期号&并网线路', required: true, disabled: () => false, type: 'input', quickOptions: ['111', '112', '121', '122'] },
+  { key: 'stationCode', label: '场站（1-4位）', required: true, disabled: () => false, type: 'select' },
+  { key: 'typeCode', label: '类型（5-6位）', required: true, disabled: () => false, type: 'select', quickOptions: ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'S1', 'Y0'] },
+  { key: 'projectLineCode', label: '项目期号&并网线路（7-9位）', required: true, disabled: () => false, type: 'input', quickOptions: ['111', '112', '121', '122'] },
   { key: 'prefixNo', label: '前缀号', required: true, disabled: () => false, type: 'select' },
-  { key: 'firstClassCode', label: '一级类码', required: true, disabled: () => false, type: 'select' },
-  { key: 'secondClassCode', label: '二级类码', required: true, disabled: (c) => !c.firstClassCode, type: 'select' },
-  { key: 'secondExtCode', label: '二级类扩展码', required: true, disabled: (c) => !c.secondClassCode, type: 'extend-number' },
-  { key: 'thirdClassCode', label: '三级类码', required: true, disabled: (c) => !c.secondClassCode, type: 'select' },
-  { key: 'thirdExtCode', label: '三级类扩展码', required: true, disabled: (c) => !c.thirdClassCode, type: 'extend-number' },
-  { key: 'dataTypeCode', label: '数据类码', required: true, disabled: (c) => !c.secondClassCode, type: 'select' },
-  { key: 'dataCode', label: '数据码', required: true, disabled: (c) => !c.dataTypeCode, type: 'select', multiple: true },
+  { key: 'firstClassCode', label: '一级类码（11-12位）', required: true, disabled: () => false, type: 'select' },
+  { key: 'secondClassCode', label: '二级类码（13-15位）', required: true, disabled: (c) => !c.firstClassCode, type: 'select' },
+  { key: 'secondExtCode', label: '二级类扩展码（16-19位）', required: true, disabled: (c) => !c.secondClassCode, type: 'extend-number' },
+  { key: 'thirdClassCode', label: '三级类码（20-22位）', required: true, disabled: (c) => !c.secondClassCode, type: 'select' },
+  { key: 'thirdExtCode', label: '三级类扩展码（23-26位）', required: true, disabled: (c) => !c.thirdClassCode, type: 'extend-number' },
+  { key: 'dataTypeCode', label: '数据类码（27-28位）', required: true, disabled: (c) => !c.secondClassCode, type: 'select' },
+  { key: 'dataCode', label: '数据码（29-31位）', required: true, disabled: (c) => !c.dataTypeCode, type: 'select', multiple: true },
 ];
 
 const conditions = reactive<Record<string, any>>({});
@@ -1919,9 +1919,11 @@ function cancelEditName() {
 
 .section-body .el-row {
   margin: 0 !important;
+  display: flex;
+  flex-wrap: wrap;
 }
-
 .section-body .el-row .el-col {
+  display: flex;
   padding: 4px !important;
 }
 
@@ -2329,6 +2331,8 @@ function cancelEditName() {
 /* ==================== 筛选条件卡片单元 ==================== */
 .filter-item {
   transition: all 0.25s ease;
+  display: flex;
+  width: 100%;
 }
 
 .filter-item > :deep(.el-form-item) {
@@ -2338,7 +2342,13 @@ function cancelEditName() {
   padding: 14px 14px 8px;
   margin-bottom: 0;
   transition: all 0.25s ease;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.filter-item > :deep(.el-form-item) .el-form-item__content {
+  flex: 1;
+  align-items: flex-start;
 }
 
 .filter-item > :deep(.el-form-item:hover) {
