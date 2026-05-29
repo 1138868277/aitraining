@@ -1,9 +1,26 @@
 import { query, getSchema } from '../../db/index.js';
 
+/** 数据库迁移：为场站字典表增加 station_type 字段 */
+export async function migrateStationType(): Promise<void> {
+  const schema = getSchema();
+  const sql = `ALTER TABLE ${schema}.cec_new_energy_station_dict
+    ADD COLUMN IF NOT EXISTS station_type VARCHAR(2)`;
+  await query(sql);
+}
+
+/** 查询所有场站信息（含类型） */
+export async function getStationDictWithType(): Promise<Array<{ code: string; name: string; stationType: string | null }>> {
+  const sql = `SELECT station_code AS code, station_name AS name, station_type AS "stationType"
+    FROM ${getSchema()}.cec_new_energy_station_dict
+    WHERE if_delete = '0'`;
+  return query(sql);
+}
+
 export interface StationRow {
   station_id: number;
   station_code: string;
   station_name: string;
+  station_type: string | null;
   management_domain: string | null;
   creator: string;
   modifier: string;
@@ -42,7 +59,7 @@ export async function listStation(
 
   const offset = (pageNum - 1) * pageSize;
   const items = await query<StationRow>(
-    `SELECT station_id, station_code, station_name, management_domain,
+    `SELECT station_id, station_code, station_name, station_type, management_domain,
             creator, modifier, create_tm, modify_tm
      FROM ${getSchema()}.cec_new_energy_station_dict
      WHERE ${where}
@@ -57,7 +74,7 @@ export async function listStation(
 /** 查询所有场站（用于导出） */
 export async function listAllStation(): Promise<StationRow[]> {
   return query<StationRow>(
-    `SELECT station_id, station_code, station_name, management_domain,
+    `SELECT station_id, station_code, station_name, station_type, management_domain,
             creator, modifier, create_tm, modify_tm
      FROM ${getSchema()}.cec_new_energy_station_dict
      WHERE if_delete = '0'
@@ -68,7 +85,7 @@ export async function listAllStation(): Promise<StationRow[]> {
 /** 根据编码查询场站 */
 export async function findByCode(code: string): Promise<StationRow | null> {
   const rows = await query<StationRow>(
-    `SELECT station_id, station_code, station_name, management_domain,
+    `SELECT station_id, station_code, station_name, station_type, management_domain,
             creator, modifier, create_tm, modify_tm
      FROM ${getSchema()}.cec_new_energy_station_dict
      WHERE if_delete = '0' AND station_code = $1`,
@@ -80,7 +97,7 @@ export async function findByCode(code: string): Promise<StationRow | null> {
 /** 根据ID查询场站 */
 export async function findById(id: number): Promise<StationRow | null> {
   const rows = await query<StationRow>(
-    `SELECT station_id, station_code, station_name, management_domain,
+    `SELECT station_id, station_code, station_name, station_type, management_domain,
             creator, modifier, create_tm, modify_tm
      FROM ${getSchema()}.cec_new_energy_station_dict
      WHERE if_delete = '0' AND station_id = $1`,
@@ -93,16 +110,17 @@ export async function findById(id: number): Promise<StationRow | null> {
 export async function createStation(input: {
   stationCode: string;
   stationName: string;
+  stationType?: string;
   managementDomain?: string;
   creator: string;
 }): Promise<StationRow> {
   const rows = await query<StationRow>(
     `INSERT INTO ${getSchema()}.cec_new_energy_station_dict
-     (station_code, station_name, management_domain, creator, modifier, create_tm, modify_tm)
-     VALUES ($1, $2, $3, $4, $4, NOW(), NOW())
-     RETURNING station_id, station_code, station_name, management_domain,
+     (station_code, station_name, station_type, management_domain, creator, modifier, create_tm, modify_tm)
+     VALUES ($1, $2, $3, $4, $5, $5, NOW(), NOW())
+     RETURNING station_id, station_code, station_name, station_type, management_domain,
                creator, modifier, create_tm, modify_tm`,
-    [input.stationCode, input.stationName, input.managementDomain || null, input.creator],
+    [input.stationCode, input.stationName, input.stationType || null, input.managementDomain || null, input.creator],
   );
   return rows[0];
 }
@@ -112,6 +130,7 @@ export async function batchCreateStation(
   entries: Array<{
     stationCode: string;
     stationName: string;
+    stationType?: string;
     managementDomain?: string;
   }>,
   creator: string,
@@ -124,18 +143,19 @@ export async function batchCreateStation(
 
   for (const entry of entries) {
     valuePlaceholders.push(
-      `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 3}, NOW(), NOW())`,
+      `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 4}, NOW(), NOW())`,
     );
-    params.push(entry.stationCode, entry.stationName, entry.managementDomain || null, creator);
-    idx += 4;
+    params.push(entry.stationCode, entry.stationName, entry.stationType || null, entry.managementDomain || null, creator);
+    idx += 5;
   }
 
   await query(
     `INSERT INTO ${getSchema()}.cec_new_energy_station_dict
-     (station_code, station_name, management_domain, creator, modifier, create_tm, modify_tm)
+     (station_code, station_name, station_type, management_domain, creator, modifier, create_tm, modify_tm)
      VALUES ${valuePlaceholders.join(', ')}
      ON CONFLICT (station_code) DO UPDATE SET
        station_name = EXCLUDED.station_name,
+       station_type = EXCLUDED.station_type,
        management_domain = EXCLUDED.management_domain,
        if_delete = '0',
        modifier = EXCLUDED.modifier,
@@ -149,7 +169,7 @@ export async function batchCreateStation(
 /** 更新场站 */
 export async function updateStation(
   id: number,
-  input: { stationName?: string; managementDomain?: string; modifier: string },
+  input: { stationName?: string; stationType?: string; managementDomain?: string; modifier: string },
 ): Promise<StationRow | null> {
   const sets: string[] = [];
   const params: (string | null)[] = [];
@@ -158,6 +178,10 @@ export async function updateStation(
   if (input.stationName !== undefined) {
     sets.push(`station_name = $${idx++}`);
     params.push(input.stationName);
+  }
+  if (input.stationType !== undefined) {
+    sets.push(`station_type = $${idx++}`);
+    params.push(input.stationType || null);
   }
   if (input.managementDomain !== undefined) {
     sets.push(`management_domain = $${idx++}`);
@@ -176,7 +200,7 @@ export async function updateStation(
     `UPDATE ${getSchema()}.cec_new_energy_station_dict
      SET ${sets.join(', ')}
      WHERE station_id = $${idx} AND if_delete = '0'
-     RETURNING station_id, station_code, station_name, management_domain,
+     RETURNING station_id, station_code, station_name, station_type, management_domain,
                creator, modifier, create_tm, modify_tm`,
     params,
   );

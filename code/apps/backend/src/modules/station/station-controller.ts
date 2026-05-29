@@ -2,6 +2,12 @@ import { Router, Request, Response } from 'express';
 import * as stationService from './station-service.js';
 import { success, error, paginated } from '../../common/response.js';
 import { ErrorCode } from '@cec/contracts';
+import { migrateStationType } from './station-domain.js';
+
+// 启动时执行数据库迁移
+migrateStationType().catch(err => {
+  console.warn('⚠️ 场站类型字段迁移失败（可能已存在）:', err.message);
+});
 
 const router: Router = Router();
 
@@ -22,7 +28,7 @@ router.get('/api/station/list', async (req: Request, res: Response) => {
 /** 新增场站 */
 router.post('/api/station', async (req: Request, res: Response) => {
   try {
-    const { stationCode, stationName, managementDomain } = req.body;
+    const { stationCode, stationName, stationType, managementDomain } = req.body;
     if (!stationCode || !stationName) {
       error(res, ErrorCode.MISSING_PARAMETER, '场站编码和名称不能为空', 400);
       return;
@@ -32,7 +38,7 @@ router.post('/api/station', async (req: Request, res: Response) => {
       return;
     }
     const creator = req.headers['x-session-id'] as string || 'system';
-    const result = await stationService.createStation({ stationCode, stationName, managementDomain, creator });
+    const result = await stationService.createStation({ stationCode, stationName, stationType, managementDomain, creator });
     success(res, result, 201);
   } catch (err: any) {
     if (err.code === ErrorCode.DUPLICATE_SUBMISSION) {
@@ -83,9 +89,9 @@ router.put('/api/station/:id', async (req: Request, res: Response) => {
       error(res, ErrorCode.PARAM_FORMAT_ERROR, '场站ID格式不正确', 400);
       return;
     }
-    const { stationName, managementDomain } = req.body;
+    const { stationName, stationType, managementDomain } = req.body;
     const modifier = req.headers['x-session-id'] as string || 'system';
-    const result = await stationService.updateStation(id, { stationName, managementDomain, modifier });
+    const result = await stationService.updateStation(id, { stationName, stationType, managementDomain, modifier });
     success(res, result);
   } catch (err: any) {
     if (err.code === ErrorCode.RESOURCE_NOT_FOUND) {

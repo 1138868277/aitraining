@@ -14,6 +14,7 @@ import stationRouter from './modules/station/station-controller.js';
 import datasourceRouter from './modules/datasource/datasource-controller.js';
 import approvalRouter from './modules/approval/approval-controller.js';
 import tsrRouter from './modules/tsr/tsr-controller.js';
+import autoCodeRouter from './modules/auto-code/auto-code-controller.js';
 
 export function createApp(): import('express').Express {
   const app = express();
@@ -87,6 +88,7 @@ export function createApp(): import('express').Express {
   app.use(datasourceRouter);
   app.use(approvalRouter);
   app.use(tsrRouter);
+  app.use(autoCodeRouter);
 
   // 全局错误处理
   app.use(globalErrorHandler);

@@ -146,13 +146,15 @@
     <!-- 手动新增编码字典对话框 -->
     <AddCodeDialog v-model="showAddDialog" @success="onAddCodeSuccess" />
 
-    <!-- 编码生成条件面板 -->
+    <!-- 编码生成面板（含手动/自动Tab） -->
     <div class="section-card">
       <div class="section-header">
         <span class="card-title">编码生成</span>
       </div>
-      <div class="section-body">
-      <el-form :model="conditions" label-width="140px" label-position="top">
+      <div class="section-body" style="padding-top:0">
+      <el-tabs v-model="genMode" class="code-gen-tabs">
+        <el-tab-pane label="手动编码" name="manual">
+        <el-form :model="conditions" label-position="top">
         <el-row :gutter="20">
           <el-col :span="6" v-for="field in conditionFields" :key="field.key" class="filter-item" :class="'fi-' + field.key">
             <el-form-item :label="field.label" :required="field.required">
@@ -295,10 +297,15 @@
           预计生成 {{ expectedCodeCount }} 个编码
         </span>
       </div>
-      </div>
+      </el-tab-pane>
+      <el-tab-pane label="自动编码" name="auto">
+        <AutoCodePanel @success="onAutoCodeSuccess" />
+      </el-tab-pane>
+    </el-tabs>
     </div>
+  </div>
 
-    <!-- 编码结果展示区 -->
+  <!-- 编码结果展示区 -->
     <div class="section-card">
       <div class="section-header">
         <span class="card-title">编码结果</span>
@@ -483,6 +490,7 @@ import * as codeService from '@/services/code-generation';
 import * as statsService from '@/services/statistics';
 import { generateCodeRequestSchema } from '@cec/contracts';
 import AddCodeDialog from '@/components/add-code-dialog.vue';
+import AutoCodePanel from './auto-code-panel.vue';
 
 const authUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
 const currentTenant = authUser?.tenant || authUser?.username || '';
@@ -1100,6 +1108,15 @@ function onAddCodeSuccess() {
     onQuickSearchInput();
   }
 }
+
+/** 自动编码成功回调 */
+function onAutoCodeSuccess(codes: Array<{ code: string; name: string; generateTime: string }>) {
+  generatedCodes.value = codes;
+  activeTab.value = 'preview';
+  ElMessage.success(`成功生成 ${codes.length} 条编码`);
+}
+
+const genMode = ref('manual');
 
 /** 快速检索持久化 */
 const QUICK_SEARCH_STATE_KEY = 'quick_search_state';

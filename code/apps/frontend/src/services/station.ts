@@ -4,6 +4,7 @@ export interface StationItem {
   station_id: number;
   station_code: string;
   station_name: string;
+  station_type: string | null;
   management_domain: string | null;
   creator: string;
   modifier: string;
@@ -31,6 +32,7 @@ export async function listStation(pageNum: number = 1, pageSize: number = 20, ke
 export async function createStation(data: {
   stationCode: string;
   stationName: string;
+  stationType?: string;
   managementDomain?: string;
 }): Promise<StationItem> {
   const res = await api.post('/station', data);
@@ -41,6 +43,7 @@ export async function createStation(data: {
 export async function batchCreateStation(entries: Array<{
   stationCode: string;
   stationName: string;
+  stationType?: string;
   managementDomain?: string;
 }>): Promise<{ insertedCount: number }> {
   const res = await api.post('/station/batch', { entries });
@@ -50,6 +53,7 @@ export async function batchCreateStation(entries: Array<{
 /** 更新场站 */
 export async function updateStation(id: number, data: {
   stationName?: string;
+  stationType?: string;
   managementDomain?: string;
 }): Promise<StationItem> {
   const res = await api.put(`/station/${id}`, data);

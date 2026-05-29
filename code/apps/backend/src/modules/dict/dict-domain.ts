@@ -6,11 +6,19 @@ export interface DictItem {
   parentCode?: string;
 }
 
-/** 获取场站字典列表 */
+/** 获取场站字典列表（含类型） */
 export async function getStationDict(): Promise<DictItem[]> {
-  const sql = `SELECT station_code AS code, station_name AS name
+  const sql = `SELECT station_code AS code, station_name AS name, station_type AS "parentCode"
     FROM ${getSchema()}.cec_new_energy_station_dict
     WHERE if_delete = '0' ORDER BY station_code`;
+  return query(sql);
+}
+
+/** 获取场站名称到编码的映射（含类型） */
+export async function getStationDictWithType(): Promise<Array<{ code: string; name: string; stationType: string | null }>> {
+  const sql = `SELECT station_code AS code, station_name AS name, station_type
+    FROM ${getSchema()}.cec_new_energy_station_dict
+    WHERE if_delete = '0'`;
   return query(sql);
 }
 

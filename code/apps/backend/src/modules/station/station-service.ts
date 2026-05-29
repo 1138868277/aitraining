@@ -9,6 +9,7 @@ export async function listStation(pageNum: number, pageSize: number, keyword?: s
 export async function createStation(input: {
   stationCode: string;
   stationName: string;
+  stationType?: string;
   managementDomain?: string;
   creator: string;
 }) {
@@ -17,6 +18,10 @@ export async function createStation(input: {
     throw new AppError(ErrorCode.DUPLICATE_SUBMISSION, `场站编码 ${input.stationCode} 已存在`);
   }
   return stationDomain.createStation(input);
+}
+
+export async function getStationDictWithType() {
+  return stationDomain.getStationDictWithType();
 }
 
 export async function batchCreateStation(
@@ -30,7 +35,7 @@ export async function batchCreateStation(
   return stationDomain.batchCreateStation(entries, creator);
 }
 
-export async function updateStation(id: number, input: { stationName?: string; managementDomain?: string; modifier: string }) {
+export async function updateStation(id: number, input: { stationName?: string; stationType?: string; managementDomain?: string; modifier: string }) {
   const station = await stationDomain.findById(id);
   if (!station) {
     throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, '场站不存在');

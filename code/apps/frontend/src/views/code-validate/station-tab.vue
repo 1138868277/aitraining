@@ -100,6 +100,13 @@
             <span class="station-name-cell">{{ row.station_name }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="场站类型" width="140" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.station_type ? 'primary' : 'info'" effect="plain">
+              {{ row.station_type || '未设置' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="management_domain" label="所属区域">
           <template #default="{ row }">
             <span v-if="row.management_domain" class="region-tag">{{ row.management_domain }}</span>
@@ -188,6 +195,19 @@
           prop="stationName"
         >
           <el-input v-model="form.stationName" placeholder="请输入场站名称" maxlength="100" />
+        </el-form-item>
+        <el-form-item label="场站类型" prop="stationType">
+          <el-select v-model="form.stationType" placeholder="请选择场站类型" filterable style="width:100%">
+            <el-option label="— 未设置 —" value="" />
+            <el-option label="F1 风电" value="F1" />
+            <el-option label="F2 风电" value="F2" />
+            <el-option label="F3 风电" value="F3" />
+            <el-option label="F4 风电" value="F4" />
+            <el-option label="G1 光伏" value="G1" />
+            <el-option label="G2 光伏" value="G2" />
+            <el-option label="S1 水电" value="S1" />
+            <el-option label="Y0 储能" value="Y0" />
+          </el-select>
         </el-form-item>
         <el-form-item label="所属区域" prop="managementDomain">
           <el-input v-model="form.managementDomain" placeholder="请输入所属区域（可选）" maxlength="50" />
@@ -287,12 +307,14 @@ const formRef = ref<any>(null);
 const form = reactive({
   stationCode: '',
   stationName: '',
+  stationType: '',
   managementDomain: '',
 });
 
 function resetForm() {
   form.stationCode = '';
   form.stationName = '';
+  form.stationType = '';
   form.managementDomain = '';
   isEditing.value = false;
   editingId.value = null;
@@ -303,6 +325,7 @@ function handleEdit(row: StationItem) {
   editingId.value = row.station_id;
   form.stationCode = row.station_code;
   form.stationName = row.station_name;
+  form.stationType = row.station_type || '';
   form.managementDomain = row.management_domain || '';
   addDialogVisible.value = true;
 }
@@ -320,6 +343,7 @@ async function confirmSubmit() {
     if (isEditing.value && editingId.value) {
       await stationService.updateStation(editingId.value, {
         stationName: form.stationName,
+        stationType: form.stationType || undefined,
         managementDomain: form.managementDomain || undefined,
       });
       ElMessage.success('更新成功');
@@ -327,6 +351,7 @@ async function confirmSubmit() {
       await stationService.createStation({
         stationCode: form.stationCode,
         stationName: form.stationName,
+        stationType: form.stationType || undefined,
         managementDomain: form.managementDomain || undefined,
       });
       ElMessage.success('新增成功');
@@ -438,6 +463,7 @@ async function handleExport() {
       '序号': index + 1,
       '场站编码': item.station_code,
       '场站名称': item.station_name,
+      '场站类型': item.station_type || '',
       '所属区域': item.management_domain || '',
       '创建时间': formatTime(item.create_tm),
     }));
