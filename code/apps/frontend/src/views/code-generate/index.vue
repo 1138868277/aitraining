@@ -63,6 +63,7 @@
               </el-radio-group>
               <button
                 class="quick-search-lock-btn"
+                type="button"
                 :class="{ 'is-locked': quickSearchLocked }"
                 @click="toggleQuickSearchLock"
               >
@@ -90,7 +91,7 @@
             >
               <el-table-column label="类型域" align="center" width="200">
                 <template #default="{ row }">
-                  <el-tag size="small" effect="plain">{{ row.typeCode }}</el-tag>
+                  <el-tag size="small" :style="{ background: typeTagColor(row.typeCode), color: '#fff', border: 'none', fontWeight: 600 }">{{ typeLabel(row.typeCode) }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="二级类码" column-key="quickSecondClassCode" :filters="quickSearchSecondClassFilterOptions" filter-placement="bottom" width="300">
@@ -153,7 +154,7 @@
       <div class="section-body">
       <el-form :model="conditions" label-width="140px" label-position="top">
         <el-row :gutter="20">
-          <el-col :span="6" v-for="field in conditionFields" :key="field.key" class="filter-item">
+          <el-col :span="6" v-for="field in conditionFields" :key="field.key" class="filter-item" :class="'fi-' + field.key">
             <el-form-item :label="field.label" :required="field.required">
               <!-- 下拉选择框（带快捷选择） -->
               <div v-if="field.type === 'select'" class="input-with-quick-options">
@@ -177,16 +178,19 @@
                     :value="item.code"
                   />
                 </el-select>
-                <el-button
+                <button
                   v-if="LOCKABLE_FIELDS.includes(field.key)"
-                  size="small"
-                  :type="lockedFields[field.key] ? 'warning' : 'default'"
-                  :plain="!lockedFields[field.key]"
                   class="lock-btn"
+                  type="button"
+                  :class="{ 'is-locked': lockedFields[field.key] }"
                   @click="toggleLock(field.key)"
                 >
+                  <span class="lock-icon">
+                    <svg v-if="lockedFields[field.key]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg>
+                    <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg>
+                  </span>
                   {{ lockedFields[field.key] ? '已锁定' : '锁定' }}
-                </el-button>
+                </button>
                 </div>
                 <div v-if="field.quickOptions && field.quickOptions.length > 0" class="quick-options">
                   <el-tag
@@ -213,16 +217,19 @@
                     @change="onConditionChange(field.key)"
                     style="width: 100%"
                   />
-                  <el-button
+                  <button
                     v-if="LOCKABLE_FIELDS.includes(field.key)"
-                    size="small"
-                    :type="lockedFields[field.key] ? 'warning' : 'default'"
-                    :plain="!lockedFields[field.key]"
                     class="lock-btn"
+                    type="button"
+                    :class="{ 'is-locked': lockedFields[field.key] }"
                     @click="toggleLock(field.key)"
                   >
+                    <span class="lock-icon">
+                      <svg v-if="lockedFields[field.key]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg>
+                      <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg>
+                    </span>
                     {{ lockedFields[field.key] ? '已锁定' : '锁定' }}
-                  </el-button>
+                  </button>
                 </div>
                 <div v-if="field.quickOptions && field.quickOptions.length > 0" class="quick-options">
                   <el-tag
@@ -273,10 +280,17 @@
       </el-form>
 
       <div class="condition-actions">
-        <el-button type="primary" :disabled="!canGenerate" @click="handleGenerate">
-          生成编码
-        </el-button>
-        <el-button @click="handleClear">清空条件</el-button>
+        <button class="btn-generate" type="button" :disabled="!canGenerate" @click="handleGenerate">
+          <span class="btn-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </span>
+          <span class="btn-text">生成编码</span>
+          <span class="btn-glow"></span>
+        </button>
+        <button class="btn-clear" type="button" @click="handleClear">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          清空条件
+        </button>
         <span v-if="canGenerate && expectedCodeCount > 1" class="expected-count">
           预计生成 {{ expectedCodeCount }} 个编码
         </span>
@@ -801,6 +815,15 @@ function typeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' |
   return 'warning';
 }
 
+function typeTagColor(code: string): string {
+  if (!code) return '#64748b';
+  const first = code.charAt(0).toUpperCase();
+  if (first === 'F') return '#10b981';
+  if (first === 'G') return '#f59e0b';
+  if (first === 'S') return '#06b6d4';
+  return '#64748b';
+}
+
 function typeLabel(code: string): string {
   if (!code) return '其他';
   const first = code.charAt(0).toUpperCase();
@@ -991,6 +1014,7 @@ let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 function toggleQuickSearchLock() {
   quickSearchLocked.value = !quickSearchLocked.value;
+  saveQuickSearchState();
 }
 
 const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
@@ -1024,6 +1048,7 @@ function onQuickSearchHeaderFilterChange(filters: Record<string, any[]>) {
     // 如果是用户主动点击筛选（非 clearFilter 触发的），重新搜索
     if (quickSearchSearched.value) {
       doQuickSearch();
+      saveQuickSearchState();
     }
   }
 }
@@ -1034,6 +1059,7 @@ function onQuickSearchFilterChange() {
   quickSearchSecondClassFilter.value = [];
   quickSearchTableRef.value?.clearFilter('quickSecondClassCode');
   doQuickSearch();
+  saveQuickSearchState();
 }
 
 /** 执行带当前编码生成的服务端搜索 */
@@ -1073,6 +1099,43 @@ function onAddCodeSuccess() {
   if (quickSearchText.value.trim()) {
     onQuickSearchInput();
   }
+}
+
+/** 快速检索持久化 */
+const QUICK_SEARCH_STATE_KEY = 'quick_search_state';
+
+interface QuickSearchState {
+  text: string;
+  typeFilter: string;
+  locked: boolean;
+  pageNum: number;
+  pageSize: number;
+  secondClassFilter: string[];
+}
+
+function saveQuickSearchState() {
+  const state: QuickSearchState = {
+    text: quickSearchText.value,
+    typeFilter: quickSearchTypeFilter.value,
+    locked: quickSearchLocked.value,
+    pageNum: quickSearchPageNum.value,
+    pageSize: quickSearchPageSize.value,
+    secondClassFilter: quickSearchSecondClassFilter.value,
+  };
+  localStorage.setItem(QUICK_SEARCH_STATE_KEY, JSON.stringify(state));
+}
+
+function loadQuickSearchState(): QuickSearchState | null {
+  try {
+    const saved = localStorage.getItem(QUICK_SEARCH_STATE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearQuickSearchState() {
+  localStorage.removeItem(QUICK_SEARCH_STATE_KEY);
 }
 
 /** 最近搜索标签 */
@@ -1130,6 +1193,7 @@ function onQuickSearchInput() {
       quickSearchTableRef.value?.clearFilter();
     }
     await doQuickSearch();
+    saveQuickSearchState();
     if (quickSearchResults.value.length > 0) {
       saveRecentSearchTag(text);
     }
@@ -1146,6 +1210,7 @@ function onQuickSearchClear() {
   quickSearchSecondClassFilter.value = [];
   quickSearchSecondClassOptions.value = [];
   quickSearchTypeOptions.value = [];
+  clearQuickSearchState();
 }
 
 /** 复制单行名称（二级类 + 数据类 + 数据码名称，tab 分隔便于贴到Excel） */
@@ -1316,6 +1381,21 @@ onMounted(async () => {
     loadCodeList();
     // 加载编码总数
     loadCodeTotalCount();
+
+    // 恢复快速检索持久化状态
+    const savedState = loadQuickSearchState();
+    if (savedState && savedState.text) {
+      quickSearchText.value = savedState.text;
+      quickSearchTypeFilter.value = savedState.typeFilter || '';
+      quickSearchLocked.value = savedState.locked || false;
+      quickSearchPageNum.value = savedState.pageNum || 1;
+      quickSearchPageSize.value = savedState.pageSize || 20;
+      if (savedState.secondClassFilter && savedState.secondClassFilter.length > 0) {
+        quickSearchSecondClassFilter.value = savedState.secondClassFilter;
+      }
+      quickSearchSearched.value = true;
+      await doQuickSearch(false);
+    }
   } catch (err: any) {
     ElMessage.error('编码生成加载失败，请刷新重试');
   }
@@ -2222,21 +2302,101 @@ function cancelEditName() {
   background: linear-gradient(90deg, #409eff, #79bbff);
   border-radius: 0 2px 2px 0;
 }
-.condition-actions .el-button--primary {
+/* ===== 科技风操作按钮 ===== */
+.btn-generate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 28px;
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.5px;
+  border: none;
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.25);
-  transition: all 0.25s ease;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 30%, #60a5fa 50%, #2563eb 70%, #3b82f6 100%);
+  background-size: 300% 100%;
+  background-position: 0% 50%;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+  animation: btnShimmer 2.5s ease-in-out infinite;
+}
+@keyframes btnShimmer {
+  0%   { background-position: 0% 50%; box-shadow: 0 3px 12px rgba(59,130,246,0.3); }
+  50%  { background-position: 100% 50%; box-shadow: 0 3px 20px rgba(59,130,246,0.5), 0 0 30px rgba(59,130,246,0.15); }
+  100% { background-position: 0% 50%; box-shadow: 0 3px 12px rgba(59,130,246,0.3); }
+}
+.btn-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+  animation: none;
+}
+.btn-generate:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+.btn-generate:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  animation: none;
+}
+.btn-generate .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.3s ease;
+}
+.btn-generate:hover:not(:disabled) .btn-icon {
+  transform: scale(1.1);
+}
+.btn-generate .btn-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.btn-generate:hover:not(:disabled) .btn-glow {
+  opacity: 1;
 }
 
-.condition-actions .el-button--primary:hover {
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.35);
+.btn-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  color: #64748b;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.btn-clear:hover {
+  border-color: rgba(100, 116, 139, 0.35);
+  background: linear-gradient(135deg, #f1f5f9, #e9edf2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   transform: translateY(-1px);
+  color: #475569;
 }
-
-.condition-actions .el-button--primary:active {
+.btn-clear:active {
   transform: translateY(0);
 }
 
@@ -2328,52 +2488,111 @@ function cancelEditName() {
   border-radius: 6px;
 }
 
-/* ==================== 筛选条件卡片单元 ==================== */
+/* ==================== 科技风筛选条件卡片单元 ==================== */
+/* 每个字段独立配色 --item-accent 和 --item-glow */
 .filter-item {
   transition: all 0.25s ease;
   display: flex;
   width: 100%;
+  --item-accent: #3b82f6;
+  --item-border: rgba(59,130,246,0.15);
+  --item-glow: rgba(59,130,246,0.12);
 }
+.fi-stationCode   { --item-accent: #3b82f6; --item-border: rgba(59,130,246,0.18); --item-glow: rgba(59,130,246,0.12); }
+.fi-typeCode      { --item-accent: #6366f1; --item-border: rgba(99,102,241,0.18); --item-glow: rgba(99,102,241,0.12); }
+.fi-projectLineCode { --item-accent: #06b6d4; --item-border: rgba(6,182,212,0.18); --item-glow: rgba(6,182,212,0.12); }
+.fi-prefixNo      { --item-accent: #14b8a6; --item-border: rgba(20,184,166,0.18); --item-glow: rgba(20,184,166,0.12); }
+.fi-firstClassCode { --item-accent: #8b5cf6; --item-border: rgba(139,92,246,0.18); --item-glow: rgba(139,92,246,0.12); }
+.fi-secondClassCode { --item-accent: #f59e0b; --item-border: rgba(245,158,11,0.18); --item-glow: rgba(245,158,11,0.12); }
+.fi-secondExtCode { --item-accent: #f97316; --item-border: rgba(249,115,22,0.18); --item-glow: rgba(249,115,22,0.12); }
+.fi-thirdClassCode { --item-accent: #ec4899; --item-border: rgba(236,72,153,0.18); --item-glow: rgba(236,72,153,0.12); }
+.fi-thirdExtCode  { --item-accent: #a855f7; --item-border: rgba(168,85,247,0.18); --item-glow: rgba(168,85,247,0.12); }
+.fi-dataTypeCode  { --item-accent: #10b981; --item-border: rgba(16,185,129,0.18); --item-glow: rgba(16,185,129,0.12); }
+.fi-dataCode      { --item-accent: #f43f5e; --item-border: rgba(244,63,94,0.18); --item-glow: rgba(244,63,94,0.12); }
 
 .filter-item > :deep(.el-form-item) {
-  background: #f8fafc;
-  border: 1px solid #eef1f4;
+  background: linear-gradient(135deg, #fafcff 0%, #f2f7fe 100%);
+  border: 1px solid var(--item-border);
   border-radius: 10px;
   padding: 14px 14px 8px;
   margin-bottom: 0;
-  transition: all 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
   display: flex;
   flex-direction: column;
   flex: 1;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
-.filter-item > :deep(.el-form-item) .el-form-item__content {
-  flex: 1;
-  align-items: flex-start;
+/* 左侧彩色强调条 */
+.filter-item > :deep(.el-form-item)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--item-accent);
+  opacity: 0.6;
+  transition: opacity 0.3s ease, top 0.3s ease, bottom 0.3s ease;
+}
+/* 顶部微光 */
+.filter-item > :deep(.el-form-item)::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--item-accent), transparent);
+  opacity: 0.2;
+  pointer-events: none;
 }
 
 .filter-item > :deep(.el-form-item:hover) {
-  border-color: #d0d9e8;
-  background: #fafcff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-color: var(--item-border);
+  background: linear-gradient(135deg, #ffffff 0%, #f5faff 100%);
+  box-shadow: 0 4px 16px var(--item-glow);
+  transform: translateY(-1px);
+}
+.filter-item > :deep(.el-form-item:hover)::before {
+  opacity: 1;
+  top: 4px;
+  bottom: 4px;
 }
 
 .filter-item > :deep(.el-form-item.is-error) {
   border-color: #f56c6c;
   background: #fef0f0;
 }
+.filter-item > :deep(.el-form-item.is-error)::before {
+  background: #f56c6c;
+}
 
 .filter-item > :deep(.el-form-item__label) {
-  padding: 0 0 6px;
+  padding: 0 0 6px 6px;
   line-height: 1.4;
   font-size: 12px;
-  color: #606266;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  color: var(--item-accent);
+  font-weight: 700;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
+  transition: color 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+.filter-item > :deep(.el-form-item__label)::before {
+  content: '◆ ';
+  font-size: 8px;
+  opacity: 0.5;
+  vertical-align: middle;
 }
 
 .filter-item > :deep(.el-form-item__content) {
   margin-left: 0 !important;
+  position: relative;
+  z-index: 1;
 }
 
 .filter-item > :deep(.el-form-item__error) {
@@ -2381,35 +2600,64 @@ function cancelEditName() {
   padding-top: 2px;
 }
 
-/* 场站字段占两列 */
-.filter-item.station-field > :deep(.el-form-item) {
-  background: linear-gradient(135deg, #f0f7ff 0%, #f8faff 100%);
-  border-color: #dce8f5;
-}
-
-/* 有锁定的字段视觉提示 */
+/* 已锁定的字段视觉增强 */
 .filter-item > :deep(.el-form-item) .select-with-lock.is-locked + .quick-options .quick-option-tag {
   opacity: 0.4;
 }
 
 .lock-btn {
   flex-shrink: 0;
-  min-width: 62px;
+  min-width: 58px;
+  height: 28px;
+  padding: 0 12px;
   font-size: 12px;
-  padding: 7px 12px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  font-weight: 500;
+  border-radius: 7px;
+  letter-spacing: 0.3px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  background: linear-gradient(135deg, #f0f5ff, #e8f0fe);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
 }
-
-.lock-btn.el-button--warning {
-  background: #fef3e8;
-  border-color: #f9d9b3;
-  color: #d8822a;
+.lock-btn:hover {
+  background: linear-gradient(135deg, #e8f0fe, #dce8fa);
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
+  transform: translateY(-1px);
 }
-
-.lock-btn.el-button--warning:hover {
-  background: #fde8d0;
-  border-color: #f5c58c;
+.lock-btn:active {
+  transform: translateY(0);
+}
+.lock-btn.is-locked {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #b45309;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.15);
+}
+.lock-btn.is-locked:hover {
+  background: linear-gradient(135deg, #fde68a, #fcd34d);
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 3px 12px rgba(245, 158, 11, 0.2);
+  transform: translateY(-1px);
+}
+.lock-btn .lock-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+.lock-btn.is-locked .lock-icon {
+  transform: scale(1.1);
 }
 
 .select-with-lock.is-locked .el-select :deep(.el-input__wrapper) {
