@@ -72,6 +72,24 @@ export async function downloadOverallExcel(type: string): Promise<Blob> {
   return res.data;
 }
 
+/** 分批下载拆分后的 ZIP 文件 */
+export async function downloadSplitZip(type: string): Promise<Blob> {
+  const res = await api.get(`/tsr/export/split/${type}`, {
+    responseType: 'blob',
+    timeout: 300000,
+  });
+  return res.data;
+}
+
+/** 分批下载全部4种规则类型的拆分 ZIP */
+export async function downloadAllSplitZip(): Promise<Blob> {
+  const res = await api.get('/tsr/export/split-all', {
+    responseType: 'blob',
+    timeout: 300000,
+  });
+  return res.data;
+}
+
 /** 下载全部4种规则类型的总体文件 ZIP（打包下载全部） */
 export async function downloadAllOverallZip(): Promise<Blob> {
   const res = await api.get('/tsr/export/overall', {

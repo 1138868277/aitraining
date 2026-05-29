@@ -216,22 +216,47 @@
 
                 <!-- 导出文件 -->
                 <template v-if="step.key === 'export'">
-                  <div class="export-grid">
-                    <div
-                      v-for="t in exportTypes"
-                      :key="t.key"
-                      class="export-box"
-                      :class="[`box-${t.key}`, { 'export-loading': exportLoading === t.key }]"
-                      @click="downloadSingle(t.key)"
-                    >
-                      <div class="box-icon"><span v-if="exportLoading === t.key" class="export-spinner"></span><span v-else>{{ t.icon }}</span></div>
-                      <div class="box-label">{{ t.label }}</div>
-                      <div class="box-desc">完整单文件 · 不分片</div>
+                  <div class="export-section">
+                    <div class="split-section-title">总体文件（完整单文件 · 不分片）</div>
+                    <div class="export-grid">
+                      <div
+                        v-for="t in exportTypes"
+                        :key="t.key"
+                        class="export-box"
+                        :class="[`box-${t.key}`, { 'export-loading': exportLoading === t.key }]"
+                        @click="downloadSingle(t.key)"
+                      >
+                        <div class="box-icon"><span v-if="exportLoading === t.key" class="export-spinner"></span><span v-else>{{ t.icon }}</span></div>
+                        <div class="box-label">{{ t.label }}</div>
+                        <div class="box-desc">完整单文件 · 不分片</div>
+                      </div>
+                      <div class="export-box box-all" :class="{ 'export-loading': exportAllLoading }" @click="downloadAll">
+                        <div class="box-icon"><span v-if="exportAllLoading" class="export-spinner"></span><span v-else>📦</span></div>
+                        <div class="box-label">打包下载全部</div>
+                        <div class="box-desc">4 个完整规则文件</div>
+                      </div>
                     </div>
-                    <div class="export-box box-all" :class="{ 'export-loading': exportAllLoading }" @click="downloadAll">
-                      <div class="box-icon"><span v-if="exportAllLoading" class="export-spinner"></span><span v-else>📦</span></div>
-                      <div class="box-label">打包下载全部</div>
-                      <div class="box-desc">4 个完整规则文件</div>
+                  </div>
+                  <!-- 分批导出 -->
+                  <div class="export-split-section">
+                    <div class="split-section-title">分批下载（大文件自动拆分）</div>
+                    <div class="export-grid">
+                      <div
+                        v-for="t in splitExportTypes"
+                        :key="'split-' + t.key"
+                        class="export-box"
+                        :class="[`box-${t.key}`, { 'export-loading': splitLoading === t.key }]"
+                        @click="downloadSplit(t.key)"
+                      >
+                        <div class="box-icon"><span v-if="splitLoading === t.key" class="export-spinner"></span><span v-else>{{ t.icon }}</span></div>
+                        <div class="box-label">{{ t.label }}</div>
+                        <div class="box-desc">分批 ZIP · 按合并边界拆分</div>
+                      </div>
+                      <div class="export-box box-all" :class="{ 'export-loading': splitAllLoading }" @click="downloadSplitAll">
+                        <div class="box-icon"><span v-if="splitAllLoading" class="export-spinner"></span><span v-else>📦</span></div>
+                        <div class="box-label">分批打包全部</div>
+                        <div class="box-desc">4 种规则分批文件</div>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -252,7 +277,7 @@ import {
   importStation as apiImportStation,
   importMeasure as apiImportMeasure,
   generateRules as apiGenerateRules,
-  downloadOverallExcel, downloadAllOverallZip, saveBlobAsFile,
+  downloadOverallExcel, downloadSplitZip, downloadAllSplitZip, downloadAllOverallZip, saveBlobAsFile,
   clearAllData, getImportProgress,
   getGenerateProgress,
 } from '@/services/time-series-rules';
@@ -273,7 +298,7 @@ const steps = reactive([
   { key: 'import-station', title: '导入场站数据', desc: '上传组织机构编码，导入场站基础信息', status: 'pending' },
   { key: 'import-measure', title: '导入测点数据', desc: '上传时序测点编码，导入测点标准化信息', status: 'pending' },
   { key: 'generate', title: '生成稽核规则', desc: '基于场站和测点数据自动生成质量稽核规则', status: 'pending' },
-  { key: 'export', title: '导出规则文件', desc: '导出规则 Excel（大文件自动拆分）', status: 'pending' },
+  { key: 'export', title: '导出规则文件', desc: '导出生成的稽核规则文件', status: 'pending' },
 ]);
 
 // ====== 导入场站 ======
@@ -336,7 +361,16 @@ const totalRules = computed(() => {
 // ====== 导出 ======
 const exportLoading = ref<string>('');
 const exportAllLoading = ref(false);
-const exportBusy = computed(() => exportLoading.value !== '' || exportAllLoading.value);
+const splitLoading = ref<string>('');
+const splitAllLoading = ref(false);
+const exportBusy = computed(() => exportLoading.value !== '' || exportAllLoading.value || splitLoading.value !== '' || splitAllLoading.value);
+
+const splitExportTypes = [
+  { key: 'sz', label: '死值', icon: '⏳' },
+  { key: 'tb', label: '跳变', icon: '⚡' },
+  { key: 'yx', label: '越限', icon: '🌡️' },
+  { key: 'zd', label: '中断', icon: '🔌' },
+];
 
 function saveGenResult(result: typeof genResult.value) {
   genResult.value = result;
@@ -611,6 +645,37 @@ async function downloadAll() {
     ElMessage.error(err.message || '批量下载失败');
   } finally {
     exportAllLoading.value = false;
+  }
+}
+
+async function downloadSplit(type: string) {
+  if (exportBusy.value) return;
+  splitLoading.value = type;
+  const label = typeLabels[type] || type;
+  try {
+    const blob = await downloadSplitZip(type);
+    saveBlobAsFile(blob, `${currentSchema.value}_时序稽核质量规则_${label}_分批.zip`);
+    steps[3].status = 'completed';
+    ElMessage.success(`已下载 ${label} 分批文件`);
+  } catch (err: any) {
+    ElMessage.error(err.message || '分批下载失败');
+  } finally {
+    splitLoading.value = '';
+  }
+}
+
+async function downloadSplitAll() {
+  if (exportBusy.value) return;
+  splitAllLoading.value = true;
+  try {
+    const blob = await downloadAllSplitZip();
+    saveBlobAsFile(blob, '时序规则结果_分批.zip');
+    steps[3].status = 'completed';
+    ElMessage.success('已下载 时序规则结果_分批.zip');
+  } catch (err: any) {
+    ElMessage.error(err.message || '分批批量下载失败');
+  } finally {
+    splitAllLoading.value = false;
   }
 }
 
@@ -2136,6 +2201,24 @@ onMounted(async () => {
 
 @keyframes export-spin {
   to { transform: rotate(360deg); }
+}
+
+/* ==================== 导出分区 ==================== */
+.export-section {
+  margin-bottom: 16px;
+}
+
+.export-split-section {
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.split-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7a8f;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
 }
 
 </style>

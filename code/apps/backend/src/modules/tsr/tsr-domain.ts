@@ -373,10 +373,10 @@ export async function queryExportList(area: string, type: 'sz' | 'tb' | 'yx' | '
   };
 
   const orderBy: Record<string, string[]> = {
-    sz: ['standard_name', 'sz_threshold', 'sz_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name'],
-    tb: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name'],
-    yx: ['standard_name', 'lower_range', 'upper_range', 'begin_time', 'end_time', 'measure_name'],
-    zd: ['standard_name', 'zd_duration', 'begin_time', 'end_time', 'measure_name'],
+    sz: ['standard_name', 'sz_threshold', 'sz_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
+    tb: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
+    yx: ['standard_name', 'lower_range', 'upper_range', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
+    zd: ['standard_name', 'zd_duration', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
   };
 
   const cols = fields[type].join(', ');

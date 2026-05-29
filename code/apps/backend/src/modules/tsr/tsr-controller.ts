@@ -198,6 +198,46 @@ router.get('/api/tsr/export/overall', async (_req: Request, res: Response) => {
   }
 });
 
+/** 分批导出全部4种规则类型的拆分 ZIP */
+router.get('/api/tsr/export/split-all', async (_req: Request, res: Response) => {
+  try {
+    const zipBuffer = await tsrService.exportAllSplitToZip('');
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent('时序规则结果_分批.zip')}"`,
+      'Content-Length': zipBuffer.length,
+    });
+    res.send(zipBuffer);
+  } catch (err: any) {
+    console.error('Failed to export all split:', err);
+    error(res, 'EXPORT_FAILED', err.message || '分批批量导出失败', 500);
+  }
+});
+
+/** 导出单个规则类型的分批拆分 ZIP（Z7 逻辑） */
+router.get('/api/tsr/export/split/:type', async (req: Request, res: Response) => {
+  try {
+    const type = req.params.type as 'sz' | 'tb' | 'yx' | 'zd';
+    if (!['sz', 'tb', 'yx', 'zd'].includes(type)) {
+      error(res, 'PARAM_FORMAT_ERROR', '无效的导出类型（sz/tb/yx/zd）', 400);
+      return;
+    }
+
+    const { buffer, name } = await tsrService.exportSplitToZip('', type);
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
+      'Content-Length': buffer.length,
+    });
+    res.send(buffer);
+  } catch (err: any) {
+    console.error('Failed to export split:', err);
+    error(res, 'EXPORT_FAILED', err.message || '分批导出失败', 500);
+  }
+});
+
 /** 导出规则 ZIP（含时序规则结果/01 死值/split_N.xlsx 结构） */
 router.get('/api/tsr/export/:type', async (req: Request, res: Response) => {
   try {

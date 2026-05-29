@@ -550,3 +550,154 @@ export async function exportAllToZip(area: string, maxRows: number = 150000): Pr
   });
 }
 
+// ==================== 分批导出（Z7 逻辑） ====================
+
+/** 各类型同步列配置（1-based，与 Z7 完全一致） */
+const splitSyncColumns: Record<string, number[]> = {
+  sz: [2, 3, 4, 5, 6, 7],  // B~G
+  tb: [2, 3, 4, 5, 6],     // B~F
+  yx: [2, 3, 4, 5, 6],     // B~F
+  zd: [2, 3, 4, 5],        // B~E
+};
+
+/**
+ * 核心拆分逻辑：读取总体 Excel，按 Z7 逻辑拆分为多个 XLSX buffer
+ */
+async function splitExcelIntoSheets(
+  area: string,
+  type: 'sz' | 'tb' | 'yx' | 'zd',
+  maxRows: number = 175000,
+): Promise<{ buffer: Buffer; name: string }[]> {
+  const fullBuffer = await makeOverallExcel(area, type);
+  if (!fullBuffer) throw new Error(`未找到 ${typeNames[type]} 类型的导出数据`);
+
+  const wb = XLSX.read(fullBuffer, { type: 'buffer' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const allData: Record<string, any>[] = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
+  if (allData.length <= 1) throw new Error('数据为空');
+
+  const header = allData[0] as string[];
+  const rows = allData.slice(1);
+  const totalRows = rows.length;
+
+  // 提取 A 列合并范围
+  const merges = (ws['!merges'] || []) as XLSX.Range[];
+  const aMerges = merges
+    .filter(m => m.s.c === 0 && m.e.c === 0)
+    .map(m => ({ start: m.s.r + 1, end: m.e.r + 1 }))
+    .sort((a, b) => a.start - b.start);
+
+  // 构建不可拆分块
+  const blocks: { type: 'normal' | 'merged'; start: number; end: number; rowCount: number }[] = [];
+  let currentRow = 1;
+  for (const mr of aMerges) {
+    if (currentRow < mr.start) {
+      blocks.push({ type: 'normal', start: currentRow, end: mr.start - 1, rowCount: mr.start - currentRow });
+    }
+    blocks.push({ type: 'merged', start: mr.start, end: mr.end, rowCount: mr.end - mr.start + 1 });
+    currentRow = mr.end + 1;
+  }
+  if (currentRow <= totalRows) {
+    blocks.push({ type: 'normal', start: currentRow, end: totalRows, rowCount: totalRows - currentRow + 1 });
+  }
+
+  // 计算拆分断点
+  const splitPoints: { start: number; end: number }[] = [];
+  let fileRows = 0;
+  let fileStart = 1;
+  for (const block of blocks) {
+    if (fileRows + block.rowCount > maxRows) {
+      splitPoints.push({ start: fileStart, end: block.start - 1 });
+      fileStart = block.start;
+      fileRows = block.rowCount;
+    } else {
+      fileRows += block.rowCount;
+    }
+  }
+  splitPoints.push({ start: fileStart, end: totalRows });
+
+  // 生成分片文件
+  const syncCols = splitSyncColumns[type] || [];
+  const sheets: { buffer: Buffer; name: string }[] = [];
+
+  for (let i = 0; i < splitPoints.length; i++) {
+    const { start, end } = splitPoints[i];
+    const chunkRows = [header, ...rows.slice(start - 1, end)];
+    const newWs = XLSX.utils.aoa_to_sheet(chunkRows as any[][]);
+
+    const newMerges: XLSX.Range[] = [];
+    const mergedInChunk = aMerges.filter(m => m.start >= start && m.end <= end);
+    for (const m of mergedInChunk) {
+      newMerges.push({ s: { r: m.start - start, c: 0 }, e: { r: m.end - start, c: 0 } });
+    }
+    for (const col of syncCols) {
+      for (const m of mergedInChunk) {
+        newMerges.push({ s: { r: m.start - start, c: col - 1 }, e: { r: m.end - start, c: col - 1 } });
+      }
+    }
+    newWs['!merges'] = newMerges;
+    clearMergedValues(newWs, newMerges);
+
+    const newWb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(newWb, newWs, typeNames[type]);
+    const buf = XLSX.write(newWb, { type: 'buffer', bookType: 'xlsx', compression: true }) as Buffer;
+    sheets.push({ buffer: buf, name: `split_${i + 1}.xlsx` });
+  }
+
+  return sheets;
+}
+
+/**
+ * 导出单个规则类型的分批拆分 ZIP（内含 split_N.xlsx）
+ */
+export async function exportSplitToZip(
+  area: string,
+  type: 'sz' | 'tb' | 'yx' | 'zd',
+  maxRows: number = 175000,
+): Promise<{ buffer: Buffer; name: string }> {
+  const sheets = await splitExcelIntoSheets(area, type, maxRows);
+
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  const zipBuffers: Buffer[] = [];
+  archive.on('data', (d: Buffer) => zipBuffers.push(d));
+
+  return new Promise<Buffer>((resolve, reject) => {
+    archive.on('end', () => resolve(Buffer.concat(zipBuffers)));
+    archive.on('error', reject);
+
+    const folder = `时序规则结果/${typeFolderNames[type]}`;
+    sheets.forEach(f => archive.append(f.buffer, { name: `${folder}/${f.name}` }));
+    archive.finalize();
+  }).then(buffer => {
+    const s = domain.getCurrentSchema();
+    return { buffer, name: `${s}_时序稽核质量规则_${typeNames[type]}_分批.zip` };
+  });
+}
+
+/**
+ * 分批导出全部4种规则类型（每个类型一个多 Sheet XLSX，打包为 ZIP）
+ */
+export async function exportAllSplitToZip(area: string, maxRows: number = 175000): Promise<Buffer> {
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  const zipBuffers: Buffer[] = [];
+  archive.on('data', (d: Buffer) => zipBuffers.push(d));
+
+  return new Promise<Buffer>(async (resolve, reject) => {
+    archive.on('end', () => resolve(Buffer.concat(zipBuffers)));
+    archive.on('error', reject);
+
+    for (const type of ['sz', 'tb', 'yx', 'zd'] as const) {
+      try {
+        const sheets = await splitExcelIntoSheets(area, type, maxRows);
+        const folder = `时序规则结果/${typeFolderNames[type]}`;
+        sheets.forEach(f => archive.append(f.buffer, { name: `${folder}/${f.name}` }));
+      } catch {
+        // 该类型无数据时跳过
+      }
+    }
+
+    await archive.finalize();
+  });
+}
+
+
