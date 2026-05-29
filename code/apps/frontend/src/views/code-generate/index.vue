@@ -65,7 +65,7 @@
           </div>
           <template v-if="quickSearchResults.length > 0">
             <el-table
-              :data="quickSearchFilteredResults"
+              :data="quickSearchResults"
               stripe
               style="width: 100%"
               class="styled-table"
@@ -100,9 +100,10 @@
                   <span class="cell-name">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" align="center" fixed="right">
+              <el-table-column label="操作" align="center" fixed="right" width="140">
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="onQuickSearchRowClick(row)">快速编码</el-button>
+                  <el-button link type="success" size="small" @click="copyQuickCodes(row)">复制</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -980,23 +981,11 @@ const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; ty
 
 /** 列头筛选选项：二级类码 */
 const quickSearchSecondClassFilterOptions = computed(() => {
-  const seen = new Set<string>();
-  return quickSearchResults.value
-    .filter(r => {
-      if (!r.secondClassCode) return false;
-      const key = `${r.secondClassCode}|${r.secondClassName}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .map(r => ({ text: `${r.secondClassCode} ${r.secondClassName}`, value: `${r.secondClassCode}|${r.secondClassName}` }));
-});
-
-/** 客户端二级类码筛选后的结果 */
-const quickSearchFilteredResults = computed(() => {
-  const codes = quickSearchSecondClassFilterCodes.value;
-  if (codes.length === 0) return quickSearchResults.value;
-  return quickSearchResults.value.filter(r => codes.includes(r.secondClassCode));
+  // 使用后端返回的全量去重结果，而非当前页数据
+  return quickSearchSecondClassOptions.value.map(s => ({
+    text: `${s.code} ${s.name}`,
+    value: `${s.code}|${s.name}`,
+  }));
 });
 
 /** 二级类码表头选中的编码列表 */
@@ -1006,17 +995,21 @@ const quickSearchSecondClassFilterCodes = computed(() => {
   return f.map((v: string) => v.split('|')[0]);
 });
 
-/** 表头筛选变化 */
+/** 表头筛选变化 → 重新搜索（传给后端过滤） */
 function onQuickSearchHeaderFilterChange(filters: Record<string, any[]>) {
   if ('quickSecondClassCode' in filters) {
     quickSearchSecondClassFilter.value = filters.quickSecondClassCode || [];
+    // 如果是用户主动点击筛选（非 clearFilter 触发的），重新搜索
+    if (quickSearchSearched.value) {
+      doQuickSearch();
+    }
   }
 }
 
 function onQuickSearchFilterChange() {
-  // 类型切换后清除二级类码筛选
+  // 类型切换后清除二级类码筛选并重新搜索
   quickSearchSecondClassFilter.value = [];
-  quickSearchTableRef.value?.clearFilter();
+  quickSearchTableRef.value?.clearFilter('quickSecondClassCode');
   doQuickSearch();
 }
 
@@ -1028,7 +1021,8 @@ async function doQuickSearch(resetPage: boolean = true) {
   if (resetPage) quickSearchPageNum.value = 1;
   try {
     const typeFilter = quickSearchTypeFilter.value || undefined;
-    const result = await dictService.quickSearchDict(text, quickSearchPageNum.value, quickSearchPageSize.value, typeFilter);
+    const secondClassFilter = quickSearchSecondClassFilterCodes.value.length > 0 ? quickSearchSecondClassFilterCodes.value.join(',') : undefined;
+    const result = await dictService.quickSearchDict(text, quickSearchPageNum.value, quickSearchPageSize.value, typeFilter, secondClassFilter);
     quickSearchResults.value = result.items;
     quickSearchTotal.value = result.total;
     quickSearchTypeOptions.value = result.typeOptions || [];
@@ -1107,6 +1101,7 @@ function onQuickSearchInput() {
     quickSearchSearched.value = true;
     quickSearchTypeFilter.value = '';
     quickSearchSecondClassFilter.value = [];
+    quickSearchTableRef.value?.clearFilter();
     await doQuickSearch();
     if (quickSearchResults.value.length > 0) {
       saveRecentSearchTag(text);
@@ -1123,6 +1118,15 @@ function onQuickSearchClear() {
   quickSearchSecondClassFilter.value = [];
   quickSearchSecondClassOptions.value = [];
   quickSearchTypeOptions.value = [];
+}
+
+/** 复制单行名称（二级类 + 数据类 + 数据码名称，tab 分隔便于贴到Excel） */
+function copyQuickCodes(row: { secondClassName: string; dataCategoryName: string; dataName: string }) {
+  const text = `${row.secondClassName}\t${row.dataCategoryName}\t${row.dataName}`;
+  navigator.clipboard.writeText(text).then(
+    () => ElMessage.success('已复制'),
+    () => ElMessage.warning('复制失败'),
+  );
 }
 
 /** 点击快速检索结果行，自动填入编码生成 */
