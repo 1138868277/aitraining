@@ -2308,24 +2308,49 @@ function cancelEditName() {
 .recent-search-tags {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
-  padding-top: 2px;
 }
 
 .recent-tags-label {
-  font-size: 14px;
-  color: #606266;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #94a3b8;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .recent-tag {
-  cursor: pointer;
-  font-size: 13px;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  padding: 0 12px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px;
+  border: none !important;
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  user-select: none;
 }
-
 .recent-tag:hover {
-  opacity: 0.8;
+  background: #bfdbfe !important;
+  color: #1e40af !important;
+}
+.recent-tag :deep(.el-tag__close) {
+  color: #60a5fa !important;
+  font-size: 13px !important;
+  margin-left: 1px !important;
+  transition: all 0.2s ease !important;
+}
+.recent-tag:hover :deep(.el-tag__close) {
+  color: #ef4444 !important;
 }
 
 .search-prefix {
