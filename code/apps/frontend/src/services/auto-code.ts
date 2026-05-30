@@ -45,11 +45,11 @@ export interface AutoCodeResponse {
   config: AutoCodeConfig;
 }
 
-/** 自动编码：匹配+生成 */
+/** 自动编码：匹配+生成（大数据量时使用较长超时） */
 export async function autoGenerate(
   rows: ImportRow[],
   config: AutoCodeConfig,
 ): Promise<AutoCodeResponse> {
-  const res = await api.post('/auto-code/generate', { rows, config });
+  const res = await api.post('/auto-code/generate', { rows, config }, { timeout: 600000 });
   return res.data;
 }

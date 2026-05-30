@@ -36,26 +36,40 @@
 
       <!-- Step 0: Upload -->
       <div v-if="step === 0" class="step-body">
-        <div class="upload-section">
-          <div class="upload-zone" :class="{ 'has-file': !!fileName }" @dragover.prevent @drop.prevent="onDrop" @click="triggerFileInput">
+        <div class="step-cards">
+          <div class="step-card upload-card" :class="{ 'has-file': !!fileName }" @dragover.prevent @drop.prevent="onDrop" @click="triggerFileInput">
             <input ref="fileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileInputChange" />
-            <div class="upload-glow"></div>
+            <div class="card-glow"></div>
             <template v-if="!fileName">
-              <div class="upload-icon">
-                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div class="card-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               </div>
-              <div class="upload-title">上传 Excel 文件</div>
-              <div class="upload-desc">拖拽文件到此处，或点击上传</div>
-              <div class="upload-formats">支持 .xlsx / .xls</div>
+              <div class="card-title">上传 Excel 文件</div>
+              <div class="card-desc">拖拽文件到此处，或点击上传</div>
+              <div class="card-tip">支持 .xlsx / .xls 格式</div>
             </template>
             <template v-else>
-              <div class="upload-icon uploaded">
-                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <div class="card-icon uploaded">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               </div>
-              <div class="upload-title uploaded">{{ fileName }}</div>
-              <div class="upload-desc">点击重新选择文件</div>
+              <div class="card-title uploaded">{{ fileName }}</div>
+              <div class="card-desc">点击重新选择文件</div>
             </template>
           </div>
+          <div class="step-card template-card" @click="downloadTemplate">
+            <div class="card-glow"></div>
+            <div class="card-icon template">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="card-title">下载导入模板</div>
+            <div class="card-desc">含名称、场站、二级类码等标准列</div>
+            <div class="card-tip">.xlsx 格式，可直接填写数据</div>
+          </div>
+        </div>
+
+        <div class="upload-limit-hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>单次最多支持 <strong>20,000</strong> 条编码的自动匹配与生成</span>
         </div>
 
         <div v-if="previewRows.length > 0" class="preview-box">
@@ -265,6 +279,15 @@ function onDrop(e: DragEvent) {
   if (e.dataTransfer?.files.length) handleFile(e.dataTransfer.files[0]);
 }
 
+function downloadTemplate() {
+  const headers = ['测点描述', '场站名称', '二级类码', '数据类码', '数据码', '项目期号', '三级类码'];
+  const ws = XLSX.utils.aoa_to_sheet([headers]);
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 18) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '模板');
+  XLSX.writeFile(wb, '自动编码导入模板.xlsx');
+}
+
 function handleFile(file: File) {
   fileName.value = file.name;
   const reader = new FileReader();
@@ -276,6 +299,10 @@ function handleFile(file: File) {
     if (json.length < 2) { ElMessage.warning('文件为空或只有表头'); return; }
     const headers = json[0].map((h: any) => String(h || ''));
     const rows = json.slice(1).filter((r: any[]) => r.some(c => c !== undefined && c !== null && c !== ''));
+    if (rows.length > 20000) {
+      ElMessage.warning(`数据行数超出限制（最多 20,000 条），当前文件共 ${rows.length} 行`);
+      return;
+    }
     excelData.value = rows;
     previewCols.value = headers;
     totalRows.value = rows.length;
@@ -488,33 +515,69 @@ function sendToPreview() {
   overflow-x: hidden;
   position: relative;
 }
-.upload-section { display: flex; justify-content: center; margin-bottom: 20px; }
-.upload-zone {
+.step-cards {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.step-card {
   position: relative;
-  width: 100%;
-  max-width: 480px;
-  padding: 40px 20px 36px;
+  flex: 1;
+  max-width: 360px;
+  padding: 44px 24px 36px;
   text-align: center;
   border: 2px dashed #d1d9e6;
-  border-radius: 12px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
   cursor: pointer;
   transition: all 0.3s ease;
+  overflow: hidden;
 }
-.upload-zone:hover {
+.step-card:hover {
   border-color: #3b82f6;
   background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 100%);
-  box-shadow: 0 4px 16px rgba(59,130,246,0.08);
+  box-shadow: 0 6px 24px rgba(59,130,246,0.10);
+  transform: translateY(-2px);
 }
-.upload-zone.has-file { border-color: #10b981; border-style: solid; }
-.upload-glow { display: none; }
-.upload-icon { margin-bottom: 12px; transition: transform 0.3s; }
-.upload-zone:hover .upload-icon { transform: translateY(-4px); }
-.upload-title { font-size: 16px; font-weight: 600; color: #1a2a4a; margin-bottom: 6px; }
-.upload-title.uploaded { color: #059669; }
-.upload-icon.uploaded svg { stroke: #10b981; }
-.upload-desc { font-size: 13px; color: #64748b; margin-bottom: 4px; }
-.upload-formats { font-size: 11px; color: #94a3b8; margin-bottom: 16px; }
+.step-card:active { transform: translateY(0); }
+.step-card.upload-card.has-file { border-color: #10b981; border-style: solid; }
+.step-card.upload-card.has-file .card-title { color: #059669; }
+.step-card.upload-card.has-file .card-icon svg { stroke: #10b981; }
+.step-card.template-card {
+  border-style: solid;
+  border-color: #e8e0f0;
+  background: linear-gradient(135deg, #faf8ff 0%, #f5f0ff 100%);
+}
+.step-card.template-card:hover {
+  border-color: #8b5cf6;
+  background: linear-gradient(135deg, #f5f0ff 0%, #ede4ff 100%);
+  box-shadow: 0 6px 24px rgba(139,92,246,0.12);
+}
+.card-glow { display: none; }
+.card-icon { margin-bottom: 14px; transition: transform 0.3s; }
+.step-card:hover .card-icon { transform: translateY(-4px); }
+.card-icon.template svg { stroke: #8b5cf6; }
+.card-title { font-size: 16px; font-weight: 700; color: #1a2a4a; margin-bottom: 8px; letter-spacing: 0.3px; }
+.card-title.uploaded { color: #059669; }
+.card-desc { font-size: 13px; color: #64748b; margin-bottom: 6px; line-height: 1.5; }
+.card-tip { font-size: 12px; color: #94a3b8; }
+.upload-limit-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 auto 16px;
+  padding: 8px 18px;
+  font-size: 13px;
+  color: #64748b;
+  background: linear-gradient(135deg, rgba(59,130,246,0.05), rgba(34,211,238,0.03));
+  border: 1px solid rgba(59,130,246,0.10);
+  border-radius: 8px;
+  width: fit-content;
+}
+.upload-limit-hint svg { color: #3b82f6; flex-shrink: 0; }
+.upload-limit-hint strong { color: #1e40af; font-weight: 700; }
 .preview-box {
   margin-top: 20px;
   background: #fff;

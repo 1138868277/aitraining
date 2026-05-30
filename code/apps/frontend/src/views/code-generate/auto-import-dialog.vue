@@ -11,13 +11,22 @@
 
     <!-- 步骤1：上传Excel -->
     <div v-if="step === 0" class="step-body">
-      <el-upload drag accept=".xlsx,.xls" :auto-upload="false" :show-file-list="false" :on-change="handleFileChange">
-        <el-icon class="upload-icon" style="font-size:48px;color:#409eff"><Upload /></el-icon>
-        <div style="font-size:14px;color:#606266;margin-top:8px">拖拽或点击上传 Excel 文件</div>
-        <template #tip>
-          <div class="upload-tip">支持 .xlsx / .xls 格式</div>
-        </template>
-      </el-upload>
+      <div style="display:flex;gap:16px;align-items:stretch;">
+        <el-upload drag accept=".xlsx,.xls" :auto-upload="false" :show-file-list="false" :on-change="handleFileChange" style="flex:1">
+          <el-icon class="upload-icon" style="font-size:48px;color:#409eff"><Upload /></el-icon>
+          <div style="font-size:14px;color:#606266;margin-top:8px">拖拽或点击上传 Excel 文件</div>
+          <template #tip>
+            <div class="upload-tip">支持 .xlsx / .xls 格式</div>
+          </template>
+        </el-upload>
+        <div style="display:flex;flex-direction:column;justify-content:center;gap:8px;">
+          <span style="font-size:13px;color:#909399;white-space:nowrap;">还没有模板？</span>
+          <button class="dl-template-btn" type="button" @click="downloadTemplate">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>下载模板</span>
+          </button>
+        </div>
+      </div>
 
       <div v-if="previewRows.length > 0" style="margin-top:16px">
         <div style="font-size:13px;color:#909399;margin-bottom:8px">数据预览（前10行，共 {{ totalRows }} 行）</div>
@@ -249,6 +258,19 @@ function autoGuessMapping(headers: string[]) {
   }));
 }
 
+function downloadTemplate() {
+  const headers = ['名称', '场站名称', '二级类码', '三级类码', '数据类码', '数据码', '项目期号'];
+  const exampleRows = [
+    ['堆龙光伏_#1箱变_箱变_频率', '堆龙华电光储电站', '光伏箱变', '箱变UPS', '功率', '频率（F）', '111'],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...exampleRows]);
+  const colWidths = headers.map(h => ({ wch: Math.max(h.length * 2, 18) }));
+  ws['!cols'] = colWidths;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '模板');
+  XLSX.writeFile(wb, '自动编码导入模板.xlsx');
+}
+
 function onClosed() {
   step.value = 0;
   excelData.value = [];
@@ -324,6 +346,35 @@ function emitResults() {
 .step-body { min-height: 200px; }
 .step-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .upload-tip { font-size: 12px; color: #909399; margin-top: 4px; }
+
+.dl-template-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1.5px solid #3b82f6;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  color: #3b82f6;
+  background: linear-gradient(135deg, rgba(59,130,246,0.06), rgba(34,211,238,0.04));
+  transition: all 0.25s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.dl-template-btn:hover {
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 4px 16px rgba(59,130,246,0.3);
+  transform: translateY(-1px);
+}
+.dl-template-btn:active {
+  transform: translateY(0);
+}
 </style>
 
 <style>

@@ -1417,6 +1417,11 @@ onMounted(async () => {
     // 触发类型级联加载二级类码
     await onConditionChange('typeCode');
 
+    // 如果二级类码已设置，继续级联加载三级类码和数据类码
+    if (conditions.secondClassCode) {
+      await onConditionChange('secondClassCode');
+    }
+
     // 加载编码生成列表
     loadCodeList();
     // 加载编码总数

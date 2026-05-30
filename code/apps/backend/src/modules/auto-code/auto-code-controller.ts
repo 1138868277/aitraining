@@ -15,8 +15,8 @@ router.post('/api/auto-code/generate', async (req: Request, res: Response) => {
       return;
     }
 
-    if (rows.length > 5000) {
-      error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次最多处理5000条', 400);
+    if (rows.length > 20000) {
+      error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次最多处理20000条', 400);
       return;
     }
 

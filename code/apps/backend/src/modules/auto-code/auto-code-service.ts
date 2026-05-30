@@ -346,51 +346,93 @@ export async function generateCodeFromMatch(
   return { code: codeStr, name };
 }
 
-/** 聚合所有唯一的前缀组合，批量查询已存在的编码 */
+/** 获取匹配结果的编码值 */
+function getMatchedCode(matched: AutoMatchField[], key: string): string {
+  return matched.find(m => m.fieldKey === key)?.matchedCode || '';
+}
+
+/** 聚合所有唯一的前缀组合，批量查询已存在的编码（支持20000行） */
 async function batchFindExistingCodes(
   matchedRows: { name: string; matched: AutoMatchField[]; config: AutoCodeConfig }[],
 ): Promise<Map<number, Array<{ code: string }>>> {
   const schema = getSchema();
   const seen = new Map<string, number[]>();
-  const keyFields: Array<keyof AutoCodeConfig | 'stationCode' | 'secondClassCode' | 'thirdClassCode' | 'dataTypeCode' | 'dataCode'> = [
-    'stationCode', 'typeCode', 'projectLineCode', 'prefixNo',
-    'firstClassCode', 'secondClassCode', 'thirdClassCode', 'dataTypeCode', 'dataCode',
-  ];
 
   matchedRows.forEach((row, idx) => {
-    const getCode = (key: string) => {
-      const f = row.matched.find(m => m.fieldKey === key);
-      return f?.matchedCode || '';
-    };
-    const key = keyFields.map(k => k === 'stationCode' ? getCode('stationCode')
-      : k === 'secondClassCode' ? getCode('secondClassCode')
-      : k === 'thirdClassCode' ? getCode('thirdClassCode')
-      : k === 'dataTypeCode' ? getCode('dataTypeCode')
-      : k === 'dataCode' ? getCode('dataCode')
-      : (row.config as any)[k] || '').join('|');
+    const parts = [
+      getMatchedCode(row.matched, 'stationCode'),
+      row.config.typeCode,
+      row.config.projectLineCode,
+      row.config.prefixNo,
+      row.config.firstClassCode,
+      getMatchedCode(row.matched, 'secondClassCode'),
+      getMatchedCode(row.matched, 'thirdClassCode'),
+      getMatchedCode(row.matched, 'dataTypeCode'),
+      getMatchedCode(row.matched, 'dataCode'),
+    ];
+    const key = parts.join('|');
     if (!seen.has(key)) seen.set(key, []);
     seen.get(key)!.push(idx);
   });
 
   const result = new Map<number, Array<{ code: string }>>();
+  const uniqueCombos = Array.from(seen.entries());
 
-  for (const [key, indices] of seen) {
-    const parts = key.split('|');
-    const [stationCode, typeCode, projectLineCode, prefixNo, firstClassCode, secondClassCode, thirdClassCode, dataTypeCode, dataCode] = parts;
-    const sql = `SELECT code FROM ${schema}.cec_new_energy_measurement_points
-      WHERE if_delete = '0'
-        AND station_code = $1 AND type_code = $2
-        AND project_line_code = $3 AND prefix_no = $4
-        AND first_class_code = $5 AND second_class_code = $6
-        AND third_class_code = $7 AND data_category_code = $8
-        AND data_code = $9`;
-    const rows = await query<{ code: string }>(sql, [
-      stationCode, typeCode, projectLineCode, prefixNo,
-      firstClassCode, secondClassCode, thirdClassCode,
-      dataTypeCode, dataCode,
-    ]);
-    for (const idx of indices) {
-      result.set(idx, rows);
+  // PG 参数上限 ~65535，每组9字段 → 最多 ~7280 组合/批
+  const BATCH_SIZE = 5000;
+  for (let batchStart = 0; batchStart < uniqueCombos.length; batchStart += BATCH_SIZE) {
+    const batch = uniqueCombos.slice(batchStart, batchStart + BATCH_SIZE);
+    // 构建 VALUES 行：((($1,$2,...,$9),($10,...),...))
+    // 并用 LATERAL 将组合与 measurement_points 做 JOIN
+    const valueRows: string[] = [];
+    const params: string[] = [];
+    let idx = 1;
+    const comboToParamIdx: Array<{ indices: number[]; fields: string[] }> = [];
+
+    for (const [key, indices] of batch) {
+      const fields = key.split('|');
+      const placeholders = fields.map(() => `$${idx++}`);
+      valueRows.push(`(${placeholders.join(',')})`);
+      params.push(...fields);
+      comboToParamIdx.push({ indices, fields });
+    }
+
+    const valueExpr = `VALUES ${valueRows.join(',')}`;
+    const sql = `
+      SELECT v.rn, m.code FROM (
+        SELECT ROW_NUMBER() OVER () AS rn, * FROM ${valueExpr}
+      ) AS v(s_code, t_code, pl_code, p_no, fc_code, sc_code, tc_code, dt_code, d_code)
+      LEFT JOIN ${schema}.cec_new_energy_measurement_points m
+        ON m.if_delete = '0'
+       AND m.station_code = v.s_code
+       AND m.type_code = v.t_code
+       AND m.project_line_code = v.pl_code
+       AND m.prefix_no = v.p_no
+       AND m.first_class_code = v.fc_code
+       AND m.second_class_code = v.sc_code
+       AND m.third_class_code = v.tc_code
+       AND m.data_category_code = v.dt_code
+       AND m.data_code = v.d_code
+      ORDER BY v.rn
+    `;
+
+    const rows = await query<{ rn: number; code: string | null }>(sql, params);
+
+    // 按组合分组：同一组合的 rows 会在结果中连续出现（因 ORDER BY v.rn）
+    let rowPos = 0;
+    for (let ci = 0; ci < comboToParamIdx.length; ci++) {
+      const { indices } = comboToParamIdx[ci];
+      const codes: Array<{ code: string }> = [];
+      // 收集当前组合的所有匹配行（code 可能为 NULL）
+      while (rowPos < rows.length && rows[rowPos].rn === ci + 1) {
+        if (rows[rowPos].code) {
+          codes.push({ code: rows[rowPos].code! });
+        }
+        rowPos++;
+      }
+      for (const rowIdx of indices) {
+        result.set(rowIdx, codes);
+      }
     }
   }
 
