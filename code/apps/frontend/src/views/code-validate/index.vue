@@ -1,9 +1,25 @@
 <template>
   <div class="code-validate">
 <div class="page-body">
-      <el-tabs v-model="activeTab" class="page-tabs">
-        <!-- Tab 1: 字典查询 -->
-        <el-tab-pane label="字典查询" name="dictTree">
+      <div class="page-layout">
+        <!-- 左侧标签导航 -->
+        <div class="cyber-tabs">
+          <div
+            v-for="tab in visibleTabs"
+            :key="tab.name"
+            class="cyber-tab"
+            :class="{ active: activeTab === tab.name }"
+            @click="activeTab = tab.name"
+          >
+            <div class="cyber-tab-icon" v-html="tab.icon"></div>
+            <span class="cyber-tab-label">{{ tab.label }}</span>
+            <div class="cyber-tab-indicator"></div>
+          </div>
+        </div>
+
+        <!-- 右侧内容区 -->
+        <div class="tab-content">
+        <div v-show="activeTab === 'dictTree'" class="tab-panel">
           <!-- 科技风顶部 -->
           <div class="tech-hero">
             <div class="tech-hero-bg">
@@ -46,27 +62,22 @@
             <div class="tech-panel-header">
               <div class="tph-left">
                 <div class="tph-switch">
-                  <button :class="['tph-btn', { active: queryMode === 'tree' }]" @click="queryMode = 'tree'">
-                    <span class="tph-btn-icon">🌳</span> 树形浏览
-                  </button>
                   <button :class="['tph-btn', { active: queryMode === 'search' }]" @click="queryMode = 'search'">
                     <span class="tph-btn-icon">🔎</span> 数据码查询
+                  </button>
+                  <button :class="['tph-btn', { active: queryMode === 'tree' }]" @click="queryMode = 'tree'">
+                    <span class="tph-btn-icon">🌳</span> 树形浏览
                   </button>
                 </div>
               </div>
               <div class="tph-right">
-                <div v-if="queryMode === 'tree'" class="tph-search">
-                  <el-input
-                    v-model="treeSearchText"
-                    placeholder="搜索编码或名称"
-                    clearable
-                    size="small"
-                    suffix-icon="Search"
-                    @input="onTreeSearch"
-                  />
-                  <button class="tph-action-btn" title="收起所有" @click="onCollapseAll">⟵</button>
-                </div>
-                <button class="tph-action-btn" title="刷新" @click="loadDictTree" :disabled="loadingTree">↻</button>
+                <button v-if="queryMode === 'tree'" class="tph-action-btn" :title="treeExpanded ? '收起所有' : '展开所有'" @click="onToggleTree">
+                  <svg v-if="treeExpanded" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+                  <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>
+                </button>
+                <button class="tph-action-btn" title="刷新" @click="loadDictTree" :disabled="loadingTree">
+                  <svg :class="{ spinning: loadingTree }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                </button>
               </div>
             </div>
             <div class="tech-panel-body">
@@ -78,7 +89,6 @@
                   lazy
                   :load="loadTreeNode"
                   :props="treeProps"
-                  :filter-node-method="filterTreeNode"
                   v-loading="loadingTree"
                   element-loading-text="字典数据加载中..."
                   highlight-current
@@ -99,10 +109,10 @@
               <QuickSearchPanel v-show="queryMode === 'search'" />
             </div>
           </div>
-        </el-tab-pane>
+        </div>
 
         <!-- Tab 2: 新增字典记录 -->
-        <el-tab-pane label="数据码管理" name="datacode">
+        <div v-show="activeTab === 'datacode'" class="tab-panel">
           <div class="tech-hero">
             <div class="tech-hero-bg">
               <div class="tech-grid"></div>
@@ -114,14 +124,14 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </div>
               <div class="tech-hero-text">
-                <div class="tech-hero-title">数据码新增和审批</div>
+                <div class="tech-hero-title">数据码新增</div>
                 <div class="tech-hero-desc">新增数据码并提交集团审批，通过后自动下发至全区域</div>
               </div>
             </div>
           </div>
           <div class="section-card" style="margin-top: 10px;">
             <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;">
-              <span class="section-title">新增数据码记录</span>
+              <span class="section-title">数据码新增记录</span>
               <div style="display:flex;gap:8px;">
                 <el-button class="btn-add-code" @click="showAddDialog = true">
                   <span class="btn-add-code-inner">
@@ -166,12 +176,12 @@
               @sort-change="onSortChange"
               @filter-change="onFilterChange"
             >
-              <el-table-column label="序号" type="index" width="70" align="center">
+              <el-table-column label="序号" type="index" width="60" align="center">
                 <template #default="{ $index }">
                   {{ ($index + 1) + (statsPageNum - 1) * statsPageSize }}
                 </template>
               </el-table-column>
-              <el-table-column label="类型" width="270" align="center" column-key="typeCode" :filters="typeFilterOptions" filter-placement="bottom">
+              <el-table-column label="类型" width="80" align="center" column-key="typeCode" :filters="typeFilterOptions" filter-placement="bottom">
                 <template #default="{ row }">
                   <el-tag v-if="row.typeCode" :type="statsTypeTagType(row.typeCode)" size="small" effect="plain">{{ statsTypeLabel(row.typeCode) }}</el-tag>
                   <el-tag v-else size="small" type="danger">未识别</el-tag>
@@ -195,7 +205,7 @@
                   <span class="cell-name-tag">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="创建时间" prop="createTm" width="170" sortable="custom">
+              <el-table-column label="创建时间" prop="createTm" width="170" sortable="custom" align="center">
                 <template #default="{ row }">
                   <span class="time-cell">{{ formatTime(row.createTm) }}</span>
                 </template>
@@ -209,12 +219,12 @@
                   <el-tag v-else type="info" size="small">{{ row.status }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="170" fixed="right" align="center">
+              <el-table-column label="操作" width="130" fixed="right" align="center">
                 <template #default="{ row }">
                   <template v-if="!row.status || row.status === 'draft' || row.status === 'rejected'">
-                    <el-button type="primary" link size="small" :loading="submittingId === row.dataCode" @click="handleSubmitApproval(row)">提交审批</el-button>
-                    <el-button type="danger" link size="small" :loading="deletingId === row.dataCode" @click="handleDeleteCode(row)">删除</el-button>
-                    <span v-if="row.status === 'rejected' && row.rejectReason" style="color: #f56c6c; font-size: 12px; display: block; margin-top: 2px;">{{ row.rejectReason }}</span>
+                    <span class="enum-badge enum-submit" @click="handleSubmitApproval(row)">提交</span>
+                    <span class="enum-badge enum-delete" @click="handleDeleteCode(row)">删除</span>
+                    <span v-if="row.status === 'rejected' && row.rejectReason" class="reject-hint">{{ row.rejectReason }}</span>
                   </template>
                   <span v-else-if="row.status === 'submitted'" style="color: #909399; font-size: 12px;">等待审核</span>
                   <span v-else style="color: #c0c4cc;">-</span>
@@ -238,15 +248,15 @@
           <!-- 提交记录 -->
           <div class="section-card" style="margin-top: 16px;">
             <div class="section-header">
-              <span class="section-title">我的提交记录</span>
+              <span class="section-title">提交记录</span>
             </div>
             <el-table :data="submissions" stripe style="width:100%" class="styled-table submissions-table" v-loading="loadingSubmissions" empty-text="暂无提交记录" :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }">
-              <el-table-column type="index" label="序号" width="50" align="center">
+              <el-table-column type="index" label="序号" width="60" align="center">
                 <template #default="{ $index }">
                   {{ ($index + 1) + (subPageNum - 1) * subPageSize }}
                 </template>
               </el-table-column>
-              <el-table-column label="类型" align="center">
+              <el-table-column label="类型" width="80" align="center">
                 <template #default="{ row }">
                   <el-tag v-if="row.typeCode" :type="statsTypeTagType(row.typeCode)" size="small" effect="plain">{{ statsTypeLabel(row.typeCode) }}</el-tag>
                   <el-tag v-else size="small" type="danger">未识别</el-tag>
@@ -270,7 +280,7 @@
                   <span class="cell-name-tag">{{ row.dataName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="状态" align="center">
+              <el-table-column label="状态" width="100" align="center">
                 <template #default="{ row }">
                   <el-tag v-if="row.status === 'submitted'" type="warning" size="small">待审批</el-tag>
                   <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
@@ -284,12 +294,12 @@
                   <span v-else style="color: #c0c4cc;">-</span>
                 </template>
               </el-table-column>
-              <el-table-column label="提交时间">
+              <el-table-column label="提交时间" width="170" align="center">
                 <template #default="{ row }">
                   <span class="time-cell">{{ formatTime(row.submitTm || row.createTm) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="审批时间">
+              <el-table-column label="审批时间" width="170" align="center">
                 <template #default="{ row }">
                   <span class="time-cell">{{ row.reviewTm ? formatTime(row.reviewTm) : '-' }}</span>
                 </template>
@@ -308,16 +318,9 @@
               />
             </div>
           </div>
-        </el-tab-pane>
+        </div>
 
-        <!-- Tab 3: 数据码审批（仅admin可见） -->
-        <el-tab-pane v-if="currentUser === 'admin'" name="approval">
-          <template #label>
-            <span class="approval-tab-label">
-              数据码审批
-              <el-badge v-if="pendingApprovalCount > 0" :value="pendingApprovalCount" :max="99" class="approval-badge" />
-            </span>
-          </template>
+        <div v-show="activeTab === 'approval'" class="tab-panel">
           <div class="tech-hero">
             <div class="tech-hero-bg">
               <div class="tech-grid"></div>
@@ -335,9 +338,10 @@
             </div>
           </div>
           <ApprovalMgmtTab @refresh="loadPendingApprovalCount" :key="approvalTabKey" />
-        </el-tab-pane>
+        </div>
 
-      </el-tabs>
+      </div>
+    </div>
     </div>
     <AddCodeDialog v-model="showAddDialog" @success="onAddCodeSuccess" />
   </div>
@@ -376,13 +380,25 @@ async function loadPendingApprovalCount() {
   } catch {}
 }
 
+const savedTab = localStorage.getItem('codevalidate_active_tab');
 const activeTab = ref(
-  currentUser !== 'admin' && (route.query.tab as string) === 'approval'
+  currentUser !== 'admin' && ((route.query.tab as string) === 'approval' || savedTab === 'approval')
     ? 'dictTree'
-    : (route.query.tab as string) || 'dictTree'
+    : (route.query.tab as string) || savedTab || 'dictTree'
 );
 
+const tabDefs = [
+  { name: 'dictTree', label: '字典查询', adminOnly: false,
+    icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
+  { name: 'datacode', label: '数据码管理', adminOnly: false,
+    icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' },
+  { name: 'approval', label: '数据码审批', adminOnly: true,
+    icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' },
+];
+const visibleTabs = computed(() => tabDefs.filter(t => !t.adminOnly || currentUser === 'admin'));
+
 watch(activeTab, (tab) => {
+  localStorage.setItem('codevalidate_active_tab', tab);
   router.replace({ query: { ...route.query, tab } });
 });
 
@@ -413,18 +429,7 @@ const dictTreeData = ref<DictTreeNode[]>([]);
 const treeDataCache = ref<DictTreeNode[]>([]); // lazy load 查找缓存
 const loadingTree = ref(false);
 const treeRef = ref<any>(null);
-
-const treeSearchText = ref('');
-
-function onTreeSearch() {
-  treeRef.value?.filter(treeSearchText.value);
-}
-
-function filterTreeNode(value: string, data: any): boolean {
-  if (!value) return true;
-  const q = value.toLowerCase();
-  return data.code.toLowerCase().includes(q) || data.name.toLowerCase().includes(q);
-}
+const treeExpanded = ref(false);
 
 const treeProps = {
   children: 'children',
@@ -463,7 +468,10 @@ function typeCodeClass(type: string): string {
 }
 
 // ========== 数据码查询 ==========
-const queryMode = ref<'tree' | 'search'>('tree');
+const queryMode = ref<'tree' | 'search'>((localStorage.getItem('codevalidate_query_mode') as 'tree' | 'search') || 'tree');
+watch(queryMode, (mode) => {
+  localStorage.setItem('codevalidate_query_mode', mode);
+});
 
 function formatTime(tm: string): string {
   const d = new Date(tm);
@@ -515,10 +523,12 @@ async function loadTreeNode(node: any, resolve: Function) {
   }
 }
 
-function onCollapseAll() {
-  // 只收起第一层（类型域节点）下的子节点，保留一级目录展开
+function onToggleTree() {
+  treeExpanded.value = !treeExpanded.value;
   for (const node of treeRef.value?.store?.root?.childNodes || []) {
-    if (!node.isLeaf) node.collapse();
+    if (!node.isLeaf) {
+      treeExpanded.value ? node.expand() : node.collapse();
+    }
   }
 }
 
@@ -794,11 +804,94 @@ onMounted(() => {
   border-radius: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   border: 1px solid #f0f0f0;
-  padding: 8px 16px 16px;
+  padding: 8px 0 16px 0;
+  overflow: hidden;
 }
 
-.page-tabs {
-  margin-top: -8px;
+/* ==================== 左侧标签导航 ==================== */
+.page-layout {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+.cyber-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  width: 130px;
+  flex-shrink: 0;
+  border-right: 1px solid #f0f2f5;
+}
+.cyber-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+.cyber-tab:hover {
+  background: rgba(59,130,246,0.05);
+}
+.cyber-tab:hover .cyber-tab-icon {
+  color: #3b82f6;
+}
+.cyber-tab.active {
+  background: #eff6ff;
+}
+.cyber-tab.active .cyber-tab-label {
+  color: #3b82f6;
+  font-weight: 600;
+}
+.cyber-tab.active .cyber-tab-icon {
+  color: #3b82f6;
+}
+.cyber-tab.active .cyber-tab-indicator {
+  opacity: 1;
+}
+.cyber-tab-indicator {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.cyber-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: color 0.25s ease;
+}
+.cyber-tab-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+.tab-content {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px 12px 16px;
+}
+.tab-panel {
+  animation: panelIn 0.25s ease;
+}
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ==================== Tab 1: 字典树工具栏 ==================== */
@@ -807,9 +900,9 @@ onMounted(() => {
 /* --- 顶部 Hero --- */
 .tech-hero {
   position: relative;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   background: linear-gradient(135deg, #e8f4fd 0%, #eef2ff 50%, #e0f2fe 100%);
   background-size: 200% 200%;
   animation: heroGradient 8s ease infinite;
@@ -832,8 +925,8 @@ onMounted(() => {
 }
 .tech-glow {
   position: absolute;
-  width: 350px;
-  height: 350px;
+  width: 250px;
+  height: 250px;
   border-radius: 50%;
   filter: blur(100px);
   opacity: 0.1;
@@ -844,16 +937,16 @@ onMounted(() => {
 .tech-glow-2 { bottom: -120px; left: -80px; background: #c4b5fd; animation-delay: 3s; }
 .tech-hero-content {
   position: relative;
-  padding: 20px 30px;
+  padding: 14px 20px;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 .tech-hero-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -864,18 +957,18 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(59,130,246,0.25);
 }
 .tech-hero-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 .tech-hero-text {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 .tech-hero-title {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   font-family: 'Ma Shan Zheng', 'STXingkai', 'KaiTi', serif;
   background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
@@ -931,7 +1024,7 @@ onMounted(() => {
 }
 
 	/* --- 数据概览卡片组 --- */
-.tech-metrics-wrap { margin-bottom: 16px; }
+.tech-metrics-wrap { margin-bottom: 12px; }
 .tech-metrics-filter {
   display: flex;
   gap: 6px;
@@ -956,14 +1049,14 @@ onMounted(() => {
 }
 .tech-metrics {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 .tech-metric-card {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 10px 12px;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #f0f2f5;
@@ -985,18 +1078,18 @@ onMounted(() => {
   opacity: 0.6;
 }
 .tmc-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 15px;
   flex-shrink: 0;
 }
-.tmc-body { flex: 1; }
-.tmc-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
-.tmc-label { font-size: 12px; color: #909399; margin-top: 2px; }
+.tmc-body { flex: 1; min-width: 0; }
+.tmc-value { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.tmc-label { font-size: 11px; color: #909399; margin-top: 1px; white-space: nowrap; }
 
 /* --- 主面板 (树/查询) --- */
 .tech-panel {
@@ -1044,18 +1137,40 @@ onMounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: 1px solid #e8ecf1;
+  border: 1.5px solid #e4e9f2;
   background: #fff;
-  color: #606266;
+  color: #64748b;
   font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
 }
-.tph-action-btn:hover { border-color: #667eea; color: #667eea; }
-.tph-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.tph-action-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+  box-shadow: 0 2px 12px rgba(59,130,246,0.15);
+  transform: translateY(-1px);
+}
+.tph-action-btn:active {
+  transform: translateY(0);
+}
+.tph-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+.tph-action-btn .spinning {
+  animation: tphSpin 1s linear infinite;
+}
+@keyframes tphSpin {
+  to { transform: rotate(360deg); }
+}
 
 .tech-panel-body { padding: 8px 0; }
 
@@ -1285,7 +1400,10 @@ onMounted(() => {
   background: #e8f0fe !important;
 }
 .styled-table :deep(.el-table__cell) {
-  padding: 4px 0 !important;
+  padding: 8px 0 !important;
+}
+.styled-table :deep(.el-table__header-wrapper .el-table__cell) {
+  padding: 8px 0 !important;
 }
 .styled-table :deep(.el-table--border) { border-color: #ebeef5; }
 
@@ -1303,19 +1421,19 @@ onMounted(() => {
 /* ==================== 提交记录卡片 ==================== */
 .section-card {
   background: #ffffff;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid #f0f0f0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   overflow: hidden;
 }
 
 .section-header {
-  padding: 12px 16px;
+  padding: 8px 10px;
   border-bottom: 1px solid #f5f5f5;
 }
 
 .section-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #303133;
   position: relative;
@@ -1731,6 +1849,61 @@ onMounted(() => {
 .el-table-filter__bottom button:hover {
   color: #66b1ff !important;
   text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
+}
+
+/* 科技风枚举值徽章 */
+.enum-badge {
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  letter-spacing: 0.5px;
+  transition: all 0.25s ease;
+  margin-right: 4px;
+}
+.enum-badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+  pointer-events: none;
+}
+.enum-submit {
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 2px 8px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.enum-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(59,130,246,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.enum-submit:active {
+  transform: translateY(0);
+}
+.enum-delete {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 2px 8px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.enum-delete:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(239,68,68,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.enum-delete:active {
+  transform: translateY(0);
+}
+.reject-hint {
+  display: block;
+  margin-top: 2px;
+  color: #f56c6c;
+  font-size: 11px;
+  line-height: 1.4;
+  max-width: 160px;
 }
 
 /* 提交记录表各列均分宽度 */

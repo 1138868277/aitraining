@@ -54,6 +54,7 @@ export async function getApprovalList(
   status?: string,
   pageNum: number = 1,
   pageSize: number = 20,
+  sourceTenant?: string,
 ): Promise<{ items: any[]; total: number }> {
   const schema = getAdminSchema();
   const conditions: string[] = [];
@@ -70,6 +71,11 @@ export async function getApprovalList(
       conditions.push(`status IN (${placeholders.join(',')})`);
       params.push(...statuses);
     }
+  }
+
+  if (sourceTenant) {
+    conditions.push(`source_tenant = $${idx++}`);
+    params.push(sourceTenant);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

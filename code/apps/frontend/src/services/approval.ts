@@ -41,6 +41,7 @@ export async function getApprovalList(
   pageNum: number = 1,
   pageSize: number = 20,
   status?: string,
+  sourceTenant?: string,
 ): Promise<{
   items: Array<{
     approvalId: number;
@@ -63,6 +64,7 @@ export async function getApprovalList(
 }> {
   const params: any = { pageNum, pageSize };
   if (status) params.status = status;
+  if (sourceTenant) params.sourceTenant = sourceTenant;
   const res = await api.get('/approval/pending-list', { params });
   return res.data;
 }

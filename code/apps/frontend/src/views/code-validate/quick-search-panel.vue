@@ -1,142 +1,101 @@
 <template>
   <div class="quick-search-panel">
     <!-- 搜索栏 -->
-    <div class="tech-search-bar">
-      <el-input
-        v-model="searchQuery"
-        placeholder="输入数据码名称或编码，回车查询"
-        clearable
-        size="large"
-        @keyup.enter="doSearch"
-        class="search-input-tech"
-      >
-        <template #prefix>
-          <span style="color:#667eea">🔎</span>
-        </template>
-        <template #append>
-          <el-button @click="doSearch" :loading="searching" class="search-btn-tech">查询</el-button>
-        </template>
-      </el-input>
+    <div class="qs-search-section">
+      <div class="qs-search-input-wrap">
+        <el-input
+          v-model="searchQuery"
+          placeholder="输入数据码名称模糊查询，回车查询"
+          clearable
+          size="large"
+          @keyup.enter="doSearch"
+          class="qs-search-input"
+        >
+          <template #prefix>
+            <svg class="qs-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </template>
+        </el-input>
+      </div>
     </div>
 
-    <!-- 筛选栏 -->
-    <div v-if="searched" class="filter-bar">
-      <div class="filter-row">
-        <el-select
-          v-model="typeFilter"
-          placeholder="类型"
-          clearable
-          size="small"
-          class="filter-select"
-          @change="onFilterChange"
-        >
-          <el-option
-            v-for="opt in typeOptions"
-            :key="opt.value"
-            :label="opt.text"
-            :value="opt.value"
-          />
-        </el-select>
-        <el-select
-          v-model="secondClassFilter"
-          placeholder="二级类码"
-          clearable
-          size="small"
-          class="filter-select"
-          @change="onFilterChange"
-        >
-          <el-option
-            v-for="opt in secondClassOptions"
-            :key="opt.value"
-            :label="opt.text"
-            :value="opt.value"
-          />
-        </el-select>
-        <el-select
-          v-model="dataCategoryFilter"
-          placeholder="数据类码"
-          clearable
-          size="small"
-          class="filter-select"
-          @change="onFilterChange"
-        >
-          <el-option
-            v-for="opt in dataCategoryOptions"
-            :key="opt.value"
-            :label="opt.text"
-            :value="opt.value"
-          />
-        </el-select>
-        <el-button
-          v-if="hasActiveFilter"
-          size="small"
-          @click="clearFilters"
-          class="clear-filter-btn"
-        >
-          清除筛选
-        </el-button>
-      </div>
-      <!-- 激活的筛选标签 -->
-      <div v-if="hasActiveFilter" class="filter-tags">
-        <el-tag
-          v-if="typeFilter"
-          closable
-          size="small"
-          @close="typeFilter = ''; onFilterChange()"
-        >
-          类型: {{ typeLabel(typeFilter) }}
-        </el-tag>
-        <el-tag
-          v-if="secondClassFilter"
-          closable
-          size="small"
-          type="primary"
-          @close="secondClassFilter = ''; onFilterChange()"
-        >
-          二级类码: {{ secondClassFilter }}
-        </el-tag>
-        <el-tag
-          v-if="dataCategoryFilter"
-          closable
-          size="small"
-          type="success"
-          @close="dataCategoryFilter = ''; onFilterChange()"
-        >
-          数据类码: {{ dataCategoryFilter }}
-        </el-tag>
-      </div>
+    <!-- 类型快速筛选 -->
+    <div class="qs-type-filter">
+      <button
+        :class="['qs-type-btn', { active: typeFilter === '' }]"
+        @click="typeFilter = ''; onFilterChange()"
+      >
+        <span class="qs-type-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </span>
+        全部
+      </button>
+      <button
+        :class="['qs-type-btn', { active: typeFilter === 'F' }]"
+        @click="typeFilter = 'F'; onFilterChange()"
+      >
+        <span class="qs-type-icon">🌬️</span>
+        风电
+      </button>
+      <button
+        :class="['qs-type-btn', { active: typeFilter === 'G' }]"
+        @click="typeFilter = 'G'; onFilterChange()"
+      >
+        <span class="qs-type-icon">☀️</span>
+        光伏
+      </button>
+      <button
+        :class="['qs-type-btn', { active: typeFilter === 'S' }]"
+        @click="typeFilter = 'S'; onFilterChange()"
+      >
+        <span class="qs-type-icon">💧</span>
+        水电
+      </button>
     </div>
 
     <!-- 搜索结果统计 -->
-    <div v-if="searched" class="search-meta">
-      <span v-if="resultItems.length > 0">
+    <div v-if="searched" class="qs-meta">
+      <template v-if="searching">
+        <span class="qs-meta-searching">查询中...</span>
+      </template>
+      <template v-else-if="resultItems.length > 0">
         共检索到 <strong>{{ total }}</strong> 条匹配记录
-      </span>
-      <span v-else>未找到匹配的数据码</span>
+      </template>
+      <template v-else>
+        <span class="qs-meta-empty">未找到匹配的数据码</span>
+      </template>
+    </div>
+    <div v-else class="qs-meta qs-meta-hint">
+      输入关键词后回车开始查询
     </div>
 
     <!-- 结果表格 -->
-    <div v-if="resultItems.length > 0" class="search-table-wrap">
-      <el-table :data="resultItems" stripe style="width:100%" size="small" class="tech-table">
+    <div v-show="resultItems.length > 0" class="qs-table-wrap">
+      <el-table :data="resultItems" stripe style="width:100%;table-layout:fixed" size="small" class="qs-table" v-loading="searching">
         <el-table-column label="类型" width="80" align="center">
           <template #default="{ row }">
-            <el-tag :type="typeTagType(row.typeCode)" size="small" effect="plain">{{ typeLabel(row.typeCode) }}</el-tag>
+            <el-tag :type="typeTagType(row.typeCode)" size="small" effect="plain" class="qs-type-tag">{{ typeLabel(row.typeCode) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="二级类码" min-width="140">
-          <template #default="{ row }">{{ row.secondClassCode }} {{ row.secondClassName }}</template>
-        </el-table-column>
-        <el-table-column label="数据类码" min-width="140">
-          <template #default="{ row }">{{ row.dataCategoryCode }} {{ row.dataCategoryName }}</template>
-        </el-table-column>
-        <el-table-column label="数据码" min-width="150">
+        <el-table-column label="二级类码">
           <template #default="{ row }">
-            <code class="tech-code-tag">{{ row.dataCode }}</code>
-            <span style="margin-left:6px;">{{ row.dataName }}</span>
+            <el-tag size="small" color="#e8f4fd" style="color:#1677ff;border:none;font-family:monospace;margin-right:4px;">{{ row.secondClassCode }}</el-tag>
+            <span class="qs-name-tag">{{ row.secondClassName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="数据类码">
+          <template #default="{ row }">
+            <el-tag size="small" color="#f0f9eb" style="color:#67c23a;border:none;font-family:monospace;margin-right:4px;">{{ row.dataCategoryCode }}</el-tag>
+            <span class="qs-name-tag">{{ row.dataCategoryName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="数据码">
+          <template #default="{ row }">
+            <el-tag size="small" color="#fdf6ec" style="color:#e6a23c;border:none;font-family:monospace;margin-right:4px;">{{ row.dataCode }}</el-tag>
+            <span class="qs-name-tag">{{ row.dataName }}</span>
           </template>
         </el-table-column>
       </el-table>
-      <div v-if="total > pageSize" class="search-pagination">
+      <div v-if="total > pageSize" class="qs-pagination">
         <el-pagination
           v-model:current-page="pageNum"
           v-model:page-size="pageSize"
@@ -167,19 +126,6 @@ const pageNum = ref(1);
 const pageSize = ref(20);
 
 const typeFilter = ref('');
-const secondClassFilter = ref('');
-const dataCategoryFilter = ref('');
-
-const typeOptions = ref<Array<{ text: string; value: string }>>([]);
-const secondClassOptions = ref<Array<{ text: string; value: string }>>([]);
-const dataCategoryOptions = ref<Array<{ text: string; value: string }>>([]);
-
-/** 标记是否正在自动选择筛选条件，防止递归触发 */
-let applyingAutoSelect = false;
-
-const hasActiveFilter = computed(() =>
-  !!(typeFilter.value || secondClassFilter.value || dataCategoryFilter.value)
-);
 
 function typeLabel(code: string): string {
   if (!code) return '';
@@ -199,7 +145,7 @@ function typeTagType(code: string): 'primary' | 'success' | 'info' | 'warning' {
   return 'warning';
 }
 
-async function fetchData(initialSearch = false) {
+async function fetchData() {
   const q = searchQuery.value.trim();
   if (!q) return;
   searching.value = true;
@@ -207,43 +153,9 @@ async function fetchData(initialSearch = false) {
     const result = await dictService.quickSearchDict(
       q, pageNum.value, pageSize.value,
       typeFilter.value || undefined,
-      secondClassFilter.value || undefined,
-      dataCategoryFilter.value || undefined,
     );
     resultItems.value = result.items;
     total.value = result.total;
-    typeOptions.value = (result.typeOptions || []).map((t: string) => ({
-      text: t === 'F' ? 'F 风电' : t === 'G' ? 'G 光伏' : t === 'S' ? 'S 水电' : t,
-      value: t,
-    }));
-    secondClassOptions.value = (result.secondClassOptions || []).map((s: any) => ({
-      text: `${s.secondClassCode} ${s.secondClassName}`,
-      value: s.secondClassCode,
-    }));
-    dataCategoryOptions.value = (result.dataCategoryOptions || []).map((d: any) => ({
-      text: `${d.dataCategoryCode} ${d.dataCategoryName}`,
-      value: d.dataCategoryCode,
-    }));
-
-    // 初始搜索后自动选择唯一筛选选项
-    if (initialSearch && !applyingAutoSelect) {
-      applyingAutoSelect = true;
-      let changed = false;
-      if (!typeFilter.value && typeOptions.value.length === 1) {
-        typeFilter.value = typeOptions.value[0].value;
-        changed = true;
-      }
-      if (!secondClassFilter.value && secondClassOptions.value.length === 1) {
-        secondClassFilter.value = secondClassOptions.value[0].value;
-        changed = true;
-      }
-      if (!dataCategoryFilter.value && dataCategoryOptions.value.length === 1) {
-        dataCategoryFilter.value = dataCategoryOptions.value[0].value;
-        changed = true;
-      }
-      applyingAutoSelect = false;
-      // 如果自动选中了筛选条件，当前结果已正确，不触发重查
-    }
   } catch {
     ElMessage.error('查询失败');
     resultItems.value = [];
@@ -252,23 +164,16 @@ async function fetchData(initialSearch = false) {
   }
 }
 
-async function doSearch() {
+function doSearch() {
   const q = searchQuery.value.trim();
   if (!q) return;
   pageNum.value = 1;
   searched.value = true;
-  await fetchData(true);
-}
-
-function onFilterChange() {
-  pageNum.value = 1;
   fetchData();
 }
 
-function clearFilters() {
-  typeFilter.value = '';
-  secondClassFilter.value = '';
-  dataCategoryFilter.value = '';
+function onFilterChange() {
+  if (!searched.value) return;
   pageNum.value = 1;
   fetchData();
 }
@@ -283,89 +188,248 @@ function onPageChange() {
   padding: 20px 16px;
 }
 
-.tech-search-bar {
-  max-width: 600px;
+/* ========== 搜索栏 ========== */
+.qs-search-section {
+  max-width: 640px;
   margin: 0 auto;
 }
-
-.search-input-tech :deep(.el-input__wrapper) {
-  border-radius: 10px 0 0 10px !important;
-  box-shadow: 0 0 0 1.5px #e8ecf1 inset !important;
+.qs-search-input-wrap {
+  position: relative;
 }
-.search-input-tech :deep(.el-input__wrapper:hover) {
+.qs-search-input :deep(.el-input__wrapper) {
+  border-radius: 12px !important;
+  box-shadow: 0 0 0 1.5px #e2e6ec inset !important;
+  background: #fff;
+  transition: all 0.3s ease;
+}
+.qs-search-input :deep(.el-input__wrapper:hover) {
   box-shadow: 0 0 0 1.5px #667eea inset !important;
 }
-.search-input-tech :deep(.el-input__wrapper.is-focus) {
+.qs-search-input :deep(.el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 2px rgba(102,126,234,0.3) inset !important;
+  border-color: transparent;
 }
-.search-btn-tech {
-  border-radius: 0 10px 10px 0 !important;
-  background: linear-gradient(135deg, #667eea, #764ba2) !important;
-  color: #fff !important;
-  border: none !important;
-  padding: 0 24px !important;
-  font-weight: 600;
+.qs-search-icon {
+  color: #94a3b8;
+  width: 18px;
+  height: 18px;
 }
-.search-btn-tech:hover { opacity: 0.9; }
 
-/* 筛选栏 */
-.filter-bar {
-  margin-top: 16px;
-}
-.filter-row {
+/* ========== 类型快速筛选 ========== */
+.qs-type-filter {
   display: flex;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.qs-type-btn {
+  display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 18px;
+  border-radius: 8px;
+  border: 1.5px solid #e8ecf1;
+  background: #fff;
+  color: #909399;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
 }
-.filter-select {
-  width: 200px;
+.qs-type-btn:hover {
+  border-color: #c0c8d6;
+  color: #606266;
 }
-.clear-filter-btn {
-  flex-shrink: 0;
+.qs-type-btn.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.06));
+  color: #667eea;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(102,126,234,0.15);
 }
-.filter-tags {
+.qs-type-icon {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  font-size: 14px;
+  line-height: 1;
 }
 
-/* 搜索结果统计 */
-.search-meta {
+/* ========== 结果统计 ========== */
+.qs-meta {
   text-align: center;
-  margin-top: 16px;
+  margin-top: 14px;
   font-size: 13px;
   color: #909399;
+  min-height: 20px;
 }
-.search-meta strong { color: #667eea; }
+.qs-meta strong { color: #667eea; font-weight: 700; }
+.qs-meta-searching { color: #667eea; }
+.qs-meta-empty { color: #c0c4cc; }
+.qs-meta-hint { color: #c0c4cc; font-size: 12px; }
 
-/* 表格 */
-.search-table-wrap {
+/* ========== 结果表格 ========== */
+.qs-table-wrap {
   margin-top: 12px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid #f0f2f5;
+  background: #fff;
+  min-height: 200px;
 }
-.tech-table :deep(.el-table__header th) {
+.qs-table :deep(.el-table__header th) {
   background: linear-gradient(135deg, #f8f9ff, #f0f2ff) !important;
   color: #4a4a8a !important;
   font-weight: 600 !important;
   font-size: 12px !important;
 }
-.tech-code-tag {
-  background: rgba(230,162,60,0.12);
-  color: #e6a23c;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 12px;
+.qs-table :deep(.el-table__body tr:hover) {
+  background: #f0f7ff !important;
+}
+.qs-type-tag {
   font-weight: 600;
 }
-.search-pagination {
+.qs-name-tag {
+  color: #909399;
+  font-size: 12px;
+}
+.qs-pagination {
+  margin-top: 8px;
   padding: 10px 16px;
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid #f2f4f8;
+  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);
+  border-top: 1px solid #eef2f8;
+  position: relative;
+}
+.qs-pagination::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.qs-pagination :deep(.el-pagination) {
+  font-weight: 500;
+}
+.qs-pagination :deep(.el-pagination button) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+.qs-pagination :deep(.el-pagination button:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+  box-shadow: 0 0 12px rgba(59,130,246,0.15);
+}
+.qs-pagination :deep(.el-pagination button:disabled) {
+  border-color: #e4e9f2;
+  color: #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+}
+.qs-pagination :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  margin: 0 2px;
+}
+.qs-pagination :deep(.el-pager li:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+}
+.qs-pagination :deep(.el-pager li.is-active) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.30);
+}
+.qs-pagination :deep(.el-pagination__total) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-right: 12px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.05));
+  border: 1px solid rgba(59,130,246,0.12);
+  border-radius: 6px;
+  line-height: 28px;
+  height: 28px;
+  letter-spacing: 0.3px;
+}
+.qs-pagination :deep(.el-pagination__sizes) {
+  margin-right: 8px;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select) {
+  width: 110px;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper) {
+  border-radius: 6px;
+  border: 1px solid rgba(59,130,246,0.15);
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #fff, rgba(59,130,246,0.04));
+  min-height: 32px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper:hover) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59,130,246,0.12) !important;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select .el-input__inner) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select .el-input__suffix) {
+  color: #3b82f6;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select-dropdown) {
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(59,130,246,0.12);
+  padding: 6px;
+  background: rgba(255,255,255,0.98);
+  min-width: 100px;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select-dropdown__item) {
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  padding: 0 12px;
+  height: 32px;
+  line-height: 32px;
+  transition: all 0.15s ease;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select-dropdown__item:hover) {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.04));
+  color: #3b82f6;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 600;
+}
+.qs-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected:hover) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
 }
 </style>

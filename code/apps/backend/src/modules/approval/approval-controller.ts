@@ -129,8 +129,9 @@ router.get('/api/approval/pending-list', async (req: Request, res: Response) => 
     const pageNum = Math.max(1, parseInt(req.query.pageNum as string) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
     const status = (req.query.status as string) || undefined;
+    const sourceTenant = (req.query.sourceTenant as string) || undefined;
 
-    const result = await approvalService.getApprovalList(status, pageNum, pageSize);
+    const result = await approvalService.getApprovalList(status, pageNum, pageSize, sourceTenant);
     success(res, result);
   } catch (err) {
     console.error('Failed to get approval list:', err);

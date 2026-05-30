@@ -9,19 +9,18 @@
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <div class="filter-left">
-        <span class="section-label">审批列表</span>
+        <span class="section-label">{{ activeSubTab === 'pending' ? '待审批列表' : '已审批列表' }}</span>
       </div>
       <div class="filter-right">
+        <el-select v-model="filterRegion" placeholder="提交区域" style="width:140px" clearable @change="loadList">
+          <el-option label="集团" value="admin" />
+          <el-option label="云南省" value="yunnan" />
+          <el-option label="福建省" value="fujian" />
+        </el-select>
         <el-select v-if="activeSubTab === 'done'" v-model="filterStatus" placeholder="审批状态" style="width:140px" clearable @change="loadList">
           <el-option label="已通过" value="approved" />
           <el-option label="已驳回" value="rejected" />
         </el-select>
-        <el-button class="btn-search" @click="loadList">
-          <span class="btn-search-inner">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <span style="margin-left:4px;">搜索</span>
-          </span>
-        </el-button>
         <el-button class="btn-reset" @click="resetFilter">
           <span class="btn-reset-inner">
             <span class="btn-reset-icon">
@@ -35,13 +34,13 @@
 
     <!-- 审批表格 -->
     <div class="table-container">
-      <el-table :data="items" stripe style="width:100%" v-loading="loading" empty-text="暂无审批记录">
-        <el-table-column type="index" label="序号" align="center">
+      <el-table :data="items" stripe style="width:100%;table-layout:fixed" v-loading="loading" empty-text="暂无审批记录">
+        <el-table-column type="index" label="序号" align="center" width="60">
           <template #default="{ $index }">
             {{ ($index + 1) + (pageNum - 1) * pageSize }}
           </template>
         </el-table-column>
-        <el-table-column label="类型" align="center">
+        <el-table-column label="类型" align="center" width="80">
           <template #default="{ row }">
             <el-tag :type="typeTagType(row.typeCode)" size="small" effect="plain">{{ typeLabel(row.typeCode) }}</el-tag>
           </template>
@@ -64,37 +63,29 @@
             <span class="cell-name-tag">{{ row.dataName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="提交区域" align="center" width="110">
+        <el-table-column label="提交区域" align="center" width="100">
           <template #default="{ row }">
             <el-tag size="small" effect="plain" :color="regionColor(row.sourceTenant)" style="color:#fff;border:none;">{{ regionLabel(row.sourceTenant) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.status === 'pending'" type="warning" size="small">待审批</el-tag>
-            <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
-            <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已驳回</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="提交时间">
+        <el-table-column label="提交时间" align="center" width="170">
           <template #default="{ row }">
             <span class="time-cell">{{ formatTime(row.submitTm) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审批时间">
+        <el-table-column label="审批时间" align="center" width="170" v-if="activeSubTab === 'done'">
           <template #default="{ row }">
             <span class="time-cell">{{ row.status === 'pending' ? '-' : formatTime(row.reviewTm) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" align="center">
+        <el-table-column :label="activeSubTab === 'pending' ? '操作' : '状态'" align="center" width="130">
           <template #default="{ row }">
             <template v-if="row.status === 'pending'">
-              <el-button type="primary" link size="small" @click="handleApprove(row)">通过</el-button>
-              <el-button type="danger" link size="small" @click="handleReject(row)">驳回</el-button>
+              <span class="action-btn action-approve" @click="handleApprove(row)">通过</span>
+              <span class="action-btn action-reject" @click="handleReject(row)">驳回</span>
             </template>
-            <span v-else-if="row.status === 'rejected' && row.rejectReason" style="color: #f56c6c; font-size: 12px;">
-              {{ row.rejectReason }}
-            </span>
+            <span v-else-if="row.status === 'approved'" class="status-badge status-approved">通过</span>
+            <span v-else-if="row.status === 'rejected'" class="status-badge status-rejected">驳回</span>
             <span v-else style="color: #c0c4cc;">-</span>
           </template>
         </el-table-column>
@@ -149,6 +140,7 @@ const pageNum = ref(1);
 const pageSize = ref(20);
 const activeSubTab = ref('pending');
 const filterStatus = ref('');
+const filterRegion = ref('');
 
 const rejectDialog = ref(false);
 const rejectReason = ref('');
@@ -168,6 +160,7 @@ async function loadList() {
       pageNum.value,
       pageSize.value,
       status || undefined,
+      filterRegion.value || undefined,
     );
     items.value = result.items;
     total.value = result.total;
@@ -180,12 +173,14 @@ async function loadList() {
 
 function resetFilter() {
   filterStatus.value = '';
+  filterRegion.value = '';
   pageNum.value = 1;
   loadList();
 }
 
 function onTabChange() {
   filterStatus.value = '';
+  filterRegion.value = '';
   pageNum.value = 1;
   loadList();
 }
@@ -279,7 +274,6 @@ onMounted(() => {
 
 <style scoped>
 .approval-mgmt-tab {
-  padding: 16px 0;
   animation: fadeIn 0.3s ease;
 }
 
@@ -289,15 +283,115 @@ onMounted(() => {
 }
 
 .sub-tabs {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+.sub-tabs :deep(.el-tabs__header) {
+  margin: 0;
+}
+
+/* 科技风状态徽章 */
+.status-badge {
+  display: inline-block;
+  padding: 2px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  position: relative;
+}
+.status-approved {
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 2px 8px rgba(16,185,129,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.status-approved::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+  pointer-events: none;
+}
+.status-rejected {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 2px 8px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.status-rejected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+  pointer-events: none;
+}
+.status-pending {
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 2px 8px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.status-pending::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+  pointer-events: none;
+}
+
+/* 科技风操作按钮 */
+.action-btn {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  letter-spacing: 0.5px;
+  transition: all 0.25s ease;
+}
+.action-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+  pointer-events: none;
+}
+.action-approve {
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 2px 8px rgba(16,185,129,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+  margin-right: 6px;
+}
+.action-approve:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(16,185,129,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.action-approve:active {
+  transform: translateY(0);
+}
+.action-reject {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 2px 8px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.action-reject:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(239,68,68,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.action-reject:active {
+  transform: translateY(0);
 }
 
 .filter-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  margin-bottom: 12px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
   background: #ffffff;
   border-radius: 8px;
   border: 1px solid #f0f0f0;
@@ -310,7 +404,7 @@ onMounted(() => {
 }
 
 .section-label {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #303133;
   position: relative;
@@ -338,15 +432,15 @@ onMounted(() => {
   background: #ffffff;
   border-radius: 8px;
   border: 1px solid #f0f0f0;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .cell-name-tag { color: #909399; font-size: 12px; }
 .time-cell { font-family: monospace; font-size: 12px; color: #909399; }
 
 .quick-search-pagination {
-  margin-top: 8px;
-  padding: 10px 16px;
+  margin-top: 6px;
+  padding: 6px 10px;
   display: flex;
   justify-content: flex-end;
   background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);

@@ -69,8 +69,9 @@ export async function getApprovalList(
   status?: string,
   pageNum: number = 1,
   pageSize: number = 20,
+  sourceTenant?: string,
 ) {
-  return approvalDomain.getApprovalList(status, pageNum, pageSize);
+  return approvalDomain.getApprovalList(status, pageNum, pageSize, sourceTenant);
 }
 
 /** 获取当前用户的提交记录 */

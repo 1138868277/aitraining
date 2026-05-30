@@ -156,13 +156,13 @@ import * as statsService from '@/services/statistics';
 const loading = ref(true);
 const importing = ref(false);
 const imported = ref(false);
-const importStatus = ref<{ importing: boolean; batchId: string | null; totalRows: number; importedRows: number; validRows: number; status: string; message?: string; startTime?: number }>({ importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE', message: '' });
+const importStatus = ref<{ importing: boolean; batchId: string | null; totalRows: number; importedRows: number; validRows: number; status: string; message?: string; startTime?: string }>({ importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE', message: '' });
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedFileName = ref('');
 const lastImport = ref({ time: '', count: 0, duration: '' });
 
-function formatDuration(startTime: number): string {
-  const sec = Math.round((Date.now() - startTime) / 1000);
+function formatDuration(startTime: string): string {
+  const sec = Math.round((Date.now() - new Date(startTime).getTime()) / 1000);
   if (sec < 60) return `${sec}秒`;
   const min = Math.floor(sec / 60);
   const s = sec % 60;
@@ -192,7 +192,7 @@ const importProgress = computed(() => {
 const estimatedRemain = computed(() => {
   const s = importStatus.value;
   if (!s.startTime || s.totalRows === 0 || s.importedRows === 0) return '--';
-  const elapsed = (Date.now() - s.startTime) / 1000;
+  const elapsed = (Date.now() - new Date(s.startTime).getTime()) / 1000;
   const progress = s.importedRows / s.totalRows;
   if (progress <= 0) return '--';
   const remainSec = Math.round(elapsed / progress * (1 - progress));

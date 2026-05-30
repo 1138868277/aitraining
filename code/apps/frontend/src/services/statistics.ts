@@ -149,6 +149,7 @@ export async function importMeasurementFile(file: File): Promise<{ batchId: stri
 export async function getImportStatus(): Promise<{
   importing: boolean; batchId: string | null; totalRows: number;
   importedRows: number; validRows: number; status: string; message?: string;
+  startTime?: string;
 }> {
   const res = await api.get('/statistics/measurement/import-status');
   return res.data;

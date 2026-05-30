@@ -1,8 +1,25 @@
 <template>
   <div class="statistics-page">
     <div class="page-body">
-      <el-tabs v-model="activeTab" class="page-tabs" @tab-change="onTabChange">
-        <el-tab-pane label="编码生成统计" name="codeGen">
+      <div class="page-layout">
+        <!-- 左侧标签导航 -->
+        <div class="cyber-tabs">
+          <div
+            v-for="tab in tabDefs"
+            :key="tab.name"
+            class="cyber-tab"
+            :class="{ active: activeTab === tab.name }"
+            @click="activeTab = tab.name; onTabChange(tab.name)"
+          >
+            <div class="cyber-tab-icon" v-html="tab.icon"></div>
+            <span class="cyber-tab-label">{{ tab.label }}</span>
+            <div class="cyber-tab-indicator"></div>
+          </div>
+        </div>
+
+        <!-- 右侧内容区 -->
+        <div class="tab-content">
+        <div v-show="activeTab === 'codeGen'" class="tab-panel">
           <div class="tech-hero">
             <div class="tech-hero-bg">
               <div class="tech-grid"></div>
@@ -20,8 +37,8 @@
             </div>
           </div>
           <CodeGenTab />
-        </el-tab-pane>
-        <el-tab-pane label="编码测点分析" name="measure">
+        </div>
+        <div v-show="activeTab === 'measure'" class="tab-panel">
           <div class="tech-hero">
             <div class="tech-hero-bg">
               <div class="tech-grid"></div>
@@ -39,8 +56,10 @@
             </div>
           </div>
           <MeasureTab />
-        </el-tab-pane>
-      </el-tabs>
+        </div>
+
+      </div>
+      </div>
     </div>
   </div>
 </template>
@@ -49,6 +68,13 @@
 import { ref } from 'vue';
 import CodeGenTab from './code-gen-tab.vue';
 import MeasureTab from './measure-tab.vue';
+
+const tabDefs = [
+  { name: 'codeGen', label: '编码生成统计', adminOnly: false,
+    icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>' },
+  { name: 'measure', label: '编码测点分析', adminOnly: false,
+    icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>' },
+];
 
 const activeTab = ref(localStorage.getItem('statistics_active_tab') || 'codeGen');
 
@@ -71,9 +97,9 @@ function onTabChange(name: string | number) {
 /* ==================== 科技风英雄卡片 ==================== */
 .tech-hero {
   position: relative;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   background: linear-gradient(135deg, #e8f4fd 0%, #eef2ff 50%, #e0f2fe 100%);
   background-size: 200% 200%;
   animation: heroGradient 8s ease infinite;
@@ -96,8 +122,8 @@ function onTabChange(name: string | number) {
 }
 .tech-glow {
   position: absolute;
-  width: 350px;
-  height: 350px;
+  width: 250px;
+  height: 250px;
   border-radius: 50%;
   filter: blur(100px);
   opacity: 0.1;
@@ -108,16 +134,16 @@ function onTabChange(name: string | number) {
 .tech-glow-2 { bottom: -120px; left: -80px; background: #c4b5fd; animation-delay: 3s; }
 .tech-hero-content {
   position: relative;
-  padding: 20px 30px;
+  padding: 14px 20px;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 .tech-hero-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -128,18 +154,18 @@ function onTabChange(name: string | number) {
   box-shadow: 0 4px 12px rgba(59,130,246,0.25);
 }
 .tech-hero-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 .tech-hero-text {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 .tech-hero-title {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   font-family: 'Ma Shan Zheng', 'STXingkai', 'KaiTi', serif;
   background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
@@ -199,9 +225,95 @@ function onTabChange(name: string | number) {
   border-radius: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   border: 1px solid #f0f0f0;
-  padding: 8px 16px 16px;
+  padding: 8px 0 16px 0;
+  overflow: hidden;
 }
-.page-tabs { margin-top: -8px; }
+
+/* ==================== 左侧标签导航 ==================== */
+.page-layout {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+.cyber-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  width: 130px;
+  flex-shrink: 0;
+  border-right: 1px solid #f0f2f5;
+}
+.cyber-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+.cyber-tab:hover {
+  background: rgba(59,130,246,0.05);
+}
+.cyber-tab:hover .cyber-tab-icon {
+  color: #3b82f6;
+}
+.cyber-tab.active {
+  background: #eff6ff;
+}
+.cyber-tab.active .cyber-tab-label {
+  color: #3b82f6;
+  font-weight: 600;
+}
+.cyber-tab.active .cyber-tab-icon {
+  color: #3b82f6;
+}
+.cyber-tab.active .cyber-tab-indicator {
+  opacity: 1;
+}
+.cyber-tab-indicator {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.cyber-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: color 0.25s ease;
+}
+.cyber-tab-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+.tab-content {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px 12px 16px;
+}
+.tab-panel {
+  animation: panelIn 0.25s ease;
+}
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 :deep(.el-table__body tr:hover) { background: #f0f7ff !important; }
 :deep(.el-table__body tr) { animation: rowIn 0.25s ease both; }
