@@ -531,9 +531,9 @@ onMounted(() => {
 /* ==================== 科技风英雄卡片 ==================== */
 .tech-hero {
   position: relative;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   background: linear-gradient(135deg, #e8f4fd 0%, #eef2ff 50%, #e0f2fe 100%);
   background-size: 200% 200%;
   animation: heroGradient 8s ease infinite;
@@ -556,8 +556,8 @@ onMounted(() => {
 }
 .tech-glow {
   position: absolute;
-  width: 350px;
-  height: 350px;
+  width: 250px;
+  height: 250px;
   border-radius: 50%;
   filter: blur(100px);
   opacity: 0.1;
@@ -568,16 +568,16 @@ onMounted(() => {
 .tech-glow-2 { bottom: -120px; left: -80px; background: #c4b5fd; animation-delay: 3s; }
 .tech-hero-content {
   position: relative;
-  padding: 20px 30px;
+  padding: 22px 28px;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 .tech-hero-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -588,18 +588,18 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(59,130,246,0.25);
 }
 .tech-hero-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 .tech-hero-text {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 .tech-hero-title {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   font-family: 'Ma Shan Zheng', 'STXingkai', 'KaiTi', serif;
   background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
