@@ -14,6 +14,7 @@ export interface UserRow {
   password: string;
   create_tm: string;
   update_tm: string;
+  last_login_time: string | null;
 }
 
 /** 初始化用户表，若表为空则插入默认用户 */
@@ -28,8 +29,15 @@ export async function initUserTable(): Promise<void> {
       tenant VARCHAR(100) NOT NULL,
       password VARCHAR(200) NOT NULL,
       create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      update_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      update_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_login_time TIMESTAMP
     )`,
+  );
+
+  // 兼容旧表：添加 last_login_time 列（若不存在）
+  await queryAsTenant(
+    ADMIN_TENANT,
+    `ALTER TABLE ${ADMIN_SCHEMA}.cec_sys_user ADD COLUMN IF NOT EXISTS last_login_time TIMESTAMP`,
   );
 
   const existing = await queryOneAsTenant<{ cnt: number }>(
@@ -54,17 +62,27 @@ export async function initUserTable(): Promise<void> {
   }
 }
 
-/** 根据用户名和密码查找用户（登录验证） */
+/** 根据用户名和密码查找用户（登录验证），验证成功则更新登录时间 */
 export async function findUserByCredentials(
   username: string,
   password: string,
 ): Promise<UserRow | null> {
-  return queryOneAsTenant<UserRow>(
+  const user = await queryOneAsTenant<UserRow>(
     ADMIN_TENANT,
     `SELECT * FROM ${ADMIN_SCHEMA}.cec_sys_user
      WHERE username = $1 AND password = $2`,
     [username, password],
   );
+  if (user) {
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    await queryAsTenant(
+      ADMIN_TENANT,
+      `UPDATE ${ADMIN_SCHEMA}.cec_sys_user SET last_login_time = $1 WHERE username = $2`,
+      [now, username],
+    );
+    user.last_login_time = now;
+  }
+  return user;
 }
 
 /** 根据用户名查找用户 */

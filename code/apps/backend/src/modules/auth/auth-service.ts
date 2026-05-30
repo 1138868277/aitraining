@@ -58,6 +58,7 @@ export interface UserVO {
   tenant: string;
   create_tm: string;
   update_tm: string;
+  lastLoginTime: string | null;
 }
 
 /** 将 DB 行转换为驼峰格式 */
@@ -70,6 +71,7 @@ function toUserVO(row: authDomain.UserRow): UserVO {
     tenant: row.tenant,
     create_tm: row.create_tm,
     update_tm: row.update_tm,
+    lastLoginTime: row.last_login_time,
   };
 }
 

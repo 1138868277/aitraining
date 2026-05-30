@@ -198,93 +198,161 @@
     <!-- 新增/编辑对话框 -->
     <el-dialog
       v-model="addDialogVisible"
-      :title="isEditing ? '编辑场站' : '新增场站'"
-      width="500px"
+      width="560px"
+      :close-on-click-modal="false"
       @close="resetForm"
+      class="station-dialog"
     >
-      <el-form ref="formRef" :model="form" label-width="100px">
-        <el-form-item
-          label="场站编码"
-          :rules="[
-            { required: true, message: '请输入场站编码', trigger: 'blur' },
-            { pattern: /^[A-Za-z0-9]{4}$/, message: '场站编码必须为4位数字或字母', trigger: 'blur' },
-          ]"
-          prop="stationCode"
-        >
-          <el-input
-            v-model="form.stationCode"
-            placeholder="4位数字或字母"
-            maxlength="4"
-            :disabled="isEditing"
-            style="width: 160px"
-          />
-        </el-form-item>
-        <el-form-item
-          label="场站名称"
-          :rules="[
-            { required: true, message: '请输入场站名称', trigger: 'blur' },
-            { max: 100, message: '场站名称不能超过100个字符', trigger: 'blur' },
-          ]"
-          prop="stationName"
-        >
-          <el-input v-model="form.stationName" placeholder="请输入场站名称" maxlength="100" />
-        </el-form-item>
-        <el-form-item label="场站类型" prop="stationType">
-          <el-select v-model="form.stationType" placeholder="请选择场站类型" filterable style="width:100%">
-            <el-option label="— 未设置 —" value="" />
-            <el-option label="F1 风电" value="F1" />
-            <el-option label="F2 风电" value="F2" />
-            <el-option label="F3 风电" value="F3" />
-            <el-option label="F4 风电" value="F4" />
-            <el-option label="G1 光伏" value="G1" />
-            <el-option label="G2 光伏" value="G2" />
-            <el-option label="S1 水电" value="S1" />
-            <el-option label="Y0 储能" value="Y0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="所属区域" prop="managementDomain">
-          <el-input v-model="form.managementDomain" placeholder="请输入所属区域（可选）" maxlength="50" />
-        </el-form-item>
+      <template #header>
+        <div class="dialog-header">
+          <div class="dh-icon"><el-icon><Plus /></el-icon></div>
+          <div class="dh-text">
+            <div class="dh-title">{{ isEditing ? '编辑场站' : '新增场站' }}</div>
+            <div class="dh-sub">{{ isEditing ? '修改场站基本信息' : '添加新的场站到系统中' }}</div>
+          </div>
+        </div>
+      </template>
+      <el-form ref="formRef" :model="form" label-position="top" class="station-dialog-form">
+        <div class="form-section">
+          <div class="section-label">
+            <span class="sl-dot"></span>
+            <span class="sl-text">基本信息</span>
+            <span class="sl-line"></span>
+          </div>
+          <div class="form-grid">
+            <div class="form-item" :class="{ active: form.stationCode }">
+              <div class="fi-label">
+                <span class="fi-icon">📡</span>
+                <span>场站编码</span>
+                <span class="fi-req">*</span>
+              </div>
+              <el-input
+                v-model="form.stationCode"
+                placeholder="4位数字或字母"
+                maxlength="4"
+                :disabled="isEditing"
+              />
+            </div>
+            <div class="form-item" :class="{ active: form.stationName }">
+              <div class="fi-label">
+                <span class="fi-icon">🏭</span>
+                <span>场站名称</span>
+                <span class="fi-req">*</span>
+              </div>
+              <el-input v-model="form.stationName" placeholder="请输入场站名称" maxlength="100" />
+            </div>
+            <div class="form-item" :class="{ active: form.stationType }">
+              <div class="fi-label">
+                <span class="fi-icon">⚡</span>
+                <span>场站类型</span>
+              </div>
+              <el-select v-model="form.stationType" placeholder="请选择场站类型" filterable>
+                <el-option label="— 未设置 —" value="" />
+                <el-option label="F1 风电" value="F1" />
+                <el-option label="F2 风电" value="F2" />
+                <el-option label="F3 风电" value="F3" />
+                <el-option label="F4 风电" value="F4" />
+                <el-option label="G1 光伏" value="G1" />
+                <el-option label="G2 光伏" value="G2" />
+                <el-option label="S1 水电" value="S1" />
+                <el-option label="Y0 储能" value="Y0" />
+              </el-select>
+            </div>
+            <div class="form-item" :class="{ active: form.managementDomain }">
+              <div class="fi-label">
+                <span class="fi-icon">🌐</span>
+                <span>所属区域</span>
+              </div>
+              <el-input v-model="form.managementDomain" placeholder="请输入所属区域（可选）" maxlength="50" />
+            </div>
+          </div>
+        </div>
       </el-form>
       <template #footer>
-        <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="confirmSubmit">确认</el-button>
+        <div class="dialog-footer">
+          <el-button class="df-cancel" @click="addDialogVisible = false">取消</el-button>
+          <el-button class="df-confirm" type="primary" :loading="submitting" @click="confirmSubmit">
+            <el-icon v-if="!submitting" style="margin-right:4px;"><Plus /></el-icon>
+            <span>{{ isEditing ? '确认更新' : '确认新增' }}</span>
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
     <!-- 批量新增对话框 -->
-    <el-dialog v-model="showBatchDialog" title="批量新增场站" width="600px" @close="resetBatchForm">
-      <div class="batch-hint">
-        请粘贴场站数据，每行一条，格式：<code>编码 名称</code>，编码和名称之间用空格或Tab分隔。
-        <br>例如：<code>1001 张三风电场</code>
-        <br>如包含所属区域，格式：<code>编码 名称 区域</code>
-      </div>
-      <el-input
-        v-model="batchText"
-        type="textarea"
-        :rows="8"
-        placeholder="请粘贴场站数据，每行一条&#10;编码 名称&#10;编码 名称 区域"
-      />
-      <div class="batch-preview" v-if="parsedBatchEntries.length > 0">
-        <div class="batch-preview-title">已解析 {{ parsedBatchEntries.length }} 条：</div>
-        <div class="batch-preview-list">
-          <el-tag
-            v-for="(entry, index) in parsedBatchEntries"
-            :key="index"
-            size="small"
-            closable
-            @close="removeBatchEntry(index)"
-          >
-            {{ entry.stationCode }} {{ entry.stationName }}
-            <template v-if="entry.managementDomain">({{ entry.managementDomain }})</template>
-          </el-tag>
+    <el-dialog v-model="showBatchDialog" width="600px" :close-on-click-modal="false" @close="resetBatchForm" class="station-dialog batch-dialog">
+      <template #header>
+        <div class="dialog-header">
+          <div class="dh-icon"><el-icon><DocumentAdd /></el-icon></div>
+          <div class="dh-text">
+            <div class="dh-title">批量新增场站</div>
+            <div class="dh-sub">批量导入场站数据，一次新增多条记录</div>
+          </div>
+        </div>
+      </template>
+      <div class="batch-body">
+        <div class="form-section">
+          <div class="section-label">
+            <span class="sl-dot"></span>
+            <span class="sl-text">粘贴数据</span>
+            <span class="sl-line"></span>
+          </div>
+          <div class="batch-hint-card">
+            <div class="bhc-icon">📋</div>
+            <div class="bhc-text">
+              <div class="bhc-title">格式说明</div>
+              <div class="bhc-desc">每行一条，编码和名称之间用空格或Tab分隔</div>
+            </div>
+          </div>
+          <div class="batch-format-examples">
+            <div class="bfe-item">
+              <span class="bfe-label">编码 + 名称</span>
+              <code>1001 张三风电场</code>
+            </div>
+            <div class="bfe-item">
+              <span class="bfe-label">编码 + 名称 + 区域</span>
+              <code>1001 张三风电场 云南</code>
+            </div>
+          </div>
+          <el-input
+            v-model="batchText"
+            type="textarea"
+            :rows="8"
+            placeholder="请粘贴场站数据，每行一条&#10;编码 名称&#10;编码 名称 区域"
+            class="batch-textarea"
+          />
+        </div>
+        <div class="form-section" v-if="parsedBatchEntries.length > 0">
+          <div class="section-label">
+            <span class="sl-dot"></span>
+            <span class="sl-text">解析预览</span>
+            <span class="sl-count">{{ parsedBatchEntries.length }} 条</span>
+            <span class="sl-line"></span>
+          </div>
+          <div class="batch-preview-list">
+            <div
+              v-for="(entry, index) in parsedBatchEntries"
+              :key="index"
+              class="batch-tag-item"
+              :style="{ '--i': index }"
+            >
+              <span class="bti-index">{{ String(index + 1).padStart(2, '0') }}</span>
+              <span class="bti-code">{{ entry.stationCode }}</span>
+              <span class="bti-name">{{ entry.stationName }}</span>
+              <span v-if="entry.managementDomain" class="bti-region">{{ entry.managementDomain }}</span>
+              <button class="bti-del" @click="removeBatchEntry(index)">✕</button>
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
-        <el-button @click="showBatchDialog = false">取消</el-button>
-        <el-button type="primary" :loading="batchSubmitting" :disabled="parsedBatchEntries.length === 0" @click="confirmBatch">
-          确认新增 ({{ parsedBatchEntries.length }} 条)
-        </el-button>
+        <div class="dialog-footer">
+          <el-button class="df-cancel" @click="showBatchDialog = false">取消</el-button>
+          <el-button class="df-confirm" type="primary" :loading="batchSubmitting" :disabled="parsedBatchEntries.length === 0" @click="confirmBatch">
+            <el-icon v-if="!batchSubmitting" style="margin-right:4px;"><Plus /></el-icon>
+            <span>确认新增 ({{ parsedBatchEntries.length }} 条)</span>
+          </el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -973,59 +1041,384 @@ onMounted(() => {
   gap: 4px;
 }
 
-/* ==================== 批量提示 ==================== */
-.batch-hint {
-  font-size: 13px;
-  color: #909399;
+/* ==================== 批量对话框 ==================== */
+.batch-dialog {
+  --batch-primary: #3b7bbd;
+}
+.batch-body {
+  padding: 4px 28px;
+}
+.batch-body .form-section {
+  margin-bottom: 20px;
+}
+.batch-body .form-section:last-child {
+  margin-bottom: 0;
+}
+
+.batch-hint-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0f6ff, #eef2ff);
+  border: 1px solid rgba(59, 123, 189, 0.12);
+  border-radius: 10px;
   margin-bottom: 12px;
-  line-height: 1.8;
 }
-
-.batch-hint code {
-  background: #f0f5ff;
-  padding: 1px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #3b82f6;
-  font-weight: 600;
-}
-
-.batch-preview {
-  margin-top: 12px;
-}
-
-.batch-preview-title {
+.bhc-icon { font-size: 24px; line-height: 1; }
+.bhc-text { flex: 1; }
+.bhc-title {
   font-size: 13px;
-  color: #606266;
-  margin-bottom: 8px;
-  font-weight: 500;
+  font-weight: 700;
+  color: #1e293b;
+}
+.bhc-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.batch-format-examples {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.bfe-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1.5px solid #e8ecf1;
+  border-radius: 10px;
+  transition: all 0.25s ease;
+}
+.bfe-item:hover {
+  border-color: #c1d3e8;
+  background: #f5f8fe;
+}
+.bfe-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.3px;
+}
+.bfe-item code {
+  font-size: 12px;
+  color: #3b7bbd;
+  font-weight: 600;
+  background: rgba(59, 123, 189, 0.06);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.batch-textarea :deep(.el-textarea__inner) {
+  border-radius: 10px;
+  border: 1.5px solid #e8ecf1;
+  box-shadow: none;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  line-height: 1.6;
+  padding: 12px 14px;
+  transition: all 0.25s ease;
+  background: #fafbfc;
+}
+.batch-textarea :deep(.el-textarea__inner:hover) {
+  border-color: #c1d3e8;
+  background: #f5f8fe;
+}
+.batch-textarea :deep(.el-textarea__inner:focus) {
+  border-color: #3b7bbd;
+  box-shadow: 0 0 0 3px rgba(59, 123, 189, 0.08);
+  background: #fff;
 }
 
 .batch-preview-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
 }
+.batch-tag-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1.5px solid #e8ecf1;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+  animation: tagIn 0.25s ease both;
+  animation-delay: calc(var(--i, 0) * 0.04s);
+}
+.batch-tag-item:hover {
+  border-color: #c1d3e8;
+  background: #f5f8fe;
+}
+@keyframes tagIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.bti-index {
+  width: 24px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #c0c8d6;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.bti-code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #3b7bbd;
+  width: 70px;
+  flex-shrink: 0;
+}
+.bti-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bti-region {
+  font-size: 11px;
+  color: #94a3b8;
+  background: #f1f4f8;
+  padding: 1px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.bti-del {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #c0c8d6;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.bti-del:hover {
+  color: #f56c6c;
+  background: #fef0f0;
+}
 
-/* ==================== 对话框美化 ==================== */
-:deep(.el-dialog) {
-  border-radius: 12px;
+/* ==================== 对话框科技风 ==================== */
+.station-dialog :deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  background: linear-gradient(145deg, #ffffff, #fafbfc);
+}
+.station-dialog :deep(.el-dialog__header) {
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+.station-dialog :deep(.el-dialog__body) {
+  padding: 0 28px 8px;
+}
+.station-dialog :deep(.el-dialog__footer) {
+  padding: 12px 28px 20px;
+  border-top: 1px solid #f0f2f5;
+  background: #fafbfc;
+  border-radius: 0 0 16px 16px;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 28px 16px;
+  background: linear-gradient(135deg, #0f1b2d 0%, #1e3a5f 40%, #2d5a8e 100%);
+  position: relative;
   overflow: hidden;
 }
-
-:deep(.el-dialog__header) {
-  padding: 20px 24px 0;
-  font-weight: 700;
+.dialog-header::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  right: -10%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 60%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.dialog-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+}
+.dh-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.dh-text { position: relative; z-index: 1; }
+.dh-title {
   font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.dh-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
 }
 
-:deep(.el-dialog__body) {
-  padding: 20px 24px;
+.station-dialog-form { padding: 6px 0; }
+.form-section { margin-bottom: 22px; }
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+.sl-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 0.3px;
+}
+.sl-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, #e2e8f0, transparent);
 }
 
-:deep(.el-dialog__footer) {
-  padding: 0 24px 20px;
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-item {
+  background: #f8fafc;
+  border: 1.5px solid #e8ecf1;
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.form-item:hover {
+  border-color: #c1d3e8;
+  background: #f5f8fe;
+}
+.form-item.active {
+  border-color: #3b7bbd;
+  background: #f0f6ff;
+  box-shadow: 0 0 0 3px rgba(59, 123, 189, 0.08);
+}
+
+.fi-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.fi-icon { font-size: 14px; }
+.fi-req { color: #f56c6c; margin-left: 1px; }
+
+.form-item :deep(.el-input__wrapper),
+.form-item :deep(.el-select .el-input__wrapper) {
+  background: #fff;
   border: none;
+  box-shadow: 0 0 0 1px #e2e8f0 inset;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+  padding: 2px 8px;
+}
+.form-item :deep(.el-input__wrapper:hover),
+.form-item :deep(.el-select .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #94a3b8 inset;
+}
+.form-item :deep(.el-input__wrapper.is-focus),
+.form-item :deep(.el-select .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(59, 123, 189, 0.25) inset;
+}
+.form-item :deep(.el-input__inner) {
+  height: 32px;
+  font-size: 13px;
+}
+.form-item :deep(.el-select) { width: 100%; }
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.df-cancel {
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 8px 20px;
+  border: 1.5px solid #e2e8f0;
+  color: #64748b;
+  transition: all 0.25s ease;
+}
+.df-cancel:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+.df-confirm {
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 8px 22px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #0f1b2d, #1e3a5f);
+  border: none;
+  transition: all 0.3s ease;
+  letter-spacing: 0.3px;
+}
+.df-confirm:hover {
+  background: linear-gradient(135deg, #1e3a5f, #2d5a8e);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(30, 58, 95, 0.35);
+}
+.df-confirm:active {
+  transform: translateY(0);
+}
+.df-confirm.is-disabled {
+  background: linear-gradient(135deg, #94a3b8, #b0bec5) !important;
 }
 
 /* ==================== 过渡动效 ==================== */
