@@ -35,7 +35,9 @@
             @clear="onQuickSearchClear"
           >
             <template #prefix>
-              <span class="search-prefix">搜索</span>
+              <span class="search-prefix">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              </span>
             </template>
           </el-input>
           <div v-if="recentSearchTags.length > 0" class="recent-search-tags">
@@ -128,11 +130,9 @@
                 v-model:current-page="quickSearchPageNum"
                 v-model:page-size="quickSearchPageSize"
                 :total="quickSearchTotal"
-                :page-sizes="[10, 20, 50, 100]"
-                layout="total, sizes, prev, pager, next"
+                layout="total, prev, pager, next"
                 small
                 @current-change="onQuickSearchPageChange"
-                @size-change="onQuickSearchPageChange"
               />
             </div>
           </template>
@@ -317,11 +317,18 @@
         <el-tab-pane label="编码预览" name="preview">
           <div v-if="generatedCodes.length > 0" class="card-default" style="border-top: none;">
             <div class="card-header">
-              <div style="display:flex;align-items:center;gap:8px;">
+              <div style="display:flex;align-items:center;gap:12px;">
                 <span class="card-header-title" style="margin-right:4px;">共 {{ generatedCodes.length }} 条</span>
                 <span class="filter-divider" />
-                <el-button size="default" @click="copyAllPreview">复制全部</el-button>
-                <el-button size="default" type="primary" :loading="savedSaving" @click="handleSaveCodes">保存</el-button>
+                <button class="tb-btn" @click="copyAllPreview">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>复制全部</span>
+                </button>
+                <button class="tb-btn primary" :class="{ loading: savedSaving }" @click="handleSaveCodes" :disabled="savedSaving">
+                  <svg v-if="savedSaving" class="tb-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
+                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  <span>{{ savedSaving ? '保存中...' : '保存' }}</span>
+                </button>
               </div>
             </div>
             <el-table :data="paginatedPreviewCodes" stripe v-loading="savedSaving" style="width:100%" class="styled-table" max-height="520" :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }">
@@ -368,17 +375,20 @@
         <el-tab-pane label="编码列表" name="saved">
           <div class="card-default" style="border-top: none;">
             <div class="card-header" style="justify-content: flex-end; border-bottom: none; padding: 8px 16px;">
-              <div class="filter-actions">
-                <el-button @click="onResetListFilter" size="small">重置</el-button>
+              <div class="filter-actions" style="display:flex;align-items:center;gap:8px;">
+                <button class="tb-btn" @click="onResetListFilter">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  <span>重置</span>
+                </button>
                 <span class="filter-divider" />
-                <el-button :disabled="selectedRows.length === 0" @click="handleExport" size="small">
-                  <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></template>
-                  导出选中
-                </el-button>
-                <el-button :disabled="selectedRows.length === 0" @click="handleDeleteSelected" size="small">
-                  <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></template>
-                  删除选中
-                </el-button>
+                <button class="tb-btn" :disabled="selectedRows.length === 0" @click="handleExport">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>导出选中</span>
+                </button>
+                <button class="tb-btn danger" :disabled="selectedRows.length === 0" @click="handleDeleteSelected">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <span>删除选中</span>
+                </button>
               </div>
             </div>
 
@@ -1013,7 +1023,7 @@ const quickSearchSearched = ref(false);
 const quickSearchTotal = ref(0);
 const quickSearchTableRef = ref<any>(null);
 const quickSearchPageNum = ref(1);
-const quickSearchPageSize = ref(20);
+const quickSearchPageSize = ref(100);
 const quickSearchTypeFilter = ref('');
 const quickSearchSecondClassFilter = ref<string[]>([]);
 const quickSearchTypeOptions = ref<string[]>([]);
@@ -1116,7 +1126,8 @@ function onAutoCodeSuccess(codes: Array<{ code: string; name: string; generateTi
   ElMessage.success(`成功生成 ${codes.length} 条编码`);
 }
 
-const genMode = ref('manual');
+const genMode = ref(localStorage.getItem('code_gen_mode') || 'manual');
+watch(genMode, (val) => localStorage.setItem('code_gen_mode', val));
 
 /** 快速检索持久化 */
 const QUICK_SEARCH_STATE_KEY = 'quick_search_state';
@@ -1399,19 +1410,26 @@ onMounted(async () => {
     // 加载编码总数
     loadCodeTotalCount();
 
-    // 恢复快速检索持久化状态
+    // 恢复快速检索持久化状态（搜索内容始终置空）
     const savedState = loadQuickSearchState();
-    if (savedState && savedState.text) {
-      quickSearchText.value = savedState.text;
-      quickSearchTypeFilter.value = savedState.typeFilter || '';
+    if (savedState) {
+      quickSearchText.value = ''; // 搜索内容刷新后始终置空
       quickSearchLocked.value = savedState.locked || false;
-      quickSearchPageNum.value = savedState.pageNum || 1;
-      quickSearchPageSize.value = savedState.pageSize || 20;
-      if (savedState.secondClassFilter && savedState.secondClassFilter.length > 0) {
-        quickSearchSecondClassFilter.value = savedState.secondClassFilter;
+      if (savedState.locked) {
+        // 锁定状态：保持类型和二级类码的锁定值
+        quickSearchTypeFilter.value = savedState.typeFilter || '';
+        if (savedState.secondClassFilter && savedState.secondClassFilter.length > 0) {
+          quickSearchSecondClassFilter.value = savedState.secondClassFilter;
+        }
+      } else {
+        // 未锁定：重置所有筛选
+        quickSearchTypeFilter.value = '';
+        quickSearchSecondClassFilter.value = [];
+        quickSearchSecondClassOptions.value = [];
+        quickSearchTypeOptions.value = [];
       }
-      quickSearchSearched.value = true;
-      await doQuickSearch(false);
+      quickSearchPageNum.value = 1;
+      quickSearchPageSize.value = 100;
     }
   } catch (err: any) {
     ElMessage.error('编码生成加载失败，请刷新重试');
@@ -2072,8 +2090,11 @@ function cancelEditName() {
 }
 
 .search-prefix {
-  color: #909399;
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  height: 22px;
 }
 
 .quick-search-results {
@@ -2090,8 +2111,144 @@ function cancelEditName() {
 
 .quick-search-pagination {
   margin-top: 8px;
+  padding: 10px 16px;
   display: flex;
   justify-content: flex-end;
+  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);
+  border-top: 1px solid #eef2f8;
+  position: relative;
+}
+.quick-search-pagination::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
+  opacity: 0.5;
+}
+.quick-search-pagination :deep(.el-pagination) {
+  font-weight: 500;
+}
+.quick-search-pagination :deep(.el-pagination button) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination button:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+  box-shadow: 0 0 12px rgba(59,130,246,0.15);
+}
+.quick-search-pagination :deep(.el-pagination button:disabled) {
+  border-color: #e4e9f2;
+  color: #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+}
+.quick-search-pagination :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  margin: 0 2px;
+}
+.quick-search-pagination :deep(.el-pager li:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+}
+.quick-search-pagination :deep(.el-pager li.is-active) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.30);
+}
+.quick-search-pagination :deep(.el-pagination__total) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-right: 12px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.05));
+  border: 1px solid rgba(59,130,246,0.12);
+  border-radius: 6px;
+  line-height: 28px;
+  height: 28px;
+  letter-spacing: 0.3px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes) {
+  margin-right: 8px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select) {
+  width: 110px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper) {
+  border-radius: 6px;
+  border: 1px solid rgba(59,130,246,0.15);
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #fff, rgba(59,130,246,0.04));
+  min-height: 32px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper:hover) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59,130,246,0.12) !important;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__inner) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__suffix) {
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown) {
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(59,130,246,0.12);
+  padding: 6px;
+  background: rgba(255,255,255,0.98);
+  min-width: 100px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item) {
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  padding: 0 12px;
+  height: 32px;
+  line-height: 32px;
+  transition: all 0.15s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item:hover) {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.04));
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 600;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected:hover) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+.quick-search-pagination :deep(.el-pagination__rightwrapper) {
+  gap: 4px;
 }
 
 .quick-search-filter-bar {
@@ -2424,6 +2581,65 @@ function cancelEditName() {
   transform: translateY(0);
 }
 
+/* ===== 工具栏按钮 ===== */
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border: 1.5px solid #d1d9e6;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  color: #475569;
+  background: #fff;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.tb-btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+.tb-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+.tb-btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border: none;
+  box-shadow: 0 3px 10px rgba(59,130,246,0.2);
+}
+.tb-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 5px 16px rgba(59,130,246,0.35);
+  transform: translateY(-1px);
+  color: #fff;
+}
+.tb-btn.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.tb-btn.danger:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  box-shadow: 0 4px 12px rgba(220,38,38,0.08);
+}
+.tb-btn.loading { pointer-events: none; }
+.tb-spinner {
+  animation: tbSpin 0.8s linear infinite;
+}
+@keyframes tbSpin {
+  to { transform: rotate(360deg); }
+}
 
 .saved-filter-bar {
   margin-bottom: 12px;
