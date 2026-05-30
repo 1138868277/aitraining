@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { UserFilled, InfoFilled, SwitchButton } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth';
@@ -81,6 +81,10 @@ const auth = useAuthStore();
 
 const isLoginPage = computed(() => route.path === '/login');
 const currentRoute = computed(() => route.path);
+
+onMounted(() => {
+  auth.initActivityTracker();
+});
 
 function handleCommand(command: string) {
   if (command === 'logout') {

@@ -124,7 +124,7 @@
             <div class="list-pagination">
               <span style="font-size:13px;color:#909399;">共 {{ quickSearchResults.length }} 条结果</span>
             </div>
-            <div class="quick-search-pagination">
+            <div class="quick-search-pagination tech-pagination">
               <el-pagination
                 v-if="quickSearchTotal > 0"
                 v-model:current-page="quickSearchPageNum"
@@ -200,8 +200,8 @@
                     :key="option"
                     size="small"
                     class="quick-option-tag"
-                    :class="{ 'is-disabled': lockedFields[field.key] }"
-                    @click="lockedFields[field.key] || (conditions[field.key] = option, onConditionChange(field.key))"
+                    :class="{ 'is-disabled': lockedFields[field.key] || field.disabled(conditions) }"
+                    @click="(lockedFields[field.key] || field.disabled(conditions)) || (conditions[field.key] = option, onConditionChange(field.key))"
                   >
                     {{ option }}
                   </el-tag>
@@ -355,14 +355,13 @@
                 </template>
               </el-table-column>
             </el-table>
-            <div class="list-pagination">
+            <div class="list-pagination tech-pagination">
               <el-pagination
                 v-model:current-page="previewPageNum"
                 v-model:page-size="previewPageSize"
                 :total="generatedCodes.length"
                 :page-sizes="[10, 20, 50, 100, 200, 500]"
                 layout="total, sizes, prev, pager, next"
-                background
                 @current-change="onPreviewPageChange"
                 @size-change="onPreviewSizeChange"
               />
@@ -469,14 +468,13 @@
               </el-table-column>
             </el-table>
 
-            <div class="list-pagination">
+            <div class="list-pagination tech-pagination">
               <el-pagination
                 v-model:current-page="listPageNum"
                 v-model:page-size="listPageSize"
                 :total="listTotal"
                 :page-sizes="[10, 20, 50, 100]"
                 layout="total, sizes, prev, pager, next"
-                background
                 @current-change="loadCodeList"
                 @size-change="loadCodeList"
               />
@@ -517,7 +515,7 @@ interface ConditionField {
 
 const conditionFields: ConditionField[] = [
   { key: 'stationCode', label: '场站（1-4位）', required: true, disabled: () => false, type: 'select' },
-  { key: 'typeCode', label: '类型（5-6位）', required: true, disabled: () => false, type: 'select', quickOptions: ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'S1', 'Y0'] },
+  { key: 'typeCode', label: '类型（5-6位）', required: true, disabled: (c) => !!c.stationCode, type: 'select', quickOptions: ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'S1', 'Y0'] },
   { key: 'projectLineCode', label: '项目期号&并网线路（7-9位）', required: true, disabled: () => false, type: 'input', quickOptions: ['111', '112', '121', '122'] },
   { key: 'prefixNo', label: '前缀号', required: true, disabled: () => false, type: 'select' },
   { key: 'firstClassCode', label: '一级类码（11-12位）', required: true, disabled: () => false, type: 'select' },
@@ -531,6 +529,8 @@ const conditionFields: ConditionField[] = [
 
 const conditions = reactive<Record<string, any>>({});
 const dictOptions = reactive<Record<string, Array<{ code: string; name: string }>>>({});
+/** 场站代码 → 类型编码映射 */
+const stationTypeMap = ref<Record<string, string>>({});
 
 /** 记录上一次的类型编码，用于判断是否跨类型家族切换 */
 const previousTypeCode = ref('');
@@ -1364,6 +1364,10 @@ onMounted(async () => {
     ]);
     dictOptions['stationCode'] = stations;
     dictOptions['typeCode'] = types;
+    // 构建场站→类型映射（station.parentCode 即为类型编码）
+    const sMap: Record<string, string> = {};
+    stations.forEach((s: any) => { if (s.parentCode) sMap[s.code] = s.parentCode; });
+    stationTypeMap.value = sMap;
     dictOptions['prefixNo'] = prefixes;
     dictOptions['firstClassCode'] = firstClass;
     dictOptions['dataTypeCode'] = []; // 数据类码需要根据类型和二级类码加载，初始化为空
@@ -1389,6 +1393,14 @@ onMounted(async () => {
     conditions.firstClassCode = lockedFields.firstClassCode ? (lockedValues.firstClassCode || '') : (productionOperation ? productionOperation.code : '');
     conditions.projectLineCode = lockedFields.projectLineCode ? (lockedValues.projectLineCode || '') : '111';
     conditions.secondClassCode = lockedFields.secondClassCode ? (lockedValues.secondClassCode || '') : '';
+
+    // 如果场站已设置，自动从场站推导类型
+    if (conditions.stationCode) {
+      const autoType = stationTypeMap.value[conditions.stationCode];
+      if (autoType) {
+        conditions.typeCode = autoType;
+      }
+    }
 
     // 项目期号&并网线路默认"111"
     conditions.projectLineCode = '111';
@@ -1449,6 +1461,52 @@ async function onConditionChange(key: string) {
     const field = conditionFields.find(f => f.key === nextKey);
     conditions[nextKey] = field?.multiple ? [] : '';
     dictOptions[nextKey] = [];
+  }
+
+  // 场站变更时自动设置类型
+  if (key === 'stationCode') {
+    const stationType = stationTypeMap.value[conditions[key]] || '';
+    if (stationType) {
+      // 类型改变了，需要先清理旧的级联数据
+      const oldFamily = getTypeFamily(conditions.typeCode);
+      const newFamily = getTypeFamily(stationType);
+      if (newFamily !== oldFamily) {
+        if (!lockedFields.secondClassCode) conditions.secondClassCode = '';
+        conditions.secondExtCodeStart = '1';
+        conditions.secondExtCodeCount = '1';
+        conditions.thirdClassCode = '';
+        conditions.thirdExtCodeStart = '0';
+        conditions.thirdExtCodeCount = '1';
+        conditions.dataTypeCode = '';
+        conditions.dataCode = [];
+        dictOptions['secondClassCode'] = [];
+        dictOptions['thirdClassCode'] = [];
+        dictOptions['dataTypeCode'] = [];
+        dictOptions['dataCode'] = [];
+      }
+      conditions.typeCode = stationType;
+      // 加载新类型下的二级类码
+      try {
+        const items = await dictService.getSecondClassByType(stationType);
+        dictOptions['secondClassCode'] = items;
+      } catch {}
+      if (oldFamily && newFamily !== oldFamily && generatedCodes.value.length > 0) {
+        generatedCodes.value = [];
+      }
+      previousTypeCode.value = stationType;
+    } else {
+      // 场站清空时，类型也清空
+      conditions.typeCode = '';
+      dictOptions['secondClassCode'] = [];
+      dictOptions['thirdClassCode'] = [];
+      dictOptions['dataTypeCode'] = [];
+      dictOptions['dataCode'] = [];
+      conditions.secondClassCode = '';
+      conditions.thirdClassCode = '';
+      conditions.dataTypeCode = '';
+      conditions.dataCode = [];
+    }
+    return;
   }
 
   // 类型代码变更时，重新加载二级类码列表
@@ -2128,7 +2186,7 @@ function cancelEditName() {
   background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
   opacity: 0.5;
 }
-.quick-search-pagination :deep(.el-pagination) {
+.tech-pagination :deep(.el-pagination) {
   font-weight: 500;
 }
 .quick-search-pagination :deep(.el-pagination button) {
@@ -3141,6 +3199,23 @@ function cancelEditName() {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid #f5f5f5;
+}
+.list-pagination.tech-pagination {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);
+  border-top: 1px solid #eef2f8;
+  position: relative;
+}
+.list-pagination.tech-pagination::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
+  opacity: 0.5;
+  pointer-events: none;
 }
 .cell-name {
   color: #303133;

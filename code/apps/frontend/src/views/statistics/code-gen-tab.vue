@@ -126,16 +126,19 @@
       <div class="card-header">
         <span class="card-header-title">编码生成列表</span>
         <div class="filter-actions">
-          <el-button @click="onResetListFilter" size="small">重置</el-button>
+          <button class="tb-btn" @click="onResetListFilter">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            <span>重置</span>
+          </button>
           <span class="filter-divider" />
-          <el-button :disabled="selectedRows.length === 0" @click="handleExport" size="small">
-            <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></template>
-            导出选中
-          </el-button>
-          <el-button :disabled="selectedRows.length === 0" @click="handleDeleteSelected" size="small">
-            <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></template>
-            删除选中
-          </el-button>
+          <button class="tb-btn" :disabled="selectedRows.length === 0" @click="handleExport">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>导出选中</span>
+          </button>
+          <button class="tb-btn danger" :disabled="selectedRows.length === 0" @click="handleDeleteSelected">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span>删除选中</span>
+          </button>
         </div>
       </div>
 
@@ -1012,5 +1015,47 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
 .el-table-filter__bottom button:hover {
   color: #66b1ff !important;
   text-shadow: 0 0 8px rgba(64, 158, 255, 0.4);
+}
+
+/* ==================== tb-btn 工具栏按钮 ==================== */
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border: 1.5px solid #d1d9e6;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  color: #475569;
+  background: #fff;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.tb-btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+.tb-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+.tb-btn.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff;
+}
+.tb-btn.danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  box-shadow: 0 4px 12px rgba(220,38,38,0.08);
 }
 </style>

@@ -15,11 +15,46 @@ export interface UserInfo {
   avatar?: string;
 }
 
+/** 无操作超时自动登出：6 小时 */
+const INACTIVITY_TIMEOUT = 6 * 60 * 60 * 1000;
+const INACTIVITY_KEY = 'auth_last_activity';
+
+function touchActivity() {
+  localStorage.setItem(INACTIVITY_KEY, String(Date.now()));
+}
+
+function isSessionExpired(): boolean {
+  const last = localStorage.getItem(INACTIVITY_KEY);
+  if (!last) return false;
+  return Date.now() - Number(last) >= INACTIVITY_TIMEOUT;
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserInfo | null>(JSON.parse(localStorage.getItem('auth_user') || 'null'));
   const token = ref<string | null>(localStorage.getItem('auth_token'));
 
   const isLoggedIn = computed(() => user.value !== null && token.value !== null);
+
+  /** 初始化无操作超时检测（在 App.vue 中调用） */
+  let activityTrackerInited = false;
+  function initActivityTracker() {
+    if (activityTrackerInited) return;
+    activityTrackerInited = true;
+
+    // 启动时检查是否已过期
+    if (isSessionExpired()) {
+      logout();
+      return;
+    }
+
+    // 记录本次活跃
+    touchActivity();
+
+    // 监听用户操作事件，更新活跃时间
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    const onActivity = () => touchActivity();
+    events.forEach(ev => window.addEventListener(ev, onActivity));
+  }
 
   async function login(username: string, password: string): Promise<boolean> {
     try {
@@ -41,6 +76,9 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = userInfo;
       localStorage.setItem('auth_user', JSON.stringify(userInfo));
 
+      // 登录成功记录活跃时间
+      touchActivity();
+
       return true;
     } catch (err: any) {
       console.error('Login failed:', err);
@@ -53,6 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null;
     localStorage.removeItem('auth_user');
     localStorage.removeItem('auth_token');
+    localStorage.removeItem(INACTIVITY_KEY);
   }
 
   /** 获取所有用户列表 */
@@ -101,7 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user, token, isLoggedIn,
-    login, logout,
+    login, logout, initActivityTracker,
     getUsers, addUser, updateUser, deleteUser,
   };
 });
