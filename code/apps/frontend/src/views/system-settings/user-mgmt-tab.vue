@@ -208,7 +208,7 @@ function openAddDialog() {
   isEditing.value = false;
   showPwd.value = false;
   form.displayName = '';
-  form.region = '集团';
+  form.region = '';
   form.username = '';
   form.password = '';
   dialogVisible.value = true;
