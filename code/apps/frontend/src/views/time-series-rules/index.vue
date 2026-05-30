@@ -994,27 +994,14 @@ onMounted(async () => {
 .pipeline-title {
   font-size: 28px;
   font-weight: 700;
-  color: #1a2a4a;
+  font-family: 'Ma Shan Zheng', 'STXingkai', 'KaiTi', serif;
+  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 0 0 8px;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   position: relative;
-}
-
-.pipeline-title::after {
-  content: '';
-  display: block;
-  width: 60px;
-  height: 3px;
-  margin: 12px auto 0;
-  background: linear-gradient(90deg, #38bdf8, #818cf8, #38bdf8);
-  background-size: 200% 100%;
-  border-radius: 2px;
-  animation: title-glow 3s ease-in-out infinite;
-}
-
-@keyframes title-glow {
-  0%, 100% { background-position: 0% 0; opacity: 0.6; }
-  50% { background-position: 100% 0; opacity: 1; }
 }
 
 .pipeline-desc {
@@ -1031,29 +1018,12 @@ onMounted(async () => {
   gap: 16px;
   padding: 16px 28px;
   margin: 0 0 28px;
-  background: linear-gradient(135deg, #0b1424 0%, #162240 50%, #0f1f3a 100%);
+  background: linear-gradient(135deg, #e8f4fd 0%, #eef2ff 100%);
   border-radius: 16px;
-  border: 1px solid rgba(56, 189, 248, 0.15);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.15), inset 0 0 60px rgba(56, 189, 248, 0.03);
+  border: 1px solid rgba(59,130,246,0.12);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
   position: relative;
   overflow: hidden;
-}
-
-/* 顶部扫描线 */
-.region-bar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.6), #38bdf8, rgba(56, 189, 248, 0.6), transparent);
-  animation: bar-scan 3s ease-in-out infinite;
-}
-
-@keyframes bar-scan {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
 }
 
 /* 网格背景 */
@@ -1062,8 +1032,8 @@ onMounted(async () => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(59,130,246,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px);
   background-size: 24px 24px;
   pointer-events: none;
 }
@@ -1091,7 +1061,7 @@ onMounted(async () => {
 .region-label {
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(30, 64, 175, 0.5);
   letter-spacing: 2px;
   text-transform: uppercase;
   line-height: 1.2;
@@ -1100,10 +1070,10 @@ onMounted(async () => {
 .tenant-name {
   font-size: 17px;
   font-weight: 700;
-  color: #fff;
+  color: #1e293b;
   letter-spacing: 0.5px;
   line-height: 1.3;
-  background: linear-gradient(90deg, #fff, #94a3b8);
+  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1121,14 +1091,14 @@ onMounted(async () => {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(99, 102, 241, 0.1));
-  color: #818cf8;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  box-shadow: 0 0 16px rgba(99, 102, 241, 0.08), inset 0 0 12px rgba(99, 102, 241, 0.05);
+  border: none;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.25);
   position: relative;
 }
 
@@ -1161,50 +1131,18 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   padding: 8px 18px 8px 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.7);
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(59,130,246,0.1);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.05), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.stat-card:hover::before {
-  opacity: 1;
-}
-
-.stat-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 20%;
-  right: 20%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.2), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.stat-card:hover::after {
-  opacity: 1;
-}
-
 .stat-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(56, 189, 248, 0.2);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(56, 189, 248, 0.03);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(59,130,246,0.2);
+  box-shadow: 0 4px 16px rgba(59,130,246,0.1);
   transform: translateY(-1px);
 }
 
@@ -1220,17 +1158,17 @@ onMounted(async () => {
 }
 
 .stat-icon-station {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.08));
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.15);
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.06);
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 10px rgba(59,130,246,0.2);
 }
 
 .stat-icon-measure {
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.25), rgba(167, 139, 250, 0.08));
-  color: #a78bfa;
-  border: 1px solid rgba(167, 139, 250, 0.15);
-  box-shadow: 0 0 8px rgba(167, 139, 250, 0.06);
+  background: linear-gradient(135deg, #8b5cf6, #d946ef);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 10px rgba(139,92,246,0.2);
 }
 
 .stat-info {
@@ -1242,9 +1180,9 @@ onMounted(async () => {
 .stat-num {
   font-size: 22px;
   font-weight: 800;
-  color: #fff;
+  color: #1e293b;
   letter-spacing: 0.5px;
-  background: linear-gradient(180deg, #fff 60%, rgba(255, 255, 255, 0.7));
+  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1253,7 +1191,7 @@ onMounted(async () => {
 .stat-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(30, 64, 175, 0.5);
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }

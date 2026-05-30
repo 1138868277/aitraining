@@ -1,9 +1,5 @@
 <template>
   <div class="approval-mgmt-tab">
-    <div class="tab-description">
-      管理各区域提交的数据码审批申请，审核通过后将自动下发给所有区域使用。
-    </div>
-
     <!-- 子标签：待审批 / 已审批 -->
     <el-tabs v-model="activeSubTab" class="sub-tabs" @tab-change="onTabChange">
       <el-tab-pane label="待审批" name="pending" />
@@ -273,17 +269,6 @@ onMounted(() => {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-.tab-description {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 16px;
-  padding: 14px 16px;
-  background: #fafbff;
-  border: 1px solid #eef0f6;
-  border-radius: 8px;
-  line-height: 1.6;
 }
 
 .sub-tabs {

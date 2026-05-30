@@ -1,9 +1,5 @@
 <template>
   <div class="user-mgmt-tab">
-    <div class="tab-description">
-      管理系统用户账号，支持添加、编辑、删除操作。修改后即时生效。
-    </div>
-
     <div class="toolbar-card">
       <div class="toolbar-left">
         <span class="section-label">用户列表</span>
@@ -277,17 +273,6 @@ onMounted(() => {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-.tab-description {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 24px;
-  padding: 14px 16px;
-  background: #fafbff;
-  border: 1px solid #eef0f6;
-  border-radius: 8px;
-  line-height: 1.6;
 }
 
 .toolbar-card {

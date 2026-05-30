@@ -1,9 +1,5 @@
 <template>
   <div class="datasource-tab">
-    <div class="tab-description">
-      配置 PG 数据库连接信息，修改后会自动测试连接并切换。切换即时生效，无需重启服务。
-    </div>
-
     <div class="lock-bar">
       <el-alert v-if="locked" type="info" :closable="false" show-icon>
         <template #title>
@@ -221,17 +217,6 @@ onMounted(() => {
 .lock-bar .el-alert .el-button {
   margin: 0 4px;
   vertical-align: baseline;
-}
-
-.tab-description {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 24px;
-  padding: 14px 16px;
-  background: #fafbff;
-  border: 1px solid #eef0f6;
-  border-radius: 8px;
-  line-height: 1.6;
 }
 
 .datasource-form {

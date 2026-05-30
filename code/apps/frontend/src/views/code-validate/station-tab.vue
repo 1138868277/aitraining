@@ -8,8 +8,13 @@
         <div class="tech-glow tech-glow-2"></div>
       </div>
       <div class="tech-hero-content">
-        <h2 class="tech-hero-title"><span class="hero-title-icon">🏭</span> 场站管理</h2>
-        <p class="tech-hero-desc">统一维护新能源场站基本信息，支持新增、编辑、批量导入和导出</p>
+        <div class="tech-hero-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="10" width="6" height="12" rx="1"/><rect x="9" y="6" width="6" height="16" rx="1"/><rect x="16" y="3" width="6" height="19" rx="1"/></svg>
+        </div>
+        <div class="tech-hero-text">
+          <div class="tech-hero-title">场站管理</div>
+          <div class="tech-hero-desc">统一维护新能源场站基本信息，支持新增、编辑、批量导入和导出操作</div>
+        </div>
       </div>
     </div>
 
@@ -500,8 +505,12 @@ onMounted(() => {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 50%, #1d4ed8 100%);
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #e8f4fd 0%, #eef2ff 50%, #e0f2fe 100%);
+  background-size: 200% 200%;
+  animation: heroGradient 8s ease infinite;
+  border: 1px solid rgba(59,130,246,0.12);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
 }
 .tech-hero-bg {
   position: absolute;
@@ -512,42 +521,109 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(59,130,246,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  animation: gridShift 20s linear infinite;
 }
 .tech-glow {
   position: absolute;
-  width: 400px;
-  height: 400px;
+  width: 350px;
+  height: 350px;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.3;
+  filter: blur(100px);
+  opacity: 0.1;
+  pointer-events: none;
+  animation: glowPulse 6s ease-in-out infinite;
 }
-.tech-glow-1 { top: -100px; right: -50px; background: #7dd3fc; }
-.tech-glow-2 { bottom: -120px; left: -80px; background: #1e40af; }
+.tech-glow-1 { top: -120px; right: -60px; background: #93c5fd; animation-delay: 0s; }
+.tech-glow-2 { bottom: -120px; left: -80px; background: #c4b5fd; animation-delay: 3s; }
 .tech-hero-content {
   position: relative;
-  padding: 14px 28px;
+  padding: 20px 30px;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.tech-hero-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border: none;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+}
+.tech-hero-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.tech-hero-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 .tech-hero-title {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
-  color: #fff;
-  margin: 0 0 6px;
-  letter-spacing: 1px;
+  font-family: 'Ma Shan Zheng', 'STXingkai', 'KaiTi', serif;
+  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  white-space: nowrap;
+  letter-spacing: 4px;
+  flex-shrink: 0;
 }
 .tech-hero-desc {
   font-size: 13px;
-  color: rgba(255,255,255,0.5);
-  margin: 0;
-  line-height: 1.6;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
 }
-.hero-title-icon {
-  font-size: 28px;
-  margin-right: 4px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+.tech-hero::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+  border-radius: 0 2px 2px 0;
+  z-index: 2;
+}
+.tech-hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 30px;
+  right: 30px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.15), transparent);
+  z-index: 2;
+}
+
+@keyframes heroGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.08; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1.15); }
+}
+@keyframes gridShift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(28px); }
 }
 
 /* ==================== 工具栏卡片 ==================== */

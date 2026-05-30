@@ -12,8 +12,13 @@
               <div class="tech-glow tech-glow-2"></div>
             </div>
             <div class="tech-hero-content">
-              <h2 class="tech-hero-title"><span class="hero-title-icon">📖</span> 编码字典查询</h2>
-              <p class="tech-hero-desc">按类型 → 二级类码 → 数据类码 → 数据码层级浏览，支持数据码快速检索</p>
+              <div class="tech-hero-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8"/><path d="M8 11h6"/></svg>
+              </div>
+              <div class="tech-hero-text">
+                <div class="tech-hero-title">编码字典查询</div>
+                <div class="tech-hero-desc">按类型 → 二级类码 → 数据类码 → 数据码层级浏览字典数据，支持数据码快速检索和定位</div>
+              </div>
             </div>
           </div>
 
@@ -105,8 +110,13 @@
               <div class="tech-glow tech-glow-2"></div>
             </div>
             <div class="tech-hero-content">
-              <h2 class="tech-hero-title"><span class="hero-title-icon">📝</span> 数据码新增和审批</h2>
-              <p class="tech-hero-desc">手动新增数据码并提交集团审批，审批通过后将自动下发给所有区域使用</p>
+              <div class="tech-hero-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </div>
+              <div class="tech-hero-text">
+                <div class="tech-hero-title">数据码新增和审批</div>
+                <div class="tech-hero-desc">手动新增数据码并提交集团审批，审批通过后将自动下发给所有区域使用</div>
+              </div>
             </div>
           </div>
           <div class="section-card" style="margin-top: 10px;">
@@ -296,8 +306,13 @@
               <div class="tech-glow tech-glow-2"></div>
             </div>
             <div class="tech-hero-content">
-              <h2 class="tech-hero-title"><span class="hero-title-icon">📋</span> 数据码审批</h2>
-              <p class="tech-hero-desc">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</p>
+              <div class="tech-hero-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </div>
+              <div class="tech-hero-text">
+                <div class="tech-hero-title">数据码审批</div>
+                <div class="tech-hero-desc">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</div>
+              </div>
             </div>
           </div>
           <ApprovalMgmtTab @refresh="loadPendingApprovalCount" :key="approvalTabKey" />
@@ -780,8 +795,12 @@ onMounted(() => {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 50%, #1d4ed8 100%);
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #e8f4fd 0%, #eef2ff 50%, #e0f2fe 100%);
+  background-size: 200% 200%;
+  animation: heroGradient 8s ease infinite;
+  border: 1px solid rgba(59,130,246,0.12);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
 }
 .tech-hero-bg {
   position: absolute;
@@ -792,45 +811,109 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(59,130,246,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  animation: gridShift 20s linear infinite;
 }
 .tech-glow {
   position: absolute;
-  width: 400px;
-  height: 400px;
+  width: 350px;
+  height: 350px;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.3;
+  filter: blur(100px);
+  opacity: 0.1;
+  pointer-events: none;
+  animation: glowPulse 6s ease-in-out infinite;
 }
-.tech-glow-1 { top: -100px; right: -50px; background: #7dd3fc; }
-.tech-glow-2 { bottom: -120px; left: -80px; background: #1e40af; }
-
+.tech-glow-1 { top: -120px; right: -60px; background: #93c5fd; animation-delay: 0s; }
+.tech-glow-2 { bottom: -120px; left: -80px; background: #c4b5fd; animation-delay: 3s; }
 .tech-hero-content {
   position: relative;
-  padding: 14px 28px;
+  padding: 20px 30px;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
-.tech-hero-left { flex: 1; }
-.tech-hero-title {
-  font-size: 26px;
-  font-weight: 700;
+.tech-hero-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border: none;
   color: #fff;
-  margin: 0 0 6px;
-  letter-spacing: 1px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+}
+.tech-hero-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.tech-hero-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.tech-hero-title {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: 'Ma Shan Zheng', 'STXingkai', 'KaiTi', serif;
+  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  white-space: nowrap;
+  letter-spacing: 4px;
+  flex-shrink: 0;
 }
 .tech-hero-desc {
   font-size: 13px;
-  color: rgba(255,255,255,0.5);
-  margin: 0;
-  line-height: 1.6;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+.tech-hero::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+  border-radius: 0 2px 2px 0;
+  z-index: 2;
+}
+.tech-hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 30px;
+  right: 30px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.15), transparent);
+  z-index: 2;
 }
 
-.hero-title-icon {
-  font-size: 28px;
-  margin-right: 4px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+@keyframes heroGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.08; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1.15); }
+}
+@keyframes gridShift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(28px); }
 }
 
 	/* --- 数据概览卡片组 --- */

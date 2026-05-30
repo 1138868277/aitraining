@@ -8,8 +8,13 @@
         <div class="tech-glow tech-glow-2"></div>
       </div>
       <div class="tech-hero-content">
-        <h2 class="tech-hero-title"><span class="hero-title-icon">⚙️</span> 编码创建</h2>
-        <p class="tech-hero-desc">根据规则批量生成测点编码，支持导出和修正</p>
+        <div class="tech-hero-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <div class="tech-hero-text">
+          <div class="tech-hero-title">编码创建</div>
+          <div class="tech-hero-desc">根据编码规则筛选条件，灵活批量生成测点编码，支持编码预览、导出和修正</div>
+        </div>
       </div>
     </div>
 
@@ -1914,8 +1919,12 @@ function cancelEditName() {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 50%, #1d4ed8 100%);
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #eef2ff 25%, #f0fdf4 50%, #eef2ff 75%, #e0f2fe 100%);
+  background-size: 300% 300%;
+  animation: heroGradient 4s ease infinite;
+  border: 1px solid rgba(59,130,246,0.12);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.08);
 }
 .tech-hero-bg {
   position: absolute;
@@ -1926,42 +1935,129 @@ function cancelEditName() {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(59,130,246,0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.1) 1px, transparent 1px);
+  background-size: 28px 28px;
+  animation: gridShift 10s linear infinite;
+}
+.tech-hero::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6, #3b82f6, #8b5cf6);
+  background-size: 100% 300%;
+  animation: borderBarPulse 3s ease infinite;
+  border-radius: 0 2px 2px 0;
+  z-index: 2;
 }
 .tech-glow {
   position: absolute;
   width: 400px;
   height: 400px;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.3;
+  filter: blur(120px);
+  opacity: 0.15;
+  pointer-events: none;
+  animation: glowPulse 3s ease-in-out infinite;
 }
-.tech-glow-1 { top: -100px; right: -50px; background: #7dd3fc; }
-.tech-glow-2 { bottom: -120px; left: -80px; background: #1e40af; }
+.tech-glow-1 { top: -150px; right: -80px; background: #60a5fa; animation-delay: 0s; }
+.tech-glow-2 { bottom: -150px; left: -100px; background: #a78bfa; animation-delay: 1.5s; }
 .tech-hero-content {
   position: relative;
-  padding: 14px 28px;
+  padding: 20px 30px;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.tech-hero-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border: none;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+  animation: iconPulse 3s ease-in-out infinite;
+}
+.tech-hero-icon svg {
+  width: 22px;
+  height: 22px;
+  animation: iconSpin 6s ease-in-out infinite;
+}
+.tech-hero-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 .tech-hero-title {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
-  color: #fff;
-  margin: 0 0 6px;
-  letter-spacing: 1px;
+  font-family: 'Ma Shan Zheng', 'STXingkai', 'KaiTi', serif;
+  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  white-space: nowrap;
+  letter-spacing: 4px;
+  flex-shrink: 0;
 }
 .tech-hero-desc {
   font-size: 13px;
-  color: rgba(255,255,255,0.5);
-  margin: 0;
-  line-height: 1.6;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
 }
-.hero-title-icon {
-  font-size: 28px;
-  margin-right: 4px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+.tech-hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 30px;
+  right: 30px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.15), transparent);
+  z-index: 2;
+}
+
+@keyframes heroGradient {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 0% 100%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.08; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(1.2); }
+}
+@keyframes gridShift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(28px); }
+}
+@keyframes borderBarPulse {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 0% 100%; }
+}
+@keyframes iconPulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(59,130,246,0.25); transform: scale(1); }
+  50% { box-shadow: 0 4px 24px rgba(59,130,246,0.45); transform: scale(1.05); }
+}
+@keyframes iconSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(15deg) scale(1.1); }
+  75% { transform: rotate(-15deg) scale(1.1); }
+  100% { transform: rotate(0deg) scale(1); }
 }
 
 /* ==================== 工具栏卡片 ==================== */
