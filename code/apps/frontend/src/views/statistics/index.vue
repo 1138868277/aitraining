@@ -21,7 +21,7 @@
           </div>
           <CodeGenTab />
         </el-tab-pane>
-        <el-tab-pane label="全量测点统计" name="measure">
+        <el-tab-pane label="编码测点分析" name="measure">
           <div class="tech-hero">
             <div class="tech-hero-bg">
               <div class="tech-grid"></div>
@@ -33,7 +33,7 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
               </div>
               <div class="tech-hero-text">
-                <div class="tech-hero-title">全量测点统计</div>
+                <div class="tech-hero-title">编码测点分析</div>
                 <div class="tech-hero-desc">多维度统计分析全量测点数据，查看区域与类型分布情况</div>
               </div>
             </div>

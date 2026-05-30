@@ -219,7 +219,7 @@
         </el-table-column>
       </el-table>
 
-      <div class="list-pagination">
+      <div class="quick-search-pagination tech-pagination">
         <el-pagination
           v-model:current-page="listPageNum"
           v-model:page-size="listPageSize"
@@ -827,11 +827,146 @@ onMounted(() => { loadOverview(); loadTypeStats(); loadSecondClass(); loadStatio
   background: #dcdfe6;
   margin: 0 4px;
 }
-.list-pagination {
-  padding: 14px 16px;
+.quick-search-pagination {
+  margin-top: 8px;
+  padding: 10px 16px;
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid #f5f5f5;
+  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);
+  border-top: 1px solid #eef2f8;
+  position: relative;
+}
+.quick-search-pagination::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
+  opacity: 0.5;
+}
+.tech-pagination :deep(.el-pagination) {
+  font-weight: 500;
+}
+.quick-search-pagination :deep(.el-pagination button) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination button:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+  box-shadow: 0 0 12px rgba(59,130,246,0.15);
+}
+.quick-search-pagination :deep(.el-pagination button:disabled) {
+  border-color: #e4e9f2;
+  color: #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+}
+.quick-search-pagination :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  margin: 0 2px;
+}
+.quick-search-pagination :deep(.el-pager li:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+}
+.quick-search-pagination :deep(.el-pager li.is-active) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.30);
+}
+.quick-search-pagination :deep(.el-pagination__total) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-right: 12px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.05));
+  border: 1px solid rgba(59,130,246,0.12);
+  border-radius: 6px;
+  line-height: 28px;
+  height: 28px;
+  letter-spacing: 0.3px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes) {
+  margin-right: 8px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select) {
+  width: 110px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper) {
+  border-radius: 6px;
+  border: 1px solid rgba(59,130,246,0.15);
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #fff, rgba(59,130,246,0.04));
+  min-height: 32px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper:hover) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59,130,246,0.12) !important;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__inner) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__suffix) {
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown) {
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(59,130,246,0.12);
+  padding: 6px;
+  background: rgba(255,255,255,0.98);
+  min-width: 100px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item) {
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  padding: 0 12px;
+  height: 32px;
+  line-height: 32px;
+  transition: all 0.15s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item:hover) {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.04));
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 600;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected:hover) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+.quick-search-pagination :deep(.el-pagination__rightwrapper) {
+  gap: 4px;
 }
 .cell-code {
   font-weight: 500;

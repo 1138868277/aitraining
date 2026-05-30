@@ -30,18 +30,43 @@
           @clear="handleSearch"
           @keyup.enter="handleSearch"
         />
-        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
-        <el-button @click="resetSearch">重置</el-button>
+        <el-button class="btn-search" @click="handleSearch">
+          <span class="btn-search-inner">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <span style="margin-left:4px;">查询</span>
+          </span>
+        </el-button>
+        <el-button class="btn-reset" @click="resetSearch">
+          <span class="btn-reset-inner">
+            <span class="btn-reset-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            </span>
+            <span class="btn-reset-text">重置</span>
+          </span>
+        </el-button>
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" @click="addDialogVisible = true">
-          <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增场站
+        <el-button class="btn-add-code" @click="addDialogVisible = true">
+          <span class="btn-add-code-inner">
+            <span class="btn-add-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </span>
+            <span class="btn-add-text">新增场站</span>
+          </span>
         </el-button>
-        <el-button @click="showBatchDialog = true">
-          <el-icon style="margin-right: 4px;"><DocumentAdd /></el-icon>批量新增
+        <el-button class="btn-batch" @click="showBatchDialog = true">
+          <span class="btn-batch-inner">
+            <span class="btn-batch-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            </span>
+            <span class="btn-batch-text">批量新增</span>
+          </span>
         </el-button>
-        <el-button :disabled="stationList.length === 0" @click="handleExport">
-          <el-icon style="margin-right: 4px;"><Download /></el-icon>导出Excel
+        <el-button class="btn-export" :disabled="stationList.length === 0" @click="handleExport">
+          <span class="btn-export-inner">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span style="margin-left:4px;">导出Excel</span>
+          </span>
         </el-button>
         <el-popconfirm
           title="确认删除所有场站数据？此操作不可恢复"
@@ -50,8 +75,11 @@
           @confirm="handleDeleteAll"
         >
           <template #reference>
-            <el-button type="danger" :disabled="stationList.length === 0">
-              <el-icon style="margin-right: 4px;"><Delete /></el-icon>一键删除
+            <el-button class="btn-delete" type="button" :disabled="stationList.length === 0">
+              <span class="btn-delete-inner">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span style="margin-left:4px;">一键删除</span>
+              </span>
             </el-button>
           </template>
         </el-popconfirm>
@@ -153,7 +181,7 @@
       </el-empty>
 
       <!-- 分页 -->
-      <div v-if="total > 0" class="pagination-wrapper">
+      <div v-if="total > 0" class="quick-search-pagination tech-pagination">
         <el-pagination
           v-model:current-page="pageNum"
           v-model:page-size="pageSize"
@@ -803,11 +831,146 @@ onMounted(() => {
 }
 
 /* ==================== 分页 ==================== */
-.pagination-wrapper {
-  padding: 14px 16px;
+.quick-search-pagination {
+  margin-top: 8px;
+  padding: 10px 16px;
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid #f5f5f5;
+  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);
+  border-top: 1px solid #eef2f8;
+  position: relative;
+}
+.quick-search-pagination::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
+  opacity: 0.5;
+}
+.tech-pagination :deep(.el-pagination) {
+  font-weight: 500;
+}
+.quick-search-pagination :deep(.el-pagination button) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination button:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+  box-shadow: 0 0 12px rgba(59,130,246,0.15);
+}
+.quick-search-pagination :deep(.el-pagination button:disabled) {
+  border-color: #e4e9f2;
+  color: #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+}
+.quick-search-pagination :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  margin: 0 2px;
+}
+.quick-search-pagination :deep(.el-pager li:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+}
+.quick-search-pagination :deep(.el-pager li.is-active) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.30);
+}
+.quick-search-pagination :deep(.el-pagination__total) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-right: 12px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.05));
+  border: 1px solid rgba(59,130,246,0.12);
+  border-radius: 6px;
+  line-height: 28px;
+  height: 28px;
+  letter-spacing: 0.3px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes) {
+  margin-right: 8px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select) {
+  width: 110px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper) {
+  border-radius: 6px;
+  border: 1px solid rgba(59,130,246,0.15);
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #fff, rgba(59,130,246,0.04));
+  min-height: 32px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper:hover) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59,130,246,0.12) !important;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__inner) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__suffix) {
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown) {
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(59,130,246,0.12);
+  padding: 6px;
+  background: rgba(255,255,255,0.98);
+  min-width: 100px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item) {
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  padding: 0 12px;
+  height: 32px;
+  line-height: 32px;
+  transition: all 0.15s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item:hover) {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.04));
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 600;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected:hover) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+.quick-search-pagination :deep(.el-pagination__rightwrapper) {
+  gap: 4px;
 }
 
 /* ==================== 批量提示 ==================== */
@@ -873,5 +1036,389 @@ onMounted(() => {
 @keyframes rowIn {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+/* ==================== 炫酷新增按钮 ==================== */
+.btn-add-code {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-add-code::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4, #8b5cf6, #3b82f6);
+  background-size: 300% 300%;
+  animation: btnGradient 4s ease infinite;
+  z-index: 0;
+}
+.btn-add-code::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e40af, #7c3aed);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-add-code:hover::after {
+  background: linear-gradient(135deg, #2563eb, #9333ea);
+  inset: 1px;
+}
+.btn-add-code:hover {
+  box-shadow: 0 8px 32px rgba(59,130,246,0.35) !important;
+  transform: translateY(-1px);
+}
+.btn-add-code:active {
+  transform: translateY(0) !important;
+}
+.btn-add-code-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 22px;
+  height: 100%;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.btn-add-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+.btn-add-code:hover .btn-add-icon {
+  transform: rotate(90deg) scale(1.1);
+}
+.btn-add-text {
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* ==================== 查询按钮 ==================== */
+.btn-search {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-search::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1, #3b82f6);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-search::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff, #f0f4ff);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-search:hover::after {
+  background: #fff;
+  inset: 1px;
+}
+.btn-search:hover {
+  box-shadow: 0 6px 24px rgba(59,130,246,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-search:active {
+  transform: translateY(0) !important;
+}
+.btn-search-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  height: 100%;
+  color: #4f46e5;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ==================== 重置按钮 ==================== */
+.btn-reset {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-reset::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f59e0b, #f97316, #f59e0b);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-reset::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff, #fffbeb);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-reset:hover::after {
+  background: #fff;
+  inset: 1px;
+}
+.btn-reset:hover {
+  box-shadow: 0 6px 24px rgba(245,158,11,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-reset:active {
+  transform: translateY(0) !important;
+}
+.btn-reset-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 100%;
+  color: #d97706;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-reset-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.4s ease;
+}
+.btn-reset:hover .btn-reset-icon {
+  transform: rotate(-60deg);
+}
+
+/* ==================== 批量新增按钮 ==================== */
+.btn-batch {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-batch::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #06b6d4, #8b5cf6);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-batch::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff, #f5f3ff);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-batch:hover::after {
+  background: #fff;
+  inset: 1px;
+}
+.btn-batch:hover {
+  box-shadow: 0 6px 24px rgba(139,92,246,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-batch:active {
+  transform: translateY(0) !important;
+}
+.btn-batch-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 100%;
+  color: #7c3aed;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-batch-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+.btn-batch:hover .btn-batch-icon {
+  transform: scale(1.15);
+}
+
+/* ==================== 导出Excel按钮 ==================== */
+.btn-export {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 20px !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+  color: #fff !important;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.btn-export::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #10b981, #06b6d4, #10b981);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-export::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #059669, #0891b2);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-export:hover::after {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+}
+.btn-export:hover {
+  box-shadow: 0 6px 24px rgba(16,185,129,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-export:active {
+  transform: translateY(0) !important;
+}
+.btn-export .btn-export-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+.btn-export.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-export.is-disabled::before {
+  animation: none;
+}
+
+/* ==================== 一键删除按钮 ==================== */
+.btn-delete {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-delete::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ef4444, #f97316, #ef4444);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-delete::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff, #fef2f2);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-delete:hover::after {
+  background: #fff;
+  inset: 1px;
+}
+.btn-delete:hover {
+  box-shadow: 0 6px 24px rgba(239,68,68,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-delete:active {
+  transform: translateY(0) !important;
+}
+.btn-delete.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-delete.is-disabled::before {
+  animation: none;
+}
+.btn-delete-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 100%;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@keyframes btnGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes btnGrad {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 </style>

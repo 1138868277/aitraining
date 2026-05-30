@@ -40,6 +40,9 @@
           </div>
           <UserMgmtTab />
         </el-tab-pane>
+        <el-tab-pane v-if="isAdmin" label="场站管理" name="station">
+          <StationTab />
+        </el-tab-pane>
       </el-tabs>
     </div>
   </div>
@@ -51,6 +54,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import DatasourceTab from './datasource-tab.vue';
 import UserMgmtTab from './user-mgmt-tab.vue';
+import StationTab from '@/views/code-validate/station-tab.vue';
 
 const route = useRoute();
 const router = useRouter();

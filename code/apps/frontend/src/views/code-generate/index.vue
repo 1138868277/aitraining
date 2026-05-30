@@ -365,7 +365,7 @@
                 </template>
               </el-table-column>
             </el-table>
-            <div class="list-pagination tech-pagination">
+            <div class="quick-search-pagination tech-pagination">
               <el-pagination
                 v-model:current-page="previewPageNum"
                 v-model:page-size="previewPageSize"
@@ -478,7 +478,7 @@
               </el-table-column>
             </el-table>
 
-            <div class="list-pagination tech-pagination">
+            <div class="quick-search-pagination tech-pagination">
               <el-pagination
                 v-model:current-page="listPageNum"
                 v-model:page-size="listPageSize"
@@ -3375,28 +3375,12 @@ function cancelEditName() {
   background: #dcdfe6;
   margin: 0 4px;
 }
+/* ==================== 通用分页器基础样式 ==================== */
 .list-pagination {
   padding: 14px 16px;
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid #f5f5f5;
-}
-.list-pagination.tech-pagination {
-  padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);
-  border-top: 1px solid #eef2f8;
-  position: relative;
-}
-.list-pagination.tech-pagination::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
-  opacity: 0.5;
-  pointer-events: none;
 }
 .cell-name {
   color: #303133;

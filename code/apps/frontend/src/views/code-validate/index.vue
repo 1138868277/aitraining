@@ -123,16 +123,35 @@
             <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;">
               <span class="section-title">新增数据码记录</span>
               <div style="display:flex;gap:8px;">
-                <el-button type="primary" @click="showAddDialog = true">
-                  <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增数据码
+                <el-button class="btn-add-code" @click="showAddDialog = true">
+                  <span class="btn-add-code-inner">
+                    <span class="btn-add-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </span>
+                    <span class="btn-add-text">新增数据码</span>
+                  </span>
                 </el-button>
-                <el-button @click="resetTable">一键重置</el-button>
-                <el-button @click="loadManualStats">刷新</el-button>
+                <el-button class="btn-reset" @click="resetTable">
+                  <span class="btn-reset-inner">
+                    <span class="btn-reset-icon">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    </span>
+                    <span class="btn-reset-text">一键重置</span>
+                  </span>
+                </el-button>
+                <el-button class="btn-refresh" @click="loadManualStats">
+                  <span class="btn-refresh-inner">
+                    <span class="btn-refresh-icon">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    </span>
+                    <span class="btn-refresh-text">刷新</span>
+                  </span>
+                </el-button>
                 <el-button
                   v-if="manualStats.length > 0"
-                  type="primary"
+                  class="btn-export"
                   @click="handleExportStats"
-                >导出Excel</el-button>
+                ><span class="btn-export-inner">导出Excel</span></el-button>
               </div>
             </div>
             <el-table
@@ -202,7 +221,7 @@
                 </template>
               </el-table-column>
             </el-table>
-            <div v-if="statsTotal > 0" class="data-mgmt-pagination">
+            <div v-if="statsTotal > 0" class="quick-search-pagination tech-pagination">
               <el-pagination
                 v-model:current-page="statsPageNum"
                 v-model:page-size="statsPageSize"
@@ -276,7 +295,7 @@
                 </template>
               </el-table-column>
             </el-table>
-            <div v-if="subTotal > 0" class="data-mgmt-pagination">
+            <div v-if="subTotal > 0" class="quick-search-pagination tech-pagination">
               <el-pagination
                 v-model:current-page="subPageNum"
                 v-model:page-size="subPageSize"
@@ -318,10 +337,6 @@
           <ApprovalMgmtTab @refresh="loadPendingApprovalCount" :key="approvalTabKey" />
         </el-tab-pane>
 
-        <!-- Tab 4: 场站维护 -->
-        <el-tab-pane label="场站管理" name="station">
-          <StationTab />
-        </el-tab-pane>
       </el-tabs>
     </div>
     <AddCodeDialog v-model="showAddDialog" @success="onAddCodeSuccess" />
@@ -332,12 +347,11 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Search } from '@element-plus/icons-vue';
+import { Search } from '@element-plus/icons-vue';
 import * as XLSX from 'xlsx';
 import * as validateService from '@/services/validate';
 import * as approvalService from '@/services/approval';
 import * as statsService from '@/services/statistics';
-import StationTab from './station-tab.vue';
 import AddCodeDialog from '@/components/add-code-dialog.vue';
 import QuickSearchPanel from './quick-search-panel.vue';
 import ApprovalMgmtTab from '@/views/system-settings/approval-mgmt-tab.vue';
@@ -1091,11 +1105,146 @@ onMounted(() => {
 
 
 /* ==================== Tab 2: 数据码管理 ==================== */
-.data-mgmt-pagination {
-  padding: 8px 14px;
+.quick-search-pagination {
+  margin-top: 8px;
+  padding: 10px 16px;
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid #f5f5f5;
+  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(34,211,238,0.03) 100%);
+  border-top: 1px solid #eef2f8;
+  position: relative;
+}
+.quick-search-pagination::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #22d3ee, transparent);
+  opacity: 0.5;
+}
+.tech-pagination :deep(.el-pagination) {
+  font-weight: 500;
+}
+.quick-search-pagination :deep(.el-pagination button) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination button:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+  box-shadow: 0 0 12px rgba(59,130,246,0.15);
+}
+.quick-search-pagination :deep(.el-pagination button:disabled) {
+  border-color: #e4e9f2;
+  color: #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+}
+.quick-search-pagination :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e4e9f2;
+  background: #fff;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  margin: 0 2px;
+}
+.quick-search-pagination :deep(.el-pager li:hover) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.06);
+}
+.quick-search-pagination :deep(.el-pager li.is-active) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.30);
+}
+.quick-search-pagination :deep(.el-pagination__total) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-right: 12px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.05));
+  border: 1px solid rgba(59,130,246,0.12);
+  border-radius: 6px;
+  line-height: 28px;
+  height: 28px;
+  letter-spacing: 0.3px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes) {
+  margin-right: 8px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select) {
+  width: 110px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper) {
+  border-radius: 6px;
+  border: 1px solid rgba(59,130,246,0.15);
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #fff, rgba(59,130,246,0.04));
+  min-height: 32px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper:hover) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59,130,246,0.12) !important;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__inner) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select .el-input__suffix) {
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown) {
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(59,130,246,0.12);
+  padding: 6px;
+  background: rgba(255,255,255,0.98);
+  min-width: 100px;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item) {
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  padding: 0 12px;
+  height: 32px;
+  line-height: 32px;
+  transition: all 0.15s ease;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item:hover) {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(34,211,238,0.04));
+  color: #3b82f6;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 600;
+}
+.quick-search-pagination :deep(.el-pagination__sizes .el-select-dropdown__item.selected:hover) {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+.quick-search-pagination :deep(.el-pagination__rightwrapper) {
+  gap: 4px;
 }
 
 /* 排序列标识：隐藏原生箭头，使用自定义伪元素箭头 */
@@ -1193,8 +1342,277 @@ onMounted(() => {
   height: 18px;
   line-height: 18px;
   padding: 0 6px;
+  animation: badgePulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(245,108,108,0.4);
 }
 
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(245,108,108,0.4); }
+  50% { transform: scale(1.15); box-shadow: 0 0 16px rgba(245,108,108,0.7); }
+}
+
+/* ==================== 炫酷新增按钮 ==================== */
+.btn-add-code {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-add-code::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4, #8b5cf6, #3b82f6);
+  background-size: 300% 300%;
+  animation: btnGradient 4s ease infinite;
+  z-index: 0;
+}
+.btn-add-code::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e40af, #7c3aed);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-add-code:hover::after {
+  background: linear-gradient(135deg, #2563eb, #9333ea);
+  inset: 1px;
+}
+.btn-add-code:hover {
+  box-shadow: 0 8px 32px rgba(59,130,246,0.35) !important;
+  transform: translateY(-1px);
+}
+.btn-add-code:active {
+  transform: translateY(0) !important;
+}
+.btn-add-code-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 22px;
+  height: 100%;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.btn-add-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+.btn-add-code:hover .btn-add-icon {
+  transform: rotate(90deg) scale(1.1);
+}
+.btn-add-text {
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+@keyframes btnGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ==================== 一键重置按钮 ==================== */
+.btn-reset {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-reset::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f59e0b, #f97316, #f59e0b);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-reset::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff, #fffbeb);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-reset:hover::after {
+  background: #fff;
+  inset: 1px;
+}
+.btn-reset:hover {
+  box-shadow: 0 6px 24px rgba(245,158,11,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-reset:active {
+  transform: translateY(0) !important;
+}
+.btn-reset-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 100%;
+  color: #d97706;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-reset-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.4s ease;
+}
+.btn-reset:hover .btn-reset-icon {
+  transform: rotate(-60deg);
+}
+
+/* ==================== 刷新按钮 ==================== */
+.btn-refresh {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-refresh::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1, #3b82f6);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-refresh::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff, #f0f4ff);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-refresh:hover::after {
+  background: #fff;
+  inset: 1px;
+}
+.btn-refresh:hover {
+  box-shadow: 0 6px 24px rgba(59,130,246,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-refresh:active {
+  transform: translateY(0) !important;
+}
+.btn-refresh-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 100%;
+  color: #4f46e5;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-refresh-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.4s ease;
+}
+.btn-refresh:hover .btn-refresh-icon {
+  transform: rotate(360deg);
+}
+
+/* ==================== 导出Excel按钮 ==================== */
+.btn-export {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 20px !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+  color: #fff !important;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.btn-export::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #10b981, #06b6d4, #10b981);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-export::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #059669, #0891b2);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-export:hover::after {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+}
+.btn-export:hover {
+  box-shadow: 0 6px 24px rgba(16,185,129,0.3) !important;
+  transform: translateY(-1px);
+}
+.btn-export:active {
+  transform: translateY(0) !important;
+}
+.btn-export .btn-export-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+@keyframes btnGrad {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
 </style>
 
 <style>
