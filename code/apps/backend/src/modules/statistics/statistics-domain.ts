@@ -1,4 +1,4 @@
-import { query, queryOne, getSchema, queryAsTenant } from '../../db/index.js';
+import { query, queryOne, getSchema, queryAsTenant, getTenantClient } from '../../db/index.js';
 
 // ========== 编码生成统计 ==========
 
@@ -662,49 +662,30 @@ export function cancelImport(tenantId: string): void {
   getStore(tenantId).cancelRequested = true;
 }
 
-/** 解析31位编码各段 */
-function parseCodeSegments(code: string): Record<string, string> | null {
-  if (!/^[A-Za-z0-9]{31}$/.test(code)) return null;
-  return {
-    station_code: code.substring(0, 4),
-    type_code: code.substring(4, 6),
-    project_line_code: code.substring(6, 9),
-    prefix_no: code.substring(9, 10),
-    first_class_code: code.substring(10, 12),
-    second_class_code: code.substring(12, 15),
-    second_ext_code: code.substring(15, 19),
-    third_class_code: code.substring(19, 22),
-    third_ext_code: code.substring(22, 26),
-    data_category_code: code.substring(26, 28),
-    data_code: code.substring(28, 31),
-  };
-}
-
-/** 批量插入测点数据 */
+/** 批量插入测点数据（简化版：只写 code + batch_id，段字段由后续 UPDATE 批量计算） */
 async function batchInsertPoints(
-  batchId: string, rows: Array<{ code: string; seg: Record<string, string> }>, schema: string, tenantId: string,
+  batchId: string, codes: string[], schema: string, tenantId: string,
+  client?: any,
 ): Promise<void> {
-  if (rows.length === 0) return;
+  if (codes.length === 0) return;
   const values: string[] = [];
   const params: string[] = [];
   let idx = 1;
-  for (const { code, seg } of rows) {
-    values.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},'system',NOW(),NOW(),'0')`);
-    params.push(code, seg.station_code, seg.type_code, seg.project_line_code,
-      seg.prefix_no, seg.first_class_code, seg.second_class_code,
-      seg.second_ext_code, seg.third_class_code, seg.third_ext_code,
-      seg.data_category_code, seg.data_code, batchId);
+  for (const code of codes) {
+    values.push(`($${idx++}, $${idx++}, 'system', NOW(), NOW(), '0')`);
+    params.push(code, batchId);
   }
   const sql = `INSERT INTO ${schema}.cec_new_energy_measurement_points
-    (code, station_code, type_code, project_line_code, prefix_no,
-     first_class_code, second_class_code, second_ext_code,
-     third_class_code, third_ext_code, data_category_code, data_code,
-     import_batch_id, creator, create_tm, modify_tm, if_delete)
+    (code, import_batch_id, creator, create_tm, modify_tm, if_delete)
     VALUES ${values.join(',')}`;
-  await queryAsTenant(tenantId, sql, params);
+  if (client) {
+    await client.query(sql, params);
+  } else {
+    await queryAsTenant(tenantId, sql, params);
+  }
 }
 
-/** 导入测点Excel */
+/** 导入测点Excel（优化版：TRUNCATE + 分块解析 + 并行重建索引） */
 export async function importMeasurementFile(
   fileBuffer: Buffer, fileName: string, schema: string, tenantId: string,
 ): Promise<{ batchId: string }> {
@@ -722,11 +703,12 @@ export async function importMeasurementFile(
   store.validRows = 0;
   store.startTime = Date.now();
   store.cancelRequested = false;
-  store.message = '正在解析文件...';
+  store.message = '正在初始化...';
 
   const batchId = store.batchId;
+  const BATCH_SIZE = 5000;
 
-  // 确保测点表存在，并创建分析查询所需的索引
+  // 1. 确保表存在，并建好索引（插入时 PG 会增量维护，省去导入后重建的开销）
   await queryAsTenant(tenantId, `CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
     id BIGSERIAL PRIMARY KEY,
     code VARCHAR(31) NOT NULL,
@@ -747,94 +729,147 @@ export async function importMeasurementFile(
     modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     if_delete CHAR(1) DEFAULT '0'
   )`);
-  await queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_type ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code)`);
-  await queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_second_class ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code, second_class_code)`);
-  await queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_station ON ${schema}.cec_new_energy_measurement_points (if_delete, station_code)`);
+  await Promise.all([
+    queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_type ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code)`),
+    queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_second_class ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code, second_class_code)`),
+    queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_station ON ${schema}.cec_new_energy_measurement_points (if_delete, station_code)`),
+  ]);
 
-  // 先清空所有旧数据
-  await queryAsTenant(tenantId, `DELETE FROM ${schema}.cec_new_energy_measurement_points`);
-
+  let client: any = null;
   try {
+    // 3. 解析Excel
+    store.message = '正在解析文件...';
     const wb = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetNames = wb.SheetNames;
     if (!sheetNames.length) throw new Error('IMPORT_DATA_EMPTY');
 
-    // 先统计所有sheet的总行数
+    // 通过 !ref 范围快速统计总行数（无需解析数据）
     let totalRows = 0;
     for (const name of sheetNames) {
       const ws = wb.Sheets[name];
       if (!ws['!ref']) continue;
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
-      totalRows += rows.length;
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      totalRows += range.e.r; // row 0 是表头，range.e.r = 数据行数
     }
     store.totalRows = totalRows;
-    store.message = `共读取 ${totalRows} 行（${sheetNames.length} 个Sheet），正在解析...`;
 
-    // 识别测点编码列（从第一个非空sheet获取列名）
-    let codeCol = '';
+    // 识别测点编码列的索引（使用 header:1 数组模式，与 TSR 保持一致）
+    let codeColIdx = -1;
     for (const name of sheetNames) {
       const ws = wb.Sheets[name];
       if (!ws['!ref']) continue;
-      const firstRows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
-      if (firstRows.length) {
-        const headers = Object.keys(firstRows[0]);
-        codeCol = headers.find(h =>
+      const headerRow = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: '', range: 0 })[0] as (string | number)[];
+      if (headerRow?.length) {
+        const headers = headerRow.map(h => String(h));
+        const idx = headers.findIndex(h =>
           h.includes('测点编码') || h.includes('编码') || h.includes('code') || h.includes('Code')
-        ) || headers[0];
-        break;
+        );
+        if (idx !== -1) { codeColIdx = idx; break; }
       }
     }
-    if (!codeCol) throw new Error('IMPORT_DATA_EMPTY');
+    if (codeColIdx === -1) throw new Error('IMPORT_DATA_EMPTY');
 
-    const batch: Array<{ code: string; seg: Record<string, string> }> = [];
-    let validCount = 0;
+    // 4. 获取专用DB连接，开启事务
+    client = await getTenantClient(tenantId);
+    await client.query('BEGIN');
+
+    // 5. 清空旧数据（TRUNCATE 比 DELETE 快得多，直接释放数据页）
+    await client.query(`TRUNCATE ${schema}.cec_new_energy_measurement_points`);
+
+    // 6. 分块解析 & 批量插入（只写 code + batch_id，不解析段）
+    const batch: string[] = [];
+    let totalValid = 0;
 
     for (const name of sheetNames) {
       if (store.cancelRequested) break;
       const ws = wb.Sheets[name];
-      if (!ws['!ref']) continue;
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
+      const ref = ws['!ref'];
+      if (!ref) continue;
 
-      for (let i = 0; i < rows.length; i++) {
+      const range = XLSX.utils.decode_range(ref);
+      const totalDataRows = range.e.r;
+
+      // 分块读取（参考 TSR 方式，50,000 行一块，避免大文件 OOM）
+      const READ_CHUNK = 50000;
+      for (let startRow = 1; startRow <= totalDataRows; startRow += READ_CHUNK) {
         if (store.cancelRequested) break;
-        const raw = String(rows[i][codeCol] || '').trim();
-        const seg = parseCodeSegments(raw);
-        if (seg) {
-          batch.push({ code: raw, seg });
-          validCount++;
-        }
+        const endRow = Math.min(startRow + READ_CHUNK - 1, totalDataRows);
+        const chunkRange = XLSX.utils.encode_range({
+          s: { r: startRow, c: range.s.c },
+          e: { r: endRow, c: range.e.c },
+        });
+        const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: '', range: chunkRange });
 
-        if (batch.length >= 500) {
-          await batchInsertPoints(batchId, batch, schema, tenantId);
-          store.importedRows += batch.length;
-          batch.length = 0;
-          store.message = `已导入 ${store.importedRows}/${store.totalRows} 行...`;
+        for (const row of rows) {
+          if (store.cancelRequested) break;
+          const raw = String(row[codeColIdx] || '').trim();
+          if (raw) {
+            batch.push(raw);
+            totalValid++;
+          }
+
+          if (batch.length >= BATCH_SIZE) {
+            await batchInsertPoints(batchId, batch, schema, tenantId, client);
+            store.importedRows += batch.length;
+            batch.length = 0;
+            store.message = `已导入 ${store.importedRows}/${store.totalRows} 行...`;
+          }
         }
       }
     }
 
     if (batch.length > 0) {
-      await batchInsertPoints(batchId, batch, schema, tenantId);
+      await batchInsertPoints(batchId, batch, schema, tenantId, client);
       store.importedRows += batch.length;
     }
 
     if (store.cancelRequested) {
-      store.validRows = validCount;
+      await client.query('ROLLBACK');
+      client.release();
+      client = null;
+      store.validRows = totalValid;
       store.importing = false;
       store.status = 'CANCELLED';
-      store.message = `已终止，已导入 ${store.importedRows} 行（有效编码 ${validCount} 条）`;
+      store.message = `已终止，已导入 ${store.importedRows} 行（有效编码 ${totalValid} 条）`;
       return { batchId };
     }
 
-    store.validRows = validCount;
+    // 7. 提交事务
+    await client.query('COMMIT');
+    client.release();
+    client = null;
+
+    // 8. 一条 SQL 批量计算所有段字段（set-based，比逐行 JS substring 快数十倍）
+    store.message = '正在计算编码分段...';
+    await queryAsTenant(tenantId, `
+      UPDATE ${schema}.cec_new_energy_measurement_points SET
+        station_code      = SUBSTRING(code, 1, 4),
+        type_code         = SUBSTRING(code, 5, 2),
+        project_line_code = SUBSTRING(code, 7, 3),
+        prefix_no         = SUBSTRING(code, 10, 1),
+        first_class_code  = SUBSTRING(code, 11, 2),
+        second_class_code = SUBSTRING(code, 13, 3),
+        second_ext_code   = SUBSTRING(code, 16, 4),
+        third_class_code  = SUBSTRING(code, 20, 3),
+        third_ext_code    = SUBSTRING(code, 23, 4),
+        data_category_code = SUBSTRING(code, 27, 2),
+        data_code         = SUBSTRING(code, 29, 3)
+      WHERE import_batch_id = '${batchId}'
+    `);
+
+    store.validRows = totalValid;
     store.importing = false;
     store.status = 'COMPLETED';
-    store.message = `导入完成，有效编码 ${validCount} 条（${sheetNames.length} 个Sheet）`;
+    store.message = `导入完成，有效编码 ${totalValid} 条（${sheetNames.length} 个Sheet）`;
     tableVerifiedSchemas.add(schema);
     cacheClearMeasurement();
 
     return { batchId };
   } catch (err: any) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => {});
+      client.release();
+    }
     store.importing = false;
     store.status = 'FAILED';
     store.message = err.message || '导入失败';

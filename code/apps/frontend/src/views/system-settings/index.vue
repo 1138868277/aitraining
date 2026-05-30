@@ -43,18 +43,38 @@
         <el-tab-pane v-if="isAdmin" label="场站管理" name="station">
           <StationTab />
         </el-tab-pane>
+        <el-tab-pane label="测点导入" name="measureImport">
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <div class="tech-hero-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <div class="tech-hero-text">
+                <div class="tech-hero-title">测点导入</div>
+                <div class="tech-hero-desc">导入测点数据至系统，导入后可在看板和其他功能中使用</div>
+              </div>
+            </div>
+          </div>
+          <MeasureImportTab />
+        </el-tab-pane>
       </el-tabs>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onActivated } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import DatasourceTab from './datasource-tab.vue';
 import UserMgmtTab from './user-mgmt-tab.vue';
 import StationTab from '@/views/code-validate/station-tab.vue';
+import MeasureImportTab from './measure-import-tab.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -68,6 +88,13 @@ const activeTab = ref(
 
 watch(activeTab, (tab) => {
   router.replace({ query: { ...route.query, tab } });
+});
+
+// keep-alive 重新激活时，把当前 tab 同步到 URL query，保证刷新后能回到正确页面
+onActivated(() => {
+  if (route.query.tab !== activeTab.value) {
+    router.replace({ query: { ...route.query, tab: activeTab.value } });
+  }
 });
 </script>
 

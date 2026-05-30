@@ -123,6 +123,15 @@ export async function queryAsTenant<T = any>(tenantId: string, text: string, par
   return result.rows as T[];
 }
 
+/** 获取租户连接池的专用客户端（用于事务等需要保持同一连接的场景） */
+export async function getTenantClient(tenantId: string) {
+  const entry = tenantPools.get(tenantId);
+  if (!entry) {
+    return pool.connect();
+  }
+  return entry.pool.connect();
+}
+
 /** 在指定租户下执行单行查询 */
 export async function queryOneAsTenant<T = any>(tenantId: string, text: string, params?: any[]): Promise<T | null> {
   const entry = tenantPools.get(tenantId);
