@@ -13,7 +13,7 @@
         </div>
         <div class="tech-hero-text">
           <div class="tech-hero-title">场站管理</div>
-          <div class="tech-hero-desc">统一维护新能源场站基本信息，支持新增、编辑、批量导入和导出操作</div>
+          <div class="tech-hero-desc">统一管理新能源场站信息，支持新增、编辑及批量导入导出</div>
         </div>
       </div>
     </div>

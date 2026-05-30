@@ -15,7 +15,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">编码生成统计</div>
-                <div class="tech-hero-desc">统计各类编码的生成记录，支持按时段、类型等多维度筛选和分析，帮助掌握编码生成概况</div>
+                <div class="tech-hero-desc">多维度统计编码生成记录，支持按时段与类型筛选分析</div>
               </div>
             </div>
           </div>
@@ -34,7 +34,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">全量测点统计</div>
-                <div class="tech-hero-desc">对全量测点数据进行多维度统计分析，支持按区域、类型和管理归口等维度查看分布情况</div>
+                <div class="tech-hero-desc">多维度统计分析全量测点数据，查看区域与类型分布情况</div>
               </div>
             </div>
           </div>

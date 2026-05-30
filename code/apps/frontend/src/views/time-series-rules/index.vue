@@ -6,7 +6,7 @@
         <div class="pipeline-header">
           <div class="pipeline-glow"></div>
           <h1 class="pipeline-title">时序稽核规则流水线</h1>
-          <p class="pipeline-desc">自动化批量生成时序数据稽核质量规则</p>
+          <p class="pipeline-desc">自动批量生成时序数据稽核质量规则</p>
         </div>
 
         <div class="region-bar">
@@ -147,10 +147,13 @@
                 <!-- 生成规则 -->
                 <template v-if="step.key === 'generate'">
                   <div class="generate-area">
-                    <el-button type="primary" size="large" class="gen-btn" :disabled="genLoading" @click="startGenerate">
-                      <span class="gen-btn-icon">&#9889;</span>
-                      开始生成稽核规则
-                    </el-button>
+                    <button class="gen-btn" type="button" :disabled="genLoading" @click="startGenerate">
+                      <span class="gen-btn-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                      </span>
+                      <span class="gen-btn-text">{{ genLoading ? '生成中...' : '开始生成稽核规则' }}</span>
+                      <span class="gen-btn-glow"></span>
+                    </button>
                     <p class="gen-hint">将基于场站和测点数据，自动生成死值/跳变/越限/中断四种规则</p>
                   </div>
 
@@ -1744,46 +1747,84 @@ onMounted(async () => {
 }
 
 .gen-btn {
-  font-size: 18px;
-  font-weight: 700;
-  padding: 16px 48px !important;
-  border-radius: 12px !important;
-  letter-spacing: 2px;
-  border: none !important;
-  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4) !important;
-  transition: all 0.3s ease !important;
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 40px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 30%, #60a5fa 50%, #2563eb 70%, #3b82f6 100%);
+  background-size: 300% 100%;
+  background-position: 0% 50%;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
   overflow: hidden;
+  animation: genBtnShimmer 2.5s ease-in-out infinite;
 }
 
-.gen-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-  transform: translateX(-100%);
-  transition: transform 0.6s ease;
+@keyframes genBtnShimmer {
+  0%   { background-position: 0% 50%; box-shadow: 0 4px 16px rgba(59,130,246,0.35); }
+  50%  { background-position: 100% 50%; box-shadow: 0 4px 28px rgba(59,130,246,0.55), 0 0 40px rgba(59,130,246,0.15); }
+  100% { background-position: 0% 50%; box-shadow: 0 4px 16px rgba(59,130,246,0.35); }
 }
 
-.gen-btn:hover::before {
-  transform: translateX(100%);
+.gen-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.55), 0 0 50px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+  animation: none;
 }
 
-.gen-btn:hover {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6) !important;
-  box-shadow: 0 6px 30px rgba(59, 130, 246, 0.55) !important;
-  transform: translateY(-2px) !important;
+.gen-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
-.gen-btn:active {
-  transform: translateY(0) !important;
-  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.3) !important;
+.gen-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  animation: none;
 }
 
 .gen-btn-icon {
-  margin-right: 10px;
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.3s ease;
+}
+
+.gen-btn:hover:not(:disabled) .gen-btn-icon {
+  transform: scale(1.1);
+}
+
+.gen-btn-text {
+  position: relative;
+  z-index: 1;
+}
+
+.gen-btn-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.gen-btn:hover:not(:disabled) .gen-btn-glow {
+  opacity: 1;
 }
 
 .gen-hint {

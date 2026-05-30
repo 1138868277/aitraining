@@ -15,7 +15,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">数据源管理</div>
-                <div class="tech-hero-desc">配置和管理 PG 数据库连接信息，支持新增、编辑和测试连接，修改后自动生效无需重启服务</div>
+                <div class="tech-hero-desc">配置管理 PG 数据库连接，支持新增、编辑与测试，修改即时生效</div>
               </div>
             </div>
           </div>
@@ -34,7 +34,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">用户管理</div>
-                <div class="tech-hero-desc">管理系统用户账号，支持新增、编辑和删除操作，修改后即时生效</div>
+                <div class="tech-hero-desc">管理系统用户账号，支持新增、编辑与删除，修改即时生效</div>
               </div>
             </div>
           </div>

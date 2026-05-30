@@ -13,7 +13,7 @@
         </div>
         <div class="tech-hero-text">
           <div class="tech-hero-title">编码创建</div>
-          <div class="tech-hero-desc">根据编码规则筛选条件，灵活批量生成测点编码，支持编码预览、导出和修正</div>
+          <div class="tech-hero-desc">按规则筛选条件批量生成测点编码，支持预览、导出与修正</div>
         </div>
       </div>
     </div>
@@ -24,8 +24,13 @@
         <span class="card-title">快速检索</span>
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" @click="showAddDialog = true">
-          <el-icon style="margin-right: 4px;"><Plus /></el-icon>新增数据码
+        <el-button class="btn-add-code" @click="showAddDialog = true">
+          <span class="btn-add-code-inner">
+            <span class="btn-add-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </span>
+            <span class="btn-add-text">新增数据码</span>
+          </span>
         </el-button>
       </div>
     </div>
@@ -2097,6 +2102,81 @@ function cancelEditName() {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ==================== 炫酷新增按钮 ==================== */
+.btn-add-code {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-add-code::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4, #8b5cf6, #3b82f6);
+  background-size: 300% 300%;
+  animation: btnGradient 4s ease infinite;
+  z-index: 0;
+}
+.btn-add-code::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e40af, #7c3aed);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-add-code:hover::after {
+  background: linear-gradient(135deg, #2563eb, #9333ea);
+  inset: 1px;
+}
+.btn-add-code:hover {
+  box-shadow: 0 8px 32px rgba(59,130,246,0.35) !important;
+  transform: translateY(-1px);
+}
+.btn-add-code:active {
+  transform: translateY(0) !important;
+}
+.btn-add-code-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 22px;
+  height: 100%;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.btn-add-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+.btn-add-code:hover .btn-add-icon {
+  transform: rotate(90deg) scale(1.1);
+}
+.btn-add-text {
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+@keyframes btnGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .toolbar-body {

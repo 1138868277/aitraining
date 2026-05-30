@@ -16,13 +16,13 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">编码解析</div>
-                <div class="tech-hero-desc">支持单个编码逐段解析和批量导入解析，快速识别编码结构及各段位业务含义</div>
+                <div class="tech-hero-desc">逐段解析编码结构，快速识别各段位业务含义，支持批量导入</div>
               </div>
             </div>
           </div>
           <el-tabs v-model="parseMode" class="parse-mode-tabs">
             <!-- 单个解析 -->
-            <el-tab-pane label="单个解析" name="single">
+            <el-tab-pane label="单条解析" name="single">
               <div class="parse-container">
                 <div class="parse-input-section">
                   <el-input
@@ -40,11 +40,18 @@
                     <span v-if="parseCodeInput.length > 0 && parseCodeInput.length !== 31" class="parse-length-warning">编码必须为31位</span>
                   </div>
                   <el-button
-                    type="primary"
                     :disabled="parseCodeInput.length !== 31 || parsingCode"
                     @click="handleParseCode"
                     class="parse-btn"
-                  >{{ parsingCode ? '解析中...' : '解析' }}</el-button>
+                  >
+                    <span class="parse-btn-inner">
+                      <span class="parse-btn-icon">
+                        <svg v-if="!parsingCode" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
+                        <span v-else class="parse-btn-spinner"></span>
+                      </span>
+                      <span class="parse-btn-text">{{ parsingCode ? '解析中' : '解 析' }}</span>
+                    </span>
+                  </el-button>
                 </div>
 
                 <div v-if="parseResult" class="parse-result-section">
@@ -146,7 +153,7 @@
                       size="small"
                       @click="toggleAllRows"
                     >一键收起</el-button>
-                    <el-button type="primary" size="small" @click="exportBatchParseResult">导出 Excel</el-button>
+                    <el-button size="small" @click="exportBatchParseResult" class="btn-export btn-export-sm"><span class="btn-export-inner">导出 Excel</span></el-button>
                   </div>
                   <el-table
                     ref="batchParseTableRef"
@@ -223,7 +230,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">重复编码校验</div>
-                <div class="tech-hero-desc">批量导入编码列表，快速检查是否存在与数据库中已有编码重复或输入列表中重复的情况</div>
+                <div class="tech-hero-desc">批量检测编码是否与数据库或导入列表中已有编码重复</div>
               </div>
             </div>
           </div>
@@ -240,11 +247,19 @@
               <div class="audit-hint">已解析 {{ auditCodes.length }} 条编码</div>
               <div class="audit-actions">
                 <el-button
-                  type="primary"
                   :disabled="auditCodes.length === 0 || auditing"
                   @click="handleAudit"
-                >{{ auditing ? '稽核中...' : '开始稽核' }}</el-button>
-                <el-button :disabled="auditCodes.length === 0" @click="clearAudit">清空</el-button>
+                  class="btn-audit"
+                >
+                  <span class="btn-audit-inner">
+                    <span class="btn-audit-icon">
+                      <svg v-if="!auditing" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      <span v-else class="btn-spinner"></span>
+                    </span>
+                    <span class="btn-audit-text">{{ auditing ? '稽核中' : '开始稽核' }}</span>
+                  </span>
+                </el-button>
+                <el-button :disabled="auditCodes.length === 0" @click="clearAudit" class="btn-clear">清空</el-button>
               </div>
             </div>
 
@@ -288,7 +303,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">编码修正</div>
-                <div class="tech-hero-desc">导入Excel修正数据，批量修改测点编码的二级类码、数据类码、数据码等段位，支持重复校验和结果导出</div>
+                <div class="tech-hero-desc">批量修改测点编码段位，支持重复校验与修正结果导出</div>
               </div>
             </div>
           </div>
@@ -337,11 +352,19 @@
               </div>
               <div class="correct-actions">
                 <el-button
-                  type="primary"
                   :disabled="correctItems.length === 0 || correcting"
                   @click="handleCorrectCodes"
-                >{{ correcting ? '修正中 ' + correctProgress + '%' : '开始修正' }}</el-button>
-                <el-button :disabled="correctItems.length === 0" @click="clearCorrect">清空</el-button>
+                  class="btn-correct"
+                >
+                  <span class="btn-correct-inner">
+                    <span class="btn-correct-icon">
+                      <svg v-if="!correcting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                      <span v-else class="btn-spinner"></span>
+                    </span>
+                    <span class="btn-correct-text">{{ correcting ? '修正中 ' + correctProgress + '%' : '开始修正' }}</span>
+                  </span>
+                </el-button>
+                <el-button :disabled="correctItems.length === 0" @click="clearCorrect" class="btn-clear">清空</el-button>
               </div>
               <div v-if="correcting" class="correct-progress-wrapper">
                 <el-progress
@@ -363,7 +386,7 @@
                 <el-tag type="warning" effect="plain" v-if="correctDuplicateCount > 0">
                   {{ correctDuplicateCount }} 条重复
                 </el-tag>
-                <el-button type="success" @click="exportCorrectResults">导出 Excel</el-button>
+                <el-button @click="exportCorrectResults" class="btn-export"><span class="btn-export-inner">导出 Excel</span></el-button>
               </div>
               <el-table :data="displayCorrectResults" border stripe style="width: 100%" max-height="600">
                 <el-table-column type="index" label="序号" width="60" fixed />
@@ -898,7 +921,95 @@ function exportCorrectResults() {
 .parse-code-input { width: 100%; }
 .parse-code-length { font-size: 12px; color: #909399; }
 .parse-length-warning { color: #e6a23c; margin-left: 8px; }
-.parse-btn { margin-top: 4px; }
+.parse-btn {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  min-width: 110px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.parse-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4, #8b5cf6);
+  background-size: 300% 300%;
+  animation: btnGrad 4s ease infinite;
+  z-index: 0;
+}
+.parse-btn::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.parse-btn:hover:not(.is-disabled)::after {
+  background: linear-gradient(135deg, #9333ea, #2563eb);
+  inset: 1px;
+}
+.parse-btn:hover:not(.is-disabled) {
+  box-shadow: 0 8px 32px rgba(139,92,246,0.35) !important;
+  transform: translateY(-1px);
+}
+.parse-btn:active {
+  transform: translateY(0) !important;
+}
+.parse-btn.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.parse-btn.is-disabled::before {
+  animation: none;
+}
+.parse-btn-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 24px;
+  height: 100%;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 3px;
+}
+.parse-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+.parse-btn:hover:not(.is-disabled) .parse-btn-icon {
+  transform: scale(1.15);
+}
+.parse-btn-text {
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.parse-btn-spinner {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: parseSpin 0.6s linear infinite;
+}
+
+@keyframes parseSpin {
+  to { transform: rotate(360deg); }
+}
 .parse-result-section { margin-top: 20px; }
 .parse-result-card { max-width: 900px; }
 .parse-result-header { display: flex; align-items: center; gap: 12px; }
@@ -1069,6 +1180,184 @@ function exportCorrectResults() {
 }
 .correct-progress { width: 60%; }
 .correct-progress-text { font-size: 13px; color: #606266; white-space: nowrap; }
+
+/* ==================== 开始稽核按钮 ==================== */
+.btn-audit {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  min-width: 120px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-audit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4, #8b5cf6);
+  background-size: 300% 300%;
+  animation: btnGrad 4s ease infinite;
+  z-index: 0;
+}
+.btn-audit::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-audit:hover:not(.is-disabled)::after {
+  background: linear-gradient(135deg, #9333ea, #2563eb);
+  inset: 1px;
+}
+.btn-audit:hover:not(.is-disabled) {
+  box-shadow: 0 8px 32px rgba(139,92,246,0.35) !important;
+  transform: translateY(-1px);
+}
+.btn-audit:active { transform: translateY(0) !important; }
+.btn-audit.is-disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-audit.is-disabled::before { animation: none; }
+.btn-audit-inner {
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 0 24px; height: 100%; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 2px;
+}
+.btn-audit-icon { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; transition: transform 0.3s ease; }
+.btn-audit:hover:not(.is-disabled) .btn-audit-icon { transform: scale(1.15); }
+.btn-audit-text { text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+/* ==================== 开始修正按钮 ==================== */
+.btn-correct {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 40px !important;
+  min-width: 130px !important;
+  position: relative;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.btn-correct::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4, #8b5cf6);
+  background-size: 300% 300%;
+  animation: btnGrad 4s ease infinite;
+  z-index: 0;
+}
+.btn-correct::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-correct:hover:not(.is-disabled)::after {
+  background: linear-gradient(135deg, #9333ea, #2563eb);
+  inset: 1px;
+}
+.btn-correct:hover:not(.is-disabled) {
+  box-shadow: 0 8px 32px rgba(139,92,246,0.35) !important;
+  transform: translateY(-1px);
+}
+.btn-correct:active { transform: translateY(0) !important; }
+.btn-correct.is-disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-correct.is-disabled::before { animation: none; }
+.btn-correct-inner {
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 0 24px; height: 100%; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 2px;
+}
+.btn-correct-icon { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; transition: transform 0.3s ease; }
+.btn-correct:hover:not(.is-disabled) .btn-correct-icon { transform: scale(1.15); }
+.btn-correct-text { text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+/* ==================== 导出 Excel 按钮 ==================== */
+.btn-export {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 20px !important;
+  height: 36px !important;
+  position: relative;
+  border-radius: 8px !important;
+  overflow: hidden;
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.btn-export-sm { height: 30px !important; font-size: 12px; padding: 0 14px !important; }
+.btn-export::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #10b981, #06b6d4, #10b981);
+  background-size: 200% 100%;
+  animation: btnGrad 3s ease infinite;
+  z-index: 0;
+}
+.btn-export::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #059669, #0891b2);
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+.btn-export:hover::after { background: linear-gradient(135deg, #10b981, #06b6d4); }
+.btn-export:hover { box-shadow: 0 6px 24px rgba(16,185,129,0.3) !important; transform: translateY(-1px); }
+.btn-export:active { transform: translateY(0) !important; }
+.btn-export .btn-export-inner { position: relative; z-index: 1; }
+
+/* ==================== 清空按钮 ==================== */
+.btn-clear {
+  background: transparent !important;
+  border: 1px solid #d0d5dd !important;
+  color: #667085 !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+  padding: 0 20px !important;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+.btn-clear:hover:not(.is-disabled) {
+  border-color: #98a2b3 !important;
+  color: #344054 !important;
+  background: #f9fafb !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+
+/* ==================== 通用按钮渐变动画 ==================== */
+@keyframes btnGrad {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==================== 加载圈 ==================== */
+.btn-spinner {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: btnSpin 0.6s linear infinite;
+}
 
 /* ==================== 表格行动画 ==================== */
 :deep(.el-table__body tr:hover) { background: #f0f7ff !important; }

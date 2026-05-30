@@ -17,7 +17,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">编码字典查询</div>
-                <div class="tech-hero-desc">按类型 → 二级类码 → 数据类码 → 数据码层级浏览字典数据，支持数据码快速检索和定位</div>
+                <div class="tech-hero-desc">按层级结构浏览编码字典，支持数据码快速检索与精确定位</div>
               </div>
             </div>
           </div>
@@ -102,7 +102,7 @@
         </el-tab-pane>
 
         <!-- Tab 2: 新增字典记录 -->
-        <el-tab-pane label="数据码管理" name="statistics">
+        <el-tab-pane label="数据码管理" name="datacode">
           <div class="tech-hero">
             <div class="tech-hero-bg">
               <div class="tech-grid"></div>
@@ -115,7 +115,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">数据码新增和审批</div>
-                <div class="tech-hero-desc">手动新增数据码并提交集团审批，审批通过后将自动下发给所有区域使用</div>
+                <div class="tech-hero-desc">新增数据码并提交集团审批，通过后自动下发至全区域</div>
               </div>
             </div>
           </div>
@@ -311,7 +311,7 @@
               </div>
               <div class="tech-hero-text">
                 <div class="tech-hero-title">数据码审批</div>
-                <div class="tech-hero-desc">审批各区域提交的数据码申请，审核通过后将自动下发给所有区域使用</div>
+                <div class="tech-hero-desc">审批各区域数据码申请，通过后自动同步下发至全区域</div>
               </div>
             </div>
           </div>
