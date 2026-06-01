@@ -66,13 +66,29 @@
         </div>
         <div v-if="quickSearchText.trim()" class="card-default mb-16" style="border-top: none;">
           <div class="card-header quick-filter-header">
-            <div style="display:flex;align-items:center;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <el-radio-group v-model="quickSearchTypeFilter" size="small" class="type-radio-group" @change="onQuickSearchFilterChange" :disabled="quickSearchLocked">
                 <el-radio-button value="">全部</el-radio-button>
                 <el-radio-button value="F">风电 F</el-radio-button>
                 <el-radio-button value="G">光伏 G</el-radio-button>
                 <el-radio-button value="S">水电 S</el-radio-button>
               </el-radio-group>
+              <el-select
+                v-model="quickSearchSecondClassFilterValue"
+                placeholder="二级类码筛选"
+                size="small"
+                clearable
+                style="width: 170px;"
+                :disabled="quickSearchLocked"
+                @change="onQuickSearchSecondClassFilterChange"
+              >
+                <el-option
+                  v-for="opt in filteredSecondClassOptions"
+                  :key="opt.code"
+                  :label="`${opt.code} ${opt.name}`"
+                  :value="opt.code"
+                />
+              </el-select>
               <button
                 class="quick-search-lock-btn"
                 type="button"
@@ -98,7 +114,6 @@
               v-loading="quickSearchLoading"
               element-loading-text="搜索中..."
               :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
-              @filter-change="onQuickSearchHeaderFilterChange"
               ref="quickSearchTableRef"
             >
               <el-table-column label="类型域" align="center" width="200">
@@ -106,7 +121,7 @@
                   <el-tag size="small" :style="{ background: typeTagColor(row.typeCode), color: '#fff', border: 'none', fontWeight: 600 }">{{ typeLabel(row.typeCode) }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="二级类码" column-key="quickSecondClassCode" :filters="quickSearchSecondClassFilterOptions" filter-placement="bottom" width="300">
+              <el-table-column label="二级类码" width="300">
                 <template #default="{ row }">
                   <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.secondClassCode }}</el-tag>
                   <span class="cell-name">{{ row.secondClassName }}</span>
@@ -1035,7 +1050,7 @@ const quickSearchTableRef = ref<any>(null);
 const quickSearchPageNum = ref(1);
 const quickSearchPageSize = ref(100);
 const quickSearchTypeFilter = ref('');
-const quickSearchSecondClassFilter = ref<string[]>([]);
+const quickSearchSecondClassFilterValue = ref('');
 const quickSearchTypeOptions = ref<string[]>([]);
 const quickSearchLocked = ref(false);
 let quickSearchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1047,50 +1062,25 @@ function toggleQuickSearchLock() {
 
 const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
 
-/** 列头筛选选项：二级类码（按编码+名称去重） */
-const quickSearchSecondClassFilterOptions = computed(() => {
-  const seen = new Set<string>();
-  return quickSearchSecondClassOptions.value.filter(s => {
-    const key = `${s.code}|${s.name}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).map(s => ({
-    text: `${s.code} ${s.name}`,
-    value: `${s.code}|${s.name}`,
-  }));
+/** 根据当前类型筛选二级类码选项 */
+const filteredSecondClassOptions = computed(() => {
+  if (!quickSearchTypeFilter.value) return quickSearchSecondClassOptions.value;
+  return quickSearchSecondClassOptions.value.filter(s => s.typeCode === quickSearchTypeFilter.value);
 });
 
-/** 二级类码表头选中的编码列表 */
-const quickSearchSecondClassFilterCodes = computed(() => {
-  const f = quickSearchSecondClassFilter.value;
-  if (!f) return [];
-  return f.map((v: string) => v.split('|')[0]);
-});
-
-/** 表头筛选变化 → 重新搜索（传给后端过滤） */
-function onQuickSearchHeaderFilterChange(filters: Record<string, any[]>) {
-  if ('quickSecondClassCode' in filters) {
-    // 锁定状态下忽略二级类码筛选变更
-    if (quickSearchLocked.value) {
-      // 恢复为锁定的筛选值
-      quickSearchTableRef.value?.clearFilter('quickSecondClassCode');
-      return;
-    }
-    quickSearchSecondClassFilter.value = filters.quickSecondClassCode || [];
-    // 如果是用户主动点击筛选（非 clearFilter 触发的），重新搜索
-    if (quickSearchSearched.value) {
-      doQuickSearch();
-      saveQuickSearchState();
-    }
+function onQuickSearchSecondClassFilterChange() {
+  if (quickSearchLocked.value) return;
+  if (quickSearchSearched.value) {
+    doQuickSearch();
+    saveQuickSearchState();
   }
 }
 
 function onQuickSearchFilterChange() {
   if (quickSearchLocked.value) return;
   // 类型切换后清除二级类码筛选并重新搜索
-  quickSearchSecondClassFilter.value = [];
-  quickSearchTableRef.value?.clearFilter('quickSecondClassCode');
+  quickSearchSecondClassFilterValue.value = '';
+  // 选项清空，等搜索结果回来重新填充
   doQuickSearch();
   saveQuickSearchState();
 }
@@ -1103,7 +1093,7 @@ async function doQuickSearch(resetPage: boolean = true) {
   if (resetPage) quickSearchPageNum.value = 1;
   try {
     const typeFilter = quickSearchTypeFilter.value || undefined;
-    const secondClassFilter = quickSearchSecondClassFilterCodes.value.length > 0 ? quickSearchSecondClassFilterCodes.value.join(',') : undefined;
+    const secondClassFilter = quickSearchSecondClassFilterValue.value || undefined;
     const result = await dictService.quickSearchDict(text, quickSearchPageNum.value, quickSearchPageSize.value, typeFilter, secondClassFilter);
     quickSearchResults.value = result.items;
     quickSearchTotal.value = result.total;
@@ -1153,7 +1143,7 @@ interface QuickSearchState {
   locked: boolean;
   pageNum: number;
   pageSize: number;
-  secondClassFilter: string[];
+  secondClassFilter: string;
 }
 
 function saveQuickSearchState() {
@@ -1163,7 +1153,7 @@ function saveQuickSearchState() {
     locked: quickSearchLocked.value,
     pageNum: quickSearchPageNum.value,
     pageSize: quickSearchPageSize.value,
-    secondClassFilter: quickSearchSecondClassFilter.value,
+    secondClassFilter: quickSearchSecondClassFilterValue.value,
   };
   localStorage.setItem(QUICK_SEARCH_STATE_KEY, JSON.stringify(state));
 }
@@ -1222,7 +1212,7 @@ function onQuickSearchInput() {
     quickSearchPageNum.value = 1;
     if (!quickSearchLocked.value) {
       quickSearchTypeFilter.value = '';
-      quickSearchSecondClassFilter.value = [];
+      quickSearchSecondClassFilterValue.value = '';
       quickSearchSecondClassOptions.value = [];
       quickSearchTypeOptions.value = [];
     }
@@ -1232,8 +1222,8 @@ function onQuickSearchInput() {
     quickSearchSearched.value = true;
     if (!quickSearchLocked.value) {
       quickSearchTypeFilter.value = '';
-      quickSearchSecondClassFilter.value = [];
-      quickSearchTableRef.value?.clearFilter();
+      quickSearchSecondClassFilterValue.value = '';
+      quickSearchSecondClassOptions.value = [];
     }
     await doQuickSearch();
     saveQuickSearchState();
@@ -1250,7 +1240,7 @@ function onQuickSearchClear() {
   quickSearchPageNum.value = 1;
   quickSearchLocked.value = false;
   quickSearchTypeFilter.value = '';
-  quickSearchSecondClassFilter.value = [];
+  quickSearchSecondClassFilterValue.value = '';
   quickSearchSecondClassOptions.value = [];
   quickSearchTypeOptions.value = [];
   clearQuickSearchState();
@@ -1450,13 +1440,11 @@ onMounted(async () => {
       if (savedState.locked) {
         // 锁定状态：保持类型和二级类码的锁定值
         quickSearchTypeFilter.value = savedState.typeFilter || '';
-        if (savedState.secondClassFilter && savedState.secondClassFilter.length > 0) {
-          quickSearchSecondClassFilter.value = savedState.secondClassFilter;
-        }
+        quickSearchSecondClassFilterValue.value = savedState.secondClassFilter || '';
       } else {
         // 未锁定：重置所有筛选
         quickSearchTypeFilter.value = '';
-        quickSearchSecondClassFilter.value = [];
+        quickSearchSecondClassFilterValue.value = '';
         quickSearchSecondClassOptions.value = [];
         quickSearchTypeOptions.value = [];
       }

@@ -662,7 +662,7 @@ export function cancelImport(tenantId: string): void {
   getStore(tenantId).cancelRequested = true;
 }
 
-/** 批量插入测点数据（简化版：只写 code + batch_id，段字段由后续 UPDATE 批量计算） */
+/** 批量插入测点数据（解析版：直接在 JS 中计算段字段，避免后续全表 UPDATE） */
 async function batchInsertPoints(
   batchId: string, codes: string[], schema: string, tenantId: string,
   client?: any,
@@ -672,11 +672,38 @@ async function batchInsertPoints(
   const params: string[] = [];
   let idx = 1;
   for (const code of codes) {
-    values.push(`($${idx++}, $${idx++}, 'system', NOW(), NOW(), '0')`);
-    params.push(code, batchId);
+    // SUBSTRING(code, 1, 4)  → station_code
+    // SUBSTRING(code, 5, 2)  → type_code
+    // SUBSTRING(code, 7, 3)  → project_line_code
+    // SUBSTRING(code, 10, 1) → prefix_no
+    // SUBSTRING(code, 11, 2) → first_class_code
+    // SUBSTRING(code, 13, 3) → second_class_code
+    // SUBSTRING(code, 16, 4) → second_ext_code
+    // SUBSTRING(code, 20, 3) → third_class_code
+    // SUBSTRING(code, 23, 4) → third_ext_code
+    // SUBSTRING(code, 27, 2) → data_category_code
+    // SUBSTRING(code, 29, 3) → data_code
+    const station_code      = code.substring(0, 4) || null;
+    const type_code         = code.substring(4, 6) || null;
+    const project_line_code = code.substring(6, 9) || null;
+    const prefix_no         = code.substring(9, 10) || null;
+    const first_class_code  = code.substring(10, 12) || null;
+    const second_class_code = code.substring(12, 15) || null;
+    const second_ext_code   = code.substring(15, 19) || null;
+    const third_class_code  = code.substring(19, 22) || null;
+    const third_ext_code    = code.substring(22, 26) || null;
+    const data_category_code = code.substring(26, 28) || null;
+    const data_code         = code.substring(28, 31) || null;
+    values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, 'system', NOW(), NOW(), '0')`);
+    params.push(code, batchId, station_code, type_code, project_line_code, prefix_no,
+                 first_class_code, second_class_code, second_ext_code,
+                 third_class_code, third_ext_code, data_category_code, data_code);
   }
   const sql = `INSERT INTO ${schema}.cec_new_energy_measurement_points
-    (code, import_batch_id, creator, create_tm, modify_tm, if_delete)
+    (code, import_batch_id, station_code, type_code, project_line_code, prefix_no,
+     first_class_code, second_class_code, second_ext_code,
+     third_class_code, third_ext_code, data_category_code, data_code,
+     creator, create_tm, modify_tm, if_delete)
     VALUES ${values.join(',')}`;
   if (client) {
     await client.query(sql, params);
@@ -838,24 +865,6 @@ export async function importMeasurementFile(
     await client.query('COMMIT');
     client.release();
     client = null;
-
-    // 8. 一条 SQL 批量计算所有段字段（set-based，比逐行 JS substring 快数十倍）
-    store.message = '正在计算编码分段...';
-    await queryAsTenant(tenantId, `
-      UPDATE ${schema}.cec_new_energy_measurement_points SET
-        station_code      = SUBSTRING(code, 1, 4),
-        type_code         = SUBSTRING(code, 5, 2),
-        project_line_code = SUBSTRING(code, 7, 3),
-        prefix_no         = SUBSTRING(code, 10, 1),
-        first_class_code  = SUBSTRING(code, 11, 2),
-        second_class_code = SUBSTRING(code, 13, 3),
-        second_ext_code   = SUBSTRING(code, 16, 4),
-        third_class_code  = SUBSTRING(code, 20, 3),
-        third_ext_code    = SUBSTRING(code, 23, 4),
-        data_category_code = SUBSTRING(code, 27, 2),
-        data_code         = SUBSTRING(code, 29, 3)
-      WHERE import_batch_id = '${batchId}'
-    `);
 
     store.validRows = totalValid;
     store.importing = false;
