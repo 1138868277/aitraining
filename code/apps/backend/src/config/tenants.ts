@@ -48,6 +48,19 @@ export const TENANTS: TenantDef[] = [
       ssl: false,
     },
   },
+  {
+    id: 'qianyuan',
+    displayName: '黔源',
+    datasource: {
+      host: 'localhost',
+      port: 5432,
+      database: 'code_tools',
+      schema: 'qianyuan',
+      user: 'liuhaojun',
+      password: 'Stephencurry521',
+      ssl: false,
+    },
+  },
 ];
 
 /** 按租户 ID 查找 */
