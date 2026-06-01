@@ -1047,10 +1047,15 @@ function toggleQuickSearchLock() {
 
 const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
 
-/** 列头筛选选项：二级类码 */
+/** 列头筛选选项：二级类码（按编码+名称去重） */
 const quickSearchSecondClassFilterOptions = computed(() => {
-  // 使用后端返回的全量去重结果，而非当前页数据
-  return quickSearchSecondClassOptions.value.map(s => ({
+  const seen = new Set<string>();
+  return quickSearchSecondClassOptions.value.filter(s => {
+    const key = `${s.code}|${s.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(s => ({
     text: `${s.code} ${s.name}`,
     value: `${s.code}|${s.name}`,
   }));

@@ -400,8 +400,11 @@ async function batchFindExistingCodes(
     const valueExpr = `VALUES ${valueRows.join(',')}`;
     const sql = `
       SELECT v.rn, m.code FROM (
-        SELECT ROW_NUMBER() OVER () AS rn, * FROM ${valueExpr}
-      ) AS v(s_code, t_code, pl_code, p_no, fc_code, sc_code, tc_code, dt_code, d_code)
+        SELECT ROW_NUMBER() OVER () AS rn,
+               t.s_code, t.t_code, t.pl_code, t.p_no, t.fc_code,
+               t.sc_code, t.tc_code, t.dt_code, t.d_code
+        FROM (${valueExpr}) AS t(s_code, t_code, pl_code, p_no, fc_code, sc_code, tc_code, dt_code, d_code)
+      ) v
       LEFT JOIN ${schema}.cec_new_energy_measurement_points m
         ON m.if_delete = '0'
        AND m.station_code = v.s_code

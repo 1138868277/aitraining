@@ -291,12 +291,16 @@ export async function quickSearchDict(
     [...searchParams, ...typeOpt.params],
   );
 
-  // 3. 二级类码选项（应用类型+数据类码筛选）—— 含编码+名称用于区分
+  // 3. 二级类码选项（应用类型+数据类码筛选）—— 按编码+名称去重
   const scOpt = buildOptFilter('secondClass');
   const secondClassRows = await query<{ secondClassCode: string; secondClassName: string; typeCode: string }>(
-    `SELECT DISTINCT second_class_code AS "secondClassCode", second_class_name AS "secondClassName", type_domain_code AS "typeCode"
+    `SELECT DISTINCT ON (second_class_code, second_class_name)
+            second_class_code AS "secondClassCode",
+            second_class_name AS "secondClassName",
+            type_domain_code AS "typeCode"
      FROM ${getSchema()}.cec_new_energy_code_dict
-     WHERE if_delete = '0' AND ${searchClause} ${scOpt.sql} ORDER BY second_class_code`,
+     WHERE if_delete = '0' AND ${searchClause} ${scOpt.sql}
+     ORDER BY second_class_code, second_class_name, type_domain_code`,
     [...searchParams, ...scOpt.params],
   );
 
