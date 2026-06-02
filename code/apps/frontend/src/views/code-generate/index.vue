@@ -84,9 +84,9 @@
               >
                 <el-option
                   v-for="opt in filteredSecondClassOptions"
-                  :key="opt.code"
+                  :key="`${opt.code}|${opt.name}`"
                   :label="`${opt.code} ${opt.name}`"
-                  :value="opt.code"
+                  :value="`${opt.code} ${opt.name}`"
                 />
               </el-select>
               <button
@@ -1062,10 +1062,18 @@ function toggleQuickSearchLock() {
 
 const quickSearchSecondClassOptions = ref<Array<{ code: string; name: string; typeCode: string }>>([]);
 
-/** 根据当前类型筛选二级类码选项 */
+/** 根据当前类型筛选二级类码选项（按编码+名称去重） */
 const filteredSecondClassOptions = computed(() => {
-  if (!quickSearchTypeFilter.value) return quickSearchSecondClassOptions.value;
-  return quickSearchSecondClassOptions.value.filter(s => s.typeCode === quickSearchTypeFilter.value);
+  const filtered = !quickSearchTypeFilter.value
+    ? quickSearchSecondClassOptions.value
+    : quickSearchSecondClassOptions.value.filter(s => s.typeCode === quickSearchTypeFilter.value);
+  const seen = new Set<string>();
+  return filtered.filter(s => {
+    const key = `${s.code}|${s.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 });
 
 function onQuickSearchSecondClassFilterChange() {
@@ -1093,7 +1101,7 @@ async function doQuickSearch(resetPage: boolean = true) {
   if (resetPage) quickSearchPageNum.value = 1;
   try {
     const typeFilter = quickSearchTypeFilter.value || undefined;
-    const secondClassFilter = quickSearchSecondClassFilterValue.value || undefined;
+    const secondClassFilter = (quickSearchSecondClassFilterValue.value || '').split(' ')[0] || undefined;
     const result = await dictService.quickSearchDict(text, quickSearchPageNum.value, quickSearchPageSize.value, typeFilter, secondClassFilter);
     quickSearchResults.value = result.items;
     quickSearchTotal.value = result.total;
@@ -2528,6 +2536,16 @@ function cancelEditName() {
   top: 0;
   z-index: 10;
   background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%) !important;
+}
+
+/* 二级类码筛选框高度与类型切换组件保持一致 */
+.quick-filter-header .el-select :deep(.el-select__wrapper) {
+  height: 34px;
+  padding: 0 11px;
+  box-sizing: border-box;
+}
+.quick-filter-header .el-select :deep(.el-select__placeholder) {
+  font-size: 12px;
 }
 
 /* ===== 科技风类型切换 ===== */
