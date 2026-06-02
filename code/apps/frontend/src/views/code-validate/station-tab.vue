@@ -301,24 +301,31 @@
             <div class="bhc-icon">📋</div>
             <div class="bhc-text">
               <div class="bhc-title">格式说明</div>
-              <div class="bhc-desc">每行一条，编码和名称之间用空格或Tab分隔</div>
+              <div class="bhc-desc">每行一条，字段之间用空格或Tab分隔，支持2~4个字段</div>
             </div>
           </div>
           <div class="batch-format-examples">
             <div class="bfe-item">
-              <span class="bfe-label">编码 + 名称</span>
+              <span class="bfe-label">2字段：编码 + 名称</span>
               <code>1001 张三风电场</code>
             </div>
             <div class="bfe-item">
-              <span class="bfe-label">编码 + 名称 + 区域</span>
+              <span class="bfe-label">3字段：编码 + 名称 + 管理域</span>
               <code>1001 张三风电场 云南</code>
             </div>
+            <div class="bfe-item">
+              <span class="bfe-label">4字段：编码 + 名称 + 类型 + 管理域</span>
+              <code>1001 张三风电场 F 云南</code>
+            </div>
+          </div>
+          <div style="margin-bottom:12px;padding:8px 12px;background:#fff7e6;border-radius:8px;font-size:12px;color:#d46b08">
+            类型编码: F=风电 G=光伏 S=水电 F1~F4=风电 G1~G2=光伏 S1=水电 Y0=储能
           </div>
           <el-input
             v-model="batchText"
             type="textarea"
             :rows="8"
-            placeholder="请粘贴场站数据，每行一条&#10;编码 名称&#10;编码 名称 区域"
+            placeholder="请粘贴场站数据，每行一条&#10;编码 名称&#10;编码 名称 管理域&#10;编码 名称 类型 管理域"
             class="batch-textarea"
           />
         </div>
@@ -339,6 +346,7 @@
               <span class="bti-index">{{ String(index + 1).padStart(2, '0') }}</span>
               <span class="bti-code">{{ entry.stationCode }}</span>
               <span class="bti-name">{{ entry.stationName }}</span>
+              <span v-if="entry.stationType" class="bti-type">{{ entry.stationType }}</span>
               <span v-if="entry.managementDomain" class="bti-region">{{ entry.managementDomain }}</span>
               <button class="bti-del" @click="removeBatchEntry(index)">✕</button>
             </div>
@@ -496,6 +504,7 @@ const batchSubmitting = ref(false);
 interface BatchEntry {
   stationCode: string;
   stationName: string;
+  stationType?: string;
   managementDomain?: string;
 }
 
@@ -506,14 +515,35 @@ const parsedBatchEntries = computed<BatchEntry[]>(() => {
     .filter(Boolean)
     .map(line => {
       const parts = line.split(/[\t\s]+/);
-      return {
-        stationCode: parts[0] || '',
+      const entry: BatchEntry = {
+        stationCode: (parts[0] || '').toUpperCase(),
         stationName: parts[1] || '',
-        managementDomain: parts[2] || undefined,
       };
+      if (parts.length >= 4) {
+        entry.stationType = normalizeStationType(parts[2]);
+        entry.managementDomain = parts[3] || undefined;
+      } else if (parts.length >= 3) {
+        // 3字段：编码 名称 管理域（自动判断第三个是区域还是类型）
+        const third = parts[2].trim();
+        if (/^[FGSY]\d?$|^[FGSY]$/i.test(third)) {
+          entry.stationType = normalizeStationType(third);
+        } else {
+          entry.managementDomain = third || undefined;
+        }
+      }
+      return entry;
     })
     .filter(item => item.stationCode.length > 0 && item.stationName.length > 0);
 });
+
+function normalizeStationType(val: string): string {
+  const v = val.toUpperCase().trim();
+  if (/^F\d?$/.test(v)) return v.startsWith('F') ? (v.length === 1 ? 'F' : v) : v;
+  if (/^G\d?$/.test(v)) return v.startsWith('G') ? (v.length === 1 ? 'G' : v) : v;
+  if (/^S\d?$/.test(v)) return v.startsWith('S') ? (v.length === 1 ? 'S' : v) : v;
+  if (v === 'Y0') return 'Y0';
+  return '';
+}
 
 function removeBatchEntry(index: number) {
   const lines = batchText.value.split('\n').filter(l => l.trim());
@@ -538,7 +568,13 @@ async function confirmBatch() {
   }
   batchSubmitting.value = true;
   try {
-    const result = await stationService.batchCreateStation(parsedBatchEntries.value);
+    const entries = parsedBatchEntries.value.map(e => ({
+      stationCode: e.stationCode,
+      stationName: e.stationName,
+      stationType: e.stationType || undefined,
+      managementDomain: e.managementDomain || undefined,
+    }));
+    const result = await stationService.batchCreateStation(entries);
     ElMessage.success(`成功新增 ${result.insertedCount} 条场站数据`);
     showBatchDialog.value = false;
     resetBatchForm();
@@ -1186,6 +1222,15 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.bti-type {
+  font-size: 11px;
+  color: #8b5cf6;
+  background: #f5f3ff;
+  padding: 1px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-weight: 600;
 }
 .bti-region {
   font-size: 11px;

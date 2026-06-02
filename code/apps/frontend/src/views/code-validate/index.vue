@@ -320,7 +320,7 @@
           </div>
         </div>
 
-        <div v-show="activeTab === 'approval'" class="tab-panel">
+        <div v-if="activeTab === 'approval'" class="tab-panel">
           <div class="tech-hero">
             <div class="tech-hero-bg">
               <div class="tech-grid"></div>
