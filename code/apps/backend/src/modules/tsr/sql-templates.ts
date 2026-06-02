@@ -92,7 +92,8 @@ function genRuleSql(moduleSource: string, energy: string, ruleType: string, seco
     case 'tb':
       selectFields = `
       tb_windows::FLOAT AS tb_windows,
-      tb_windows::FLOAT AS sliding_step,`;
+      tb_windows::FLOAT AS sliding_step,
+      k_coefficient::FLOAT AS k_coefficient,`;
       whereField = 'tb_windows';
       break;
     case 'yx':
@@ -115,7 +116,7 @@ function genRuleSql(moduleSource: string, energy: string, ruleType: string, seco
 
   return `
     INSERT INTO __schema__.${table}
-    (module_source, energy_type, standard_name, ${ruleType === 'yx' ? 'upper_range, lower_range' : ruleType === 'zd' ? 'zd_duration' : ruleType === 'sz' ? 'sz_threshold, sz_windows, sliding_step' : 'tb_windows, sliding_step'}, begin_time, end_time, measure_name, cd_code)
+    (module_source, energy_type, standard_name, ${ruleType === 'yx' ? 'upper_range, lower_range' : ruleType === 'zd' ? 'zd_duration' : ruleType === 'sz' ? 'sz_threshold, sz_windows, sliding_step' : 'tb_windows, sliding_step, k_coefficient'}, begin_time, end_time, measure_name, cd_code)
     WITH cd_data AS (${cdDataSql(moduleSource, energy, secondCodes)}
     ),
     standard_data AS (
@@ -126,7 +127,7 @@ function genRuleSql(moduleSource: string, energy: string, ruleType: string, seco
       SELECT t1.cd_name, t1.cd_code, t3.station_name,
         t2.second_name, t2.measure_code, t2.measure_name,
         t2.module_source, t2.energy_type,
-        tb_windows, ss_windows, ss_threshold, yx_range, zd_duration
+        tb_windows, ss_windows, ss_threshold, yx_range, zd_duration, k_coefficient
       FROM cd_data t1
       INNER JOIN standard_data t2 ON t1.measure_code = t2.measure_code AND t1.second_code = t2.second_code
       INNER JOIN __schema__.tsr_station t3 ON t1.station_code = t3.station_code
@@ -191,9 +192,9 @@ export function getMergeConfig(ruleType: string): { headers: Record<string, stri
       };
     case 'tb':
       return {
-        headers: { ...common, tb_windows: '窗口大小(秒)', sliding_step: '滑动步长(秒)' },
-        mergeColumns: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name'],
-        customFields: ['module_source', 'energy_type', 'standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
+        headers: { ...common, tb_windows: '窗口大小(秒)', sliding_step: '滑动步长(秒)', k_coefficient: 'K值' },
+        mergeColumns: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'k_coefficient'],
+        customFields: ['module_source', 'energy_type', 'standard_name', 'tb_windows', 'sliding_step', 'k_coefficient', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
       };
     case 'yx':
       return {

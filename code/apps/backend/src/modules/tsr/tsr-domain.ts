@@ -22,7 +22,7 @@ export async function initTables(): Promise<void> {
   await query(`CREATE TABLE IF NOT EXISTS "${s}".tsr_standard_list (
     energy_type TEXT, module_source TEXT, second_code TEXT, second_name TEXT,
     measure_code TEXT, measure_name TEXT, tb_windows TEXT, ss_windows TEXT,
-    ss_threshold TEXT, yx_range TEXT, zd_duration TEXT
+    ss_threshold TEXT, yx_range TEXT, zd_duration TEXT, k_coefficient TEXT DEFAULT '3'
   )`);
   await query(`CREATE TABLE IF NOT EXISTS "${s}".tsr_import_list_sz (
     module_source TEXT, energy_type TEXT, standard_name TEXT,
@@ -33,6 +33,7 @@ export async function initTables(): Promise<void> {
   await query(`CREATE TABLE IF NOT EXISTS "${s}".tsr_import_list_tb (
     module_source TEXT, energy_type TEXT, standard_name TEXT,
     tb_windows DOUBLE PRECISION, sliding_step DOUBLE PRECISION,
+    k_coefficient DOUBLE PRECISION,
     begin_time TEXT, end_time TEXT, measure_name TEXT, cd_code TEXT
   )`);
   await query(`CREATE TABLE IF NOT EXISTS "${s}".tsr_import_list_yx (
@@ -88,6 +89,11 @@ export async function migrateMeasureDataColumns(): Promise<void> {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsr_standard_list_measure ON "${s}".tsr_standard_list (measure_code)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsr_standard_list_second ON "${s}".tsr_standard_list (second_code)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsr_standard_list_module_energy ON "${s}".tsr_standard_list (module_source, energy_type)`);
+
+    // k系数（跳变规则专用）
+    await pool.query(`ALTER TABLE "${s}".tsr_standard_list ADD COLUMN IF NOT EXISTS k_coefficient TEXT DEFAULT '3'`);
+    await pool.query(`ALTER TABLE "${s}".tsr_import_list_tb ADD COLUMN IF NOT EXISTS k_coefficient DOUBLE PRECISION DEFAULT 3`);
+    await pool.query(`UPDATE "${s}".tsr_standard_list SET k_coefficient = '3' WHERE k_coefficient IS NULL`);
 
     console.log(`  ✅ 测点表预计算列、索引迁移完成`);
   } catch (err) {
@@ -367,14 +373,14 @@ export async function queryExportList(area: string, type: 'sz' | 'tb' | 'yx' | '
 
   const fields: Record<string, string[]> = {
     sz: ['module_source', 'energy_type', 'standard_name', 'sz_threshold', 'sz_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
-    tb: ['module_source', 'energy_type', 'standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
+    tb: ['module_source', 'energy_type', 'standard_name', 'tb_windows', 'sliding_step', 'k_coefficient', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
     yx: ['module_source', 'energy_type', 'standard_name', 'lower_range', 'upper_range', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
     zd: ['module_source', 'energy_type', 'standard_name', 'zd_duration', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
   };
 
   const orderBy: Record<string, string[]> = {
     sz: ['standard_name', 'sz_threshold', 'sz_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
-    tb: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
+    tb: ['standard_name', 'tb_windows', 'sliding_step', 'k_coefficient', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
     yx: ['standard_name', 'lower_range', 'upper_range', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
     zd: ['standard_name', 'zd_duration', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
   };
