@@ -439,8 +439,8 @@ const overallConfig: Record<string, { fields: string[]; headers: Record<string, 
     mergeCols: ['standard_name', 'sz_threshold', 'sz_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name'],
   },
   tb: {
-    fields: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'k_coefficient', 'cd_code'],
-    headers: { standard_name: '标准化名称', tb_windows: '窗口大小(秒)', sliding_step: '滑动步长(秒)', begin_time: '生效开始时间', end_time: '生效结束时间', measure_name: '描述', k_coefficient: 'K值', cd_code: '组合31位码' },
+    fields: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code', 'k_coefficient'],
+    headers: { standard_name: '标准化名称', tb_windows: '窗口大小(秒)', sliding_step: '滑动步长(秒)', begin_time: '生效开始时间', end_time: '生效结束时间', measure_name: '描述', cd_code: '组合31位码', k_coefficient: 'K值' },
     mergeCols: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'k_coefficient'],
   },
   yx: {
@@ -555,7 +555,7 @@ export async function exportAllToZip(area: string, maxRows: number = 150000): Pr
 /** 各类型同步列配置（1-based，与 Z7 完全一致） */
 const splitSyncColumns: Record<string, number[]> = {
   sz: [2, 3, 4, 5, 6, 7],  // B~G
-  tb: [2, 3, 4, 5, 6, 7],     // B~G
+  tb: [2, 3, 4, 5, 6, 8],     // B~F,H（跳过 G=cd_code）
   yx: [2, 3, 4, 5, 6],     // B~F
   zd: [2, 3, 4, 5],        // B~E
 };
