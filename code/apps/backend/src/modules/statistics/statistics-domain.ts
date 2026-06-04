@@ -639,6 +639,7 @@ export interface ImportTask {
   status: 'IDLE' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   message?: string;
   startTime?: number;
+  endTime?: number;
   cancelRequested?: boolean;
 }
 
@@ -857,6 +858,7 @@ export async function importMeasurementFile(
       store.validRows = totalValid;
       store.importing = false;
       store.status = 'CANCELLED';
+      store.endTime = Date.now();
       store.message = `已终止，已导入 ${store.importedRows} 行（有效编码 ${totalValid} 条）`;
       return { batchId };
     }
@@ -869,6 +871,7 @@ export async function importMeasurementFile(
     store.validRows = totalValid;
     store.importing = false;
     store.status = 'COMPLETED';
+    store.endTime = Date.now();
     store.message = `导入完成，有效编码 ${totalValid} 条（${sheetNames.length} 个Sheet）`;
     tableVerifiedSchemas.add(schema);
     cacheClearMeasurement();
@@ -881,6 +884,7 @@ export async function importMeasurementFile(
     }
     store.importing = false;
     store.status = 'FAILED';
+    store.endTime = Date.now();
     store.message = err.message || '导入失败';
     throw err;
   }

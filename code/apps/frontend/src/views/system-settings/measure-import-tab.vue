@@ -107,6 +107,16 @@
         </div>
         <div class="tmc-glow" style="background:#8b5cf6"></div>
       </div>
+      <div class="tech-metric-card">
+        <div class="tmc-icon" style="color:#f97316;background:rgba(249,115,22,0.1)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div class="tmc-body">
+          <div class="tmc-value" style="color:#f97316;font-size:16px">{{ lastImport.time || '--' }}</div>
+          <div class="tmc-label">导入时间</div>
+        </div>
+        <div class="tmc-glow" style="background:#f97316"></div>
+      </div>
     </div>
 
     <!-- 导入提示 -->
@@ -121,29 +131,6 @@
       <p class="loading-text">数据加载中...</p>
     </div>
 
-    <!-- 导入情况 -->
-    <div class="import-history" v-if="lastImport.time">
-      <div class="history-header">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>最近导入情况</span>
-      </div>
-      <div class="history-body">
-        <div class="history-item">
-          <span class="history-item-label">导入时间</span>
-          <span class="history-item-value">{{ lastImport.time }}</span>
-        </div>
-        <div class="history-divider"></div>
-        <div class="history-item">
-          <span class="history-item-label">导入测点数</span>
-          <span class="history-item-value highlight">{{ lastImport.count }}</span>
-        </div>
-        <div class="history-divider"></div>
-        <div class="history-item">
-          <span class="history-item-label">用时</span>
-          <span class="history-item-value">{{ lastImport.duration }}</span>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -156,7 +143,7 @@ import * as statsService from '@/services/statistics';
 const loading = ref(true);
 const importing = ref(false);
 const imported = ref(false);
-const importStatus = ref<{ importing: boolean; batchId: string | null; totalRows: number; importedRows: number; validRows: number; status: string; message?: string; startTime?: string }>({ importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE', message: '' });
+const importStatus = ref<{ importing: boolean; batchId: string | null; totalRows: number; importedRows: number; validRows: number; status: string; message?: string; startTime?: string; endTime?: string }>({ importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE', message: '' });
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedFileName = ref('');
 const lastImport = ref({ time: '', count: 0, duration: '' });
@@ -222,13 +209,11 @@ const statusClass = computed(() => {
 
 const statsDuration = computed(() => {
   const s = importStatus.value;
-  if (s.startTime) return formatDuration(s.startTime);
+  if (importing.value && s.startTime) return formatDuration(s.startTime);
   return lastImport.value.duration || '--';
 });
 
 const STORAGE_KEY = 'measure_import_stats';
-
-const showStats = computed(() => importStatus.value.totalRows > 0 || lastImport.value.time);
 
 const statusIconStyle = computed(() => {
   const st = importStatus.value.status;
@@ -335,7 +320,7 @@ async function pollStatus() {
       imported.value = true;
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       lastImport.value = {
-        time: formatDateTime(new Date().toISOString()),
+        time: s.endTime ? formatDateTime(s.endTime) : formatDateTime(new Date().toISOString()),
         count: s.validRows,
         duration: s.startTime ? formatDuration(s.startTime) : '--',
       };
@@ -396,7 +381,7 @@ onMounted(async () => {
       imported.value = true;
       importStatus.value = s;
       lastImport.value = {
-        time: s.message || '--',
+        time: s.endTime ? formatDateTime(s.endTime) : '--',
         count: s.validRows,
         duration: s.startTime ? formatDuration(s.startTime) : '--',
       };
@@ -618,59 +603,6 @@ onMounted(async () => {
   border: 1px solid #eef2f6;
   font-size: 13px;
   color: #64748b;
-}
-
-/* ==================== 导入情况 ==================== */
-.import-history {
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e4e9f2;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
-}
-.history-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 20px;
-  border-bottom: 1px solid #eef2f8;
-  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a2a4a;
-}
-.history-body {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  gap: 0;
-}
-.history-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  text-align: center;
-}
-.history-item-label {
-  font-size: 13px;
-  color: #909399;
-}
-.history-item-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1e293b;
-}
-.history-item-value.highlight {
-  color: #3b82f6;
-  font-size: 26px;
-}
-.history-divider {
-  width: 1px;
-  height: 40px;
-  background: #eef2f8;
-  flex-shrink: 0;
 }
 
 /* ==================== 加载动画 ==================== */
