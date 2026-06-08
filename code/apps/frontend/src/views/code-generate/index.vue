@@ -344,12 +344,16 @@
             <div class="card-header">
               <div style="display:flex;align-items:center;gap:12px;">
                 <span class="card-header-title" style="margin-right:4px;">共 {{ generatedCodes.length }} 条</span>
+                <span v-if="generatedCodes.length > 0" style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                  <el-tag type="success" size="small" effect="plain">{{ newCodesCount }} 条可保存</el-tag>
+                  <el-tag v-if="generatedCodes.length - newCodesCount > 0" type="danger" size="small" effect="plain">{{ generatedCodes.length - newCodesCount }} 条已存在</el-tag>
+                </span>
                 <span class="filter-divider" />
                 <button class="tb-btn" @click="copyAllPreview">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                   <span>复制全部</span>
                 </button>
-                <button class="tb-btn primary" :class="{ loading: savedSaving }" @click="handleSaveCodes" :disabled="savedSaving">
+                <button class="tb-btn primary" :class="{ loading: savedSaving }" @click="handleSaveCodes" :disabled="savedSaving || newCodesCount === 0">
                   <svg v-if="savedSaving" class="tb-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
                   <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                   <span>{{ savedSaving ? '保存中...' : '保存' }}</span>
@@ -357,8 +361,14 @@
               </div>
             </div>
             <el-table :data="paginatedPreviewCodes" stripe v-loading="savedSaving" style="width:100%" class="styled-table" max-height="520" :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }">
-              <el-table-column type="index" label="序号" width="200" align="center" :index="previewPageIndex" />
-              <el-table-column prop="code" label="编码" min-width="200" />
+              <el-table-column type="index" label="序号" width="80" align="center" :index="previewPageIndex" />
+              <el-table-column label="状态" width="90" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row._duplicate" type="danger" size="small" effect="dark">已存在</el-tag>
+                  <el-tag v-else type="success" size="small" effect="plain">新增</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="code" label="编码" min-width="180" />
               <el-table-column label="编码名称" min-width="200">
                 <template #default="{ row }">
                   <div v-if="editingIndex === findPreviewIndex(row)" class="name-editor">
@@ -373,10 +383,10 @@
                   <span v-else class="name-display" @click="startEditName(row)">{{ row.name }}</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="generateTime" label="生成时间" min-width="160" align="center" />
+              <el-table-column prop="generateTime" label="生成时间" min-width="150" align="center" />
               <el-table-column label="操作" width="80" align="center" fixed="right">
                 <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="copyCode(row.code)">复制</el-button>
+                  <el-button link type="primary" size="small" :disabled="row._duplicate" @click="copyCode(row.code)">复制</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -566,7 +576,10 @@ const previousTypeCode = ref('');
 function getTypeFamily(typeCode: string): string {
   return typeCode ? typeCode.charAt(0) : '';
 }
-const generatedCodes = ref<Array<{ code: string; name: string; generateTime: string }>>([]);
+const generatedCodes = ref<Array<{ code: string; name: string; generateTime: string; _duplicate?: boolean }>>([]);
+
+/** 非重复的新编码数量 */
+const newCodesCount = computed(() => generatedCodes.value.filter(r => !r._duplicate).length);
 
 /** 预览分页数据 */
 const previewPageNum = ref(1);
@@ -1135,10 +1148,27 @@ function onAddCodeSuccess() {
 }
 
 /** 自动编码成功回调 */
-function onAutoCodeSuccess(codes: Array<{ code: string; name: string; generateTime: string }>) {
-  generatedCodes.value = codes;
+async function onAutoCodeSuccess(codes: Array<{ code: string; name: string; generateTime: string }>) {
+  // 检查编码名称是否重复
+  const allNames = [...new Set(codes.map(r => r.name).filter(Boolean))];
+  let duplicateNames: string[] = [];
+  if (allNames.length > 0) {
+    duplicateNames = await codeService.checkDuplicateNames(allNames);
+  }
+  const markedCodes = codes.map(r => ({
+    ...r,
+    _duplicate: duplicateNames.includes(r.name),
+  }));
+
+  generatedCodes.value = markedCodes;
   activeTab.value = 'preview';
-  ElMessage.success(`成功生成 ${codes.length} 条编码`);
+
+  const dupCount = markedCodes.filter(r => r._duplicate).length;
+  if (dupCount > 0) {
+    ElMessage.warning(`生成完成，其中 ${dupCount} 条编码名称已存在，无法保存`);
+  } else {
+    ElMessage.success(`成功生成 ${codes.length} 条编码`);
+  }
 }
 
 const genMode = ref(localStorage.getItem('code_gen_mode') || 'manual');
@@ -1718,11 +1748,24 @@ async function handleGenerate() {
       }
     }
 
-    generatedCodes.value = allResults;
+    // 检查编码名称是否重复
+    const allNames = [...new Set(allResults.map(r => r.name).filter(Boolean))];
+    let duplicateNames: string[] = [];
+    if (allNames.length > 0) {
+      duplicateNames = await codeService.checkDuplicateNames(allNames);
+    }
+    const markedResults = allResults.map(r => ({
+      ...r,
+      _duplicate: duplicateNames.includes(r.name),
+    }));
+
+    generatedCodes.value = markedResults;
     previewPageNum.value = 1;
 
-    // 显示生成数量提示
-    if (allResults.length > 1) {
+    const dupCount = markedResults.filter(r => r._duplicate).length;
+    if (dupCount > 0) {
+      ElMessage.warning(`生成完成，其中 ${dupCount} 条编码名称已存在，无法保存`);
+    } else if (allResults.length > 0) {
       ElMessage.success(`成功生成 ${allResults.length} 个编码`);
     }
 
@@ -1792,8 +1835,9 @@ function formatContextValue(key: string, code: string): string {
 
 /** 保存当前生成的编码到数据库 */
 async function handleSaveCodes() {
-  if (generatedCodes.value.length === 0) {
-    ElMessage.warning('请先生成编码');
+  const newCodes = generatedCodes.value.filter(r => !r._duplicate);
+  if (newCodes.length === 0) {
+    ElMessage.warning('所有编码名称均已存在，无法保存');
     return;
   }
   savedSaving.value = true;
@@ -1805,7 +1849,7 @@ async function handleSaveCodes() {
       stationCode: conditions.stationCode ? formatContextValue('stationCode', conditions.stationCode) : undefined,
       thirdClassCode: conditions.thirdClassCode ? formatContextValue('thirdClassCode', conditions.thirdClassCode) : undefined,
     };
-    const result = await codeService.saveCodeRecords(generatedCodes.value, context);
+    const result = await codeService.saveCodeRecords(newCodes, context);
     ElMessage.success(`已保存 ${result.savedCount} 条`);
     listPageNum.value = 1;
     loadCodeList();

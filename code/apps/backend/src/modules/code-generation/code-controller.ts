@@ -147,6 +147,21 @@ router.get('/api/codes', async (req: Request, res: Response) => {
   }
 });
 
+/** 检查编码名称是否重复 */
+router.post('/api/codes/check-names', async (req: Request, res: Response) => {
+  try {
+    const { names } = req.body;
+    if (!Array.isArray(names) || names.length === 0) {
+      return success(res, { duplicates: [] });
+    }
+    const duplicates = await codeService.checkDuplicateCodeNames(names);
+    success(res, { duplicates });
+  } catch (err) {
+    console.error('Failed to check duplicate names:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '检查编码名称失败', 500);
+  }
+});
+
 /** 批量删除编码生成记录 */
 router.delete('/api/codes/batch', async (req: Request, res: Response) => {
   try {

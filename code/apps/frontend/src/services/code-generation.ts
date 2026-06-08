@@ -89,3 +89,10 @@ export async function getRecentConditions(): Promise<any[]> {
   const res = await api.get('/codes/recent-conditions');
   return res.data;
 }
+
+/** 检查编码名称是否已在系统中存在（存量表+生成记录表） */
+export async function checkDuplicateNames(names: string[]): Promise<string[]> {
+  if (names.length === 0) return [];
+  const res = await api.post('/codes/check-names', { names });
+  return res.data?.duplicates || [];
+}

@@ -284,3 +284,17 @@ export async function batchDeleteCodeRecords(ids: number[]): Promise<number> {
   const result = await query(sql, ids);
   return (result as any)?.rowCount || 0;
 }
+
+/** 检查编码名称是否已在存量表或生成记录表中存在 */
+export async function checkDuplicateCodeNames(names: string[]): Promise<string[]> {
+  if (names.length === 0) return [];
+  const schema = getSchema();
+  const sql = `
+    SELECT DISTINCT data_name FROM ${schema}.cec_new_energy_code_dict
+    WHERE if_delete = '0' AND data_name = ANY($1)
+    UNION
+    SELECT DISTINCT name FROM ${schema}.cec_new_energy_createcode
+    WHERE if_delete = '0' AND name = ANY($1)`;
+  const result = await query<{ data_name: string }>(sql, [names]);
+  return result.map(r => r.data_name);
+}
