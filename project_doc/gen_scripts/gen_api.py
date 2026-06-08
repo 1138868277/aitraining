@@ -1317,7 +1317,7 @@ def add_section_error_codes(doc):
 # ============================================================
 def build_doc():
     doc = create_document("接口文档")
-    add_cover(doc, "接口文档", "华电新能源测点编码管理平台", "V1.0", "2026-05-30")
+    add_cover(doc, "接口文档", "华电新能源测点编码管理平台", "V1.1", "2026-06-08")
 
     add_section_overview(doc)
     add_section_general(doc)

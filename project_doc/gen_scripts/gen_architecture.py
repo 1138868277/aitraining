@@ -37,7 +37,7 @@ def build_section_2(doc):
     add_table(doc,
         ["层次", "技术选型", "版本"],
         [
-            ["运行环境", "Node.js", "20 LTS"],
+            ["运行环境", "Node.js", "24.0+"],
             ["后端框架", "Express", "4.21"],
             ["后端语言", "TypeScript", "5.6+"],
             ["前端框架", "Vue 3 (Composition API)", "3.x"],
@@ -55,7 +55,7 @@ def build_section_2(doc):
 
     add_heading2(doc, "2.2 后端技术栈")
     add_heading3(doc, "2.2.1 核心框架")
-    add_para(doc, "后端基于Node.js 20 LTS运行时，使用Express 4.21框架构建Web应用。项目采用TypeScript 5.6+作为开发语言，提供类型安全和更好的开发体验。所有业务代码均使用TypeScript编写，编译后生成JavaScript运行。")
+    add_para(doc, "后端基于Node.js 24.0+运行时，使用Express 4.21框架构建Web应用。项目采用TypeScript 5.6+作为开发语言，提供类型安全和更好的开发体验。所有业务代码均使用TypeScript编写，编译后生成JavaScript运行。")
 
     add_heading3(doc, "2.2.2 三层架构")
     add_para(doc, "后端代码严格遵循Controller → Service → Domain三层架构：")
@@ -229,14 +229,14 @@ def build_section_4(doc):
     add_table(doc,
         ["租户编码", "租户名称", "Schema名称", "说明"],
         [
-            ["admin", "集团管理员", "public", "集团级管理租户，可管理所有租户"],
-            ["yunnan", "云南分公司", "yunnan", "云南区域租户，数据隔离在yunnan Schema"],
-            ["fujian", "福建分公司", "fujian", "福建区域租户，数据隔离在fujian Schema"],
+            ["admin", "集团管理员", "liuhaojun", "集团级管理租户，连接远程数据库（10.1.1.113:7300），可管理所有租户"],
+            ["yunnan", "云南分公司", "yunnan", "云南区域租户，连接本地数据库，数据隔离在yunnan Schema"],
+            ["fujian", "福建分公司", "fujian", "福建区域租户，连接本地数据库，数据隔离在fujian Schema"],
         ]
     )
 
-    add_heading3(doc, "4.5.2 Schema级数据隔离")
-    add_para(doc, "多租户采用PostgreSQL Schema级数据隔离方案。每个租户拥有独立的Schema，Schema内的表结构完全一致。同一数据库中包含多个Schema（public, yunnan, fujian等），通过设置search_path在运行时切换当前Schema，实现租户间数据的物理隔离。")
+    add_heading3(doc, "4.5.2 数据库级+Schema级双重隔离")
+    add_para(doc, "多租户采用数据库级+Schema级双重隔离方案。集团管理员（admin）连接远程数据库（10.1.1.113:7300/training_exercises），区域租户（yunnan/fujian）连接本地数据库（localhost/code_tools）。同一数据库内通过Schema实现逻辑隔离（liuhaojun, yunnan, fujian Schema），不同数据库实例之间实现物理隔离。默认连接池配置持久化于config/datasource.json文件中，支持运行时热切换。")
 
     add_heading3(doc, "4.5.3 租户上下文传递机制")
     add_para(doc, "租户上下文的传递采用AsyncLocalStorage实现：")
@@ -317,16 +317,16 @@ def build_section_6(doc):
     add_para(doc, "用户选择统计维度 → 前端请求统计数据 → Controller接收参数 → Service调用Domain执行聚合查询 → 数据从PostgreSQL中聚合返回 → Service缓存结果 → 返回统计结果 → 前端使用ECharts渲染图表展示。")
 
     add_heading2(doc, "6.2 多租户数据隔离策略")
+    add_para(doc, "系统采用数据库级+Schema级双重隔离方案。admin连接远程数据库（10.1.1.113:7300/training_exercises），区域租户连接本地数据库（localhost/code_tools）。默认连接池配置持久化于config/datasource.json，支持运行时热切换。")
     add_table(doc,
-        ["数据类型", "隔离级别", "Schema", "说明"],
+        ["数据类型", "隔离级别", "说明"],
         [
-            ["字典数据", "Schema隔离", "租户Schema", "每个租户维护独立的字典数据"],
-            ["编码数据", "Schema隔离", "租户Schema", "编码记录按租户隔离存储"],
-            ["场站数据", "Schema隔离", "租户Schema", "场站信息按租户管理"],
-            ["用户数据", "Schema隔离", "租户Schema", "用户账号按租户隔离"],
-            ["审批数据", "Schema隔离", "租户Schema", "审批流程数据按租户隔离"],
-            ["系统配置", "全局共享", "public", "系统级配置全局可见"],
-            ["审计日志", "Schema隔离", "租户Schema", "操作日志按租户记录"],
+            ["字典数据", "数据库+Schema隔离", "admin在远程库liuhaojun Schema，区域在本地库各自Schema"],
+            ["编码数据", "数据库+Schema隔离", "编码记录按租户隔离存储"],
+            ["场站数据", "数据库+Schema隔离", "场站信息按租户管理"],
+            ["用户数据", "仅admin Schema", "cec_sys_user表仅存于admin Schema"],
+            ["审批数据", "仅admin Schema", "审批数据统一存储在admin Schema，区域草稿存本地"],
+            ["系统配置", "全局共享文件", "datasource.json配置文件全局共享"],
         ]
     )
 
@@ -361,12 +361,12 @@ def build_section_7(doc):
     add_table(doc,
         ["租户", "数据库名", "Schema", "连接池"],
         [
-            ["集团管理员", "cec_coding", "public", "默认连接池"],
-            ["云南分公司", "cec_coding", "yunnan", "运行时动态切换"],
-            ["福建分公司", "cec_coding", "fujian", "运行时动态切换"],
+            ["集团管理员", "training_exercises (远程10.1.1.113:7300)", "liuhaojun", "默认连接池（config/datasource.json配置）"],
+            ["云南分公司", "code_tools (本地localhost)", "yunnan", "运行时动态切换"],
+            ["福建分公司", "code_tools (本地localhost)", "fujian", "运行时动态切换"],
         ]
     )
-    add_para(doc, "所有租户共用同一数据库实例（cec_coding），通过Schema进行逻辑隔离。数据库连接池由pg库的Pool统一管理，租户切换通过动态设置search_path实现。")
+    add_para(doc, "集团管理员连接远程数据库（10.1.1.113:7300/training_exercises），区域租户连接本地数据库（localhost/code_tools），通过不同的数据库实例加Schema实现双重数据隔离。默认连接池配置持久化于config/datasource.json文件中，支持运行时热切换。")
 
     add_heading2(doc, "7.3 本地运行方式")
     add_heading3(doc, "7.3.1 环境要求")
@@ -459,7 +459,7 @@ def build_section_8(doc):
 def main():
     """主函数：创建文档并填充所有章节"""
     doc = create_document("总体架构设计文档")
-    add_cover(doc, "总体架构设计文档", "华电新能源测点编码管理平台", "V1.0", "2026-05-30")
+    add_cover(doc, "总体架构设计文档", "华电新能源测点编码管理平台", "V1.1", "2026-06-08")
     add_toc(doc)
 
     build_section_1(doc)
