@@ -34,11 +34,17 @@ export async function initUserTable(): Promise<void> {
     )`,
   );
 
-  // 兼容旧表：添加 last_login_time 列（若不存在）
-  await queryAsTenant(
-    ADMIN_TENANT,
+  // 兼容旧表：补充缺失列（若不存在）
+  const alterColumns = [
+    `ALTER TABLE ${ADMIN_SCHEMA}.cec_sys_user ADD COLUMN IF NOT EXISTS region VARCHAR(200)`,
+    `ALTER TABLE ${ADMIN_SCHEMA}.cec_sys_user ADD COLUMN IF NOT EXISTS tenant VARCHAR(100)`,
+    `ALTER TABLE ${ADMIN_SCHEMA}.cec_sys_user ADD COLUMN IF NOT EXISTS create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+    `ALTER TABLE ${ADMIN_SCHEMA}.cec_sys_user ADD COLUMN IF NOT EXISTS update_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
     `ALTER TABLE ${ADMIN_SCHEMA}.cec_sys_user ADD COLUMN IF NOT EXISTS last_login_time TIMESTAMP`,
-  );
+  ];
+  for (const sql of alterColumns) {
+    await queryAsTenant(ADMIN_TENANT, sql);
+  }
 
   const existing = await queryOneAsTenant<{ cnt: number }>(
     ADMIN_TENANT,

@@ -112,15 +112,18 @@
 
                 <!-- 导入测点 -->
                 <template v-if="step.key === 'import-measure'">
-                  <div class="upload-zone" :class="{ 'upload-disabled': importOngoing }" @dragover.prevent @drop.prevent="!importOngoing && onDrop($event, 'measure')" @click="!importOngoing && triggerUpload('measure')">
+                  <div v-if="!importStationDone" class="step-lock-msg">请先完成场站数据导入</div>
+                  <template v-else>
+                  <div class="upload-zone" :class="{ 'upload-disabled': measureDisabled }" @dragover.prevent @drop.prevent="!measureDisabled && onDrop($event, 'measure')" @click="!measureDisabled && triggerUpload('measure')">
                     <div class="upload-icon">&#128196;</div>
                     <p class="upload-text">拖拽或点击上传时序测点 Excel</p>
                     <p class="upload-hint">需要包含"测点编码"和"测点描述"列</p>
                   </div>
                   <div v-if="measureFile" class="file-info">
                     <span class="file-name">{{ measureFile.name }}</span>
-                    <el-button size="small" type="primary" :loading="measureLoading" :disabled="importOngoing" @click="importMeasure">导入</el-button>
+                    <el-button size="small" type="primary" :loading="measureLoading" :disabled="measureDisabled" @click="importMeasure">导入</el-button>
                   </div>
+                  </template>
                   <!-- 双进度条一行：左1/3上传，右2/3导入 -->
                   <div v-if="measureProgress < 100 && (measureUploadPercent > 0 || measureProgress > 0)" class="tech-progress-row">
                     <div class="tech-progress tech-progress-uploading" :class="{ 'tech-progress-done': measureUploadPercent >= 100 }" style="width:33%">
@@ -146,8 +149,10 @@
 
                 <!-- 生成规则 -->
                 <template v-if="step.key === 'generate'">
+                  <div v-if="!importMeasureDone" class="step-lock-msg">请先完成测点数据导入</div>
+                  <template v-else>
                   <div class="generate-area">
-                    <button class="gen-btn" type="button" :disabled="genLoading" @click="startGenerate">
+                    <button class="gen-btn" type="button" :disabled="generateDisabled" @click="startGenerate">
                       <span class="gen-btn-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                       </span>
@@ -217,8 +222,11 @@
                   </div>
                 </template>
 
+                </template>
                 <!-- 导出文件 -->
                 <template v-if="step.key === 'export'">
+                  <div v-if="!generateDone" class="step-lock-msg">请先生成稽核规则</div>
+                  <template v-else>
                   <div class="export-section">
                     <div class="split-section-title">整体下载（完整单文件 · 不分片）</div>
                     <div class="export-grid">
@@ -262,6 +270,7 @@
                       </div>
                     </div>
                   </div>
+                  </template>
                 </template>
               </div>
             </div>
@@ -394,6 +403,17 @@ const importOngoing = computed(() =>
   stationLoading.value || measureLoading.value ||
   steps[0].status === 'running' || steps[1].status === 'running'
 );
+
+/** 各步骤完成状态 */
+const importStationDone = computed(() => steps[0].status === 'completed');
+const importMeasureDone = computed(() => steps[1].status === 'completed');
+const generateDone = computed(() => steps[2].status === 'completed');
+
+/** 测点导入是否被禁用（需先完成场站导入） */
+const measureDisabled = computed(() => !importStationDone.value || importOngoing.value);
+
+/** 生成规则是否被禁用（需先完成测点导入） */
+const generateDisabled = computed(() => genLoading.value || !importMeasureDone.value);
 
 function triggerUpload(type: string) {
   const input = document.createElement('input');
@@ -839,6 +859,9 @@ async function checkOngoingImport(type: 'station' | 'measure') {
     const p = await getImportProgress(type);
     if (p.status === 'processing' && p.total > 0) {
       // 后台仍在导入中，恢复进度显示和轮询
+      // 文件已上传到后端，上传进度固定100%
+      if (type === 'station') stationUploadPercent.value = 100;
+      else measureUploadPercent.value = 100;
       const updateProgress = (total: number, done: number) => {
         if (type === 'station') {
           stationTotal.value = total;
@@ -1480,6 +1503,17 @@ onMounted(async () => {
 /* 身体区域 */
 .step-body {
   padding-left: 46px;
+}
+
+/* ==================== 步骤锁定提示 ==================== */
+.step-lock-msg {
+  padding: 20px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: #94a3b8;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
 }
 
 /* ==================== 上传区域 ==================== */

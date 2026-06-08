@@ -17,6 +17,8 @@ export function getCurrentSchema(): string {
 /** 初始化 TSR 相关表 */
 export async function initTables(): Promise<void> {
   const s = getCurrentSchema();
+  // schema 可能已存在（由 PostgreSQL 自动创建），静默忽略权限错误
+  try { await query('CREATE SCHEMA IF NOT EXISTS "' + s + '"'); } catch {}
   await query('CREATE TABLE IF NOT EXISTS "' + s + '".tsr_station (station_code TEXT, station_name TEXT)');
   await query('CREATE TABLE IF NOT EXISTS "' + s + '".tsr_measure_data (cd_code TEXT, cd_name TEXT, station_code TEXT, energy_type TEXT, measure_code TEXT, second_code TEXT)');
   await query(`CREATE TABLE IF NOT EXISTS "${s}".tsr_standard_list (
