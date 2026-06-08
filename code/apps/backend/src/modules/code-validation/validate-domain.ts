@@ -2,15 +2,22 @@ import { query as dbQuery, getSchema } from '../../db/index.js';
 import { MemoryCache } from '../../common/memory-cache.js';
 
 const dictTreeCache = new MemoryCache<DictTreeNode[]>();
-const DICT_TREE_CACHE_KEY = 'dictTree';
+const DICT_TREE_CACHE_KEY_PREFIX = 'dictTree:';
 const DICT_TREE_CACHE_TTL = 30 * 60 * 1000; // 30 分钟
+
+function dictTreeCacheKey(): string {
+  return DICT_TREE_CACHE_KEY_PREFIX + getSchema();
+}
 /** 用于服务启动时预加载，避免用户首次等待 */
 export function prewarmDictTree(): void {
   getDictTree().catch(() => {});
 }
 
 export function invalidateDictTreeCache(): void {
-  dictTreeCache.del(DICT_TREE_CACHE_KEY);
+  dictTreeCache.del(DICT_TREE_CACHE_KEY_PREFIX + 'liuhaojun');
+  dictTreeCache.del(DICT_TREE_CACHE_KEY_PREFIX + 'yunnan');
+  dictTreeCache.del(DICT_TREE_CACHE_KEY_PREFIX + 'fujian');
+  dictTreeCache.del(DICT_TREE_CACHE_KEY_PREFIX + 'qianyuan');
 }
 
 export interface DictTreeNode {
@@ -39,7 +46,7 @@ export interface ManualStatItem {
 /** 获取字典树数据（三级：类型域→二级类码→数据类码，数据码展开时懒加载） */
 export async function getDictTree(): Promise<DictTreeNode[]> {
   // 优先读缓存
-  const cached = dictTreeCache.get(DICT_TREE_CACHE_KEY);
+  const cached = dictTreeCache.get(dictTreeCacheKey());
   if (cached) return cached;
 
   // 三个并行轻量查询，不含数据码
@@ -115,7 +122,7 @@ export async function getDictTree(): Promise<DictTreeNode[]> {
   }
 
   const result = Array.from(typeDomainMap.values());
-  dictTreeCache.set(DICT_TREE_CACHE_KEY, result, DICT_TREE_CACHE_TTL);
+  dictTreeCache.set(dictTreeCacheKey(), result, DICT_TREE_CACHE_TTL);
   return result;
 }
 

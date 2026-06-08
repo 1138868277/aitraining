@@ -98,7 +98,7 @@ export async function approveApproval(approvalId: number, reviewer: string) {
   await approvalDomain.approveRecord(approvalId, reviewer);
 
   // 3. 下发到所有区域
-  await approvalDomain.distributeToAllRegions({
+  const distResult = await approvalDomain.distributeToAllRegions({
     typeCode: record.typeCode,
     secondClassCode: record.secondClassCode,
     secondClassName: record.secondClassName,
@@ -108,6 +108,9 @@ export async function approveApproval(approvalId: number, reviewer: string) {
     dataName: record.dataName,
     creator: reviewer,
   });
+  if (distResult.failed.length > 0) {
+    console.error(`分发失败租户: ${distResult.failed.join(', ')}，已分发: ${distResult.distributed.join(', ')}，已存在跳过: ${distResult.skipped.join(', ')}`);
+  }
 
   // 4. 更新来源区域的草稿状态
   try {

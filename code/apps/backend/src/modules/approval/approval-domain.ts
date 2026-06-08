@@ -295,16 +295,19 @@ export async function distributeToAllRegions(data: {
   dataCode: string;
   dataName: string;
   creator: string;
-}): Promise<void> {
+}): Promise<{ distributed: string[]; skipped: string[]; failed: string[] }> {
   const typeDomainCode = getTypeDomainCode(data.typeCode);
   const firstClassCode = 'B1';
   const firstClassName = '生产运行';
+
+  const result: { distributed: string[]; skipped: string[]; failed: string[] } = {
+    distributed: [], skipped: [], failed: [],
+  };
 
   // 写入所有租户（admin + 各区域），已存在则跳过
   for (const tenant of TENANTS) {
     const schema = tenant.datasource.schema;
     try {
-      // 先检查是否已存在
       const existing = await queryAsTenant<{ cnt: number }>(
         tenant.id,
         `SELECT COUNT(*) AS cnt FROM ${schema}.cec_new_energy_code_dict
@@ -313,7 +316,10 @@ export async function distributeToAllRegions(data: {
            AND if_delete = '0'`,
         [typeDomainCode, data.secondClassCode, data.dataCategoryCode, data.dataCode],
       );
-      if (Number(existing[0]?.cnt) > 0) continue;
+      if (Number(existing[0]?.cnt) > 0) {
+        result.skipped.push(tenant.id);
+        continue;
+      }
 
       await queryAsTenant(
         tenant.id,
@@ -328,10 +334,13 @@ export async function distributeToAllRegions(data: {
          data.dataCategoryCode, data.dataCategoryName,
          data.dataCode, data.dataName, data.creator],
       );
+      result.distributed.push(tenant.id);
     } catch (err) {
       console.error(`Failed to distribute code to tenant ${tenant.id}:`, err);
+      result.failed.push(tenant.id);
     }
   }
+  return result;
 }
 
 /** 根据审批 ID 更新来源区域的草稿状态 */

@@ -122,7 +122,9 @@ export async function queryAsTenant<T = any>(tenantId: string, text: string, par
     return query(text, params);
   }
   const result = await entry.pool.query({ text, values: params });
-  return result.rows as T[];
+  const rows = result.rows as T[];
+  (rows as any).rowCount = result.rowCount ?? 0;
+  return rows;
 }
 
 /** 获取租户连接池的专用客户端（用于事务等需要保持同一连接的场景） */
