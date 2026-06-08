@@ -1,0 +1,11 @@
+
+> @cec/frontend@1.0.0 dev /Users/liuhaojun/Documents/06 AI培训/04 脚手架/aitraining/code/apps/frontend
+> vite
+
+
+  VITE v5.4.21  ready in 213 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+2:14:02 PM [vite] hmr update /src/views/code-generate/index.vue?vue&type=style&index=0&scoped=741b1195&lang.css
+2:14:04 PM [vite] hmr update /src/views/code-generate/index.vue?vue&type=style&index=0&scoped=741b1195&lang.css

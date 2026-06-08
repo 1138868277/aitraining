@@ -92,7 +92,9 @@ export async function replacePool(dbConfig: DatasourceConfig): Promise<void> {
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
   const p = getCurrentPool();
   const result = await p.query({ text, values: params });
-  return result.rows as T[];
+  const rows = result.rows as T[];
+  (rows as any).rowCount = result.rowCount ?? 0;
+  return rows;
 }
 
 /** 执行单行查询（自动感知当前租户） */

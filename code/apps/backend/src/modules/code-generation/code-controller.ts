@@ -7,6 +7,7 @@ import {
   ErrorCode,
 } from '@cec/contracts';
 import * as codeService from './code-service.js';
+import { clearCodeGenListCache } from '../statistics/statistics-service.js';
 import { success, error, paginated } from '../../common/response.js';
 import { AppError } from '../../common/errors.js';
 
@@ -123,6 +124,7 @@ router.post('/api/codes', async (req: Request, res: Response) => {
       return error(res, ErrorCode.MISSING_PARAMETER, '请提供要保存的编码列表');
     }
     const saved = await codeService.saveCodeRecords(codes, context);
+    if (saved > 0) clearCodeGenListCache();
     success(res, { savedCount: saved });
   } catch (err) {
     console.error('Failed to save code records:', err);
@@ -153,6 +155,7 @@ router.delete('/api/codes/batch', async (req: Request, res: Response) => {
       return error(res, ErrorCode.MISSING_PARAMETER, '请指定要删除的记录ID');
     }
     const deletedCount = await codeService.batchDeleteCodeRecords(ids);
+    if (deletedCount > 0) clearCodeGenListCache();
     success(res, { deletedCount });
   } catch (err) {
     console.error('Failed to batch delete code records:', err);

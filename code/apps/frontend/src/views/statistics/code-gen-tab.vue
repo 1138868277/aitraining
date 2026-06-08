@@ -154,7 +154,9 @@
         max-height="520"
         @expand-change="onGroupExpand"
         :row-class-name="getExpandRowClass"
-        @selection-change="onSelectionChange"
+        @selection-change="syncSelection"
+        @select="syncSelection"
+        @select-all="syncSelection"
         @filter-change="onHeaderFilterChange"
         :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
       >
@@ -589,8 +591,8 @@ function onHeaderFilterChange(filters: Record<string, any[]>) {
 
 const selectedRows = ref<any[]>([]);
 
-function onSelectionChange(rows: any[]) {
-  selectedRows.value = rows;
+function syncSelection() {
+  selectedRows.value = mainTableRef.value?.getSelectionRows() || [];
 }
 
 async function handleExport() {

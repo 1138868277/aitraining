@@ -176,6 +176,12 @@ const FILTER_CACHE_TTL_MS = 30_000;
 const codeGenGroupedCache = new Map<string, { data: any; expiresAt: number }>();
 const GROUPED_CACHE_TTL_MS = 30_000;
 
+/** 新增/删除编码后清除列表相关缓存 */
+export function clearCodeGenListCache(): void {
+  codeGenGroupedCache.clear();
+  codeGenFilterCache.clear();
+}
+
 /** 字典数据缓存（TTL 5分钟） */
 const codeGenDictCache = new Map<string, { data: any; expiresAt: number }>();
 const DICT_CACHE_TTL_MS = 300_000;
@@ -472,6 +478,7 @@ export async function deleteCodeGenGroups(
     ]);
     totalDeleted += (result as any)?.rowCount || 0;
   }
+  if (totalDeleted > 0) clearCodeGenListCache();
   return totalDeleted;
 }
 

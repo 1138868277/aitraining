@@ -428,7 +428,9 @@
               max-height="520"
               @expand-change="onGroupExpand"
               :row-class-name="getExpandRowClass"
-              @selection-change="onSelectionChange"
+              @selection-change="syncSelection"
+              @select="syncSelection"
+              @select-all="syncSelection"
               @filter-change="onHeaderFilterChange"
               :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
             >
@@ -957,8 +959,8 @@ function onResetListFilter() {
 
 const selectedRows = ref<any[]>([]);
 
-function onSelectionChange(rows: any[]) {
-  selectedRows.value = rows;
+function syncSelection() {
+  selectedRows.value = mainTableRef.value?.getSelectionRows() || [];
 }
 
 async function handleExport() {
@@ -1860,8 +1862,9 @@ function onTabClick(tab: any) {
   if (tab.props?.name === 'saved' && codeList.value.length === 0) {
     loadCodeList();
   }
-  // 等 DOM 更新 + 浏览器绘制完成后恢复滚动位置，避免标签切换导致页面跳动
-  nextTick(() => {
+  // 使用两层 requestAnimationFrame 确保在浏览器完成布局渲染后恢复滚动位置，
+  // 避免标签切换导致内容高度变化引起页面跳动
+  requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       window.scrollTo(0, scrollY);
     });

@@ -1,0 +1,31 @@
+
+> @cec/backend@1.0.0 dev /Users/liuhaojun/Documents/06 AI培训/04 脚手架/aitraining/code/apps/backend
+> tsx watch src/main.ts
+
+🔌 正在初始化多租户连接池...
+  ✅ 租户 "集团" (admin) 连接池初始化成功
+  ✅ 租户 "云南省" (yunnan) 连接池初始化成功
+  ✅ 租户 "福建省" (fujian) 连接池初始化成功
+  ✅ 租户 "黔源" (qianyuan) 连接池初始化成功
+node:events:486
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:2016:16)
+    at listenInCluster (node:net:2073:12)
+    at Server.listen (node:net:2178:7)
+    at app.listen (/Users/liuhaojun/Documents/06 AI培训/04 脚手架/aitraining/code/node_modules/.pnpm/express@4.22.1/node_modules/express/lib/application.js:635:24)
+    at start (/Users/liuhaojun/Documents/06 AI培训/04 脚手架/aitraining/code/apps/backend/src/main.ts:10:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2052:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -48,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v25.6.1
