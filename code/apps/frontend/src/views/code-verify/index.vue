@@ -282,7 +282,10 @@
               <div class="audit-result-header">
                 <span>稽核结果（共 {{ auditResults.length }} 条编码）</span>
                 <el-tag v-if="uniqueCount === auditResults.length" type="success" effect="plain">全部不重复</el-tag>
-                <el-tag v-else type="danger" effect="plain">{{ duplicateCount }} 条重复</el-tag>
+                <template v-else>
+                  <el-tag type="danger" effect="plain" style="margin-right:6px">{{ duplicateCount }} 条重复</el-tag>
+                  <el-tag type="success" effect="plain">{{ uniqueCount }} 条不重复</el-tag>
+                </template>
               </div>
               <el-table :data="auditResults" border stripe style="width: 100%" max-height="600">
                 <el-table-column type="index" label="序号" width="60" />
