@@ -628,11 +628,11 @@ async function splitExcelIntoSheets(
     const newMerges: XLSX.Range[] = [];
     const mergedInChunk = aMerges.filter(m => m.start >= start && m.end <= end);
     for (const m of mergedInChunk) {
-      newMerges.push({ s: { r: m.start - start, c: 0 }, e: { r: m.end - start, c: 0 } });
+      newMerges.push({ s: { r: m.start - start + 1, c: 0 }, e: { r: m.end - start + 1, c: 0 } });
     }
     for (const col of syncCols) {
       for (const m of mergedInChunk) {
-        newMerges.push({ s: { r: m.start - start, c: col - 1 }, e: { r: m.end - start, c: col - 1 } });
+        newMerges.push({ s: { r: m.start - start + 1, c: col - 1 }, e: { r: m.end - start + 1, c: col - 1 } });
       }
     }
     newWs['!merges'] = newMerges;
