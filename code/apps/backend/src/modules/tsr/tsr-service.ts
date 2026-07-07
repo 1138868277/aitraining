@@ -457,8 +457,13 @@ const overallConfig: Record<string, { fields: string[]; headers: Record<string, 
 
 const typeNames: Record<string, string> = { sz: '死值', tb: '跳变', yx: '越限', zd: '中断' };
 
-/** 生成单个规则类型的总体 Excel 文件 buffer（完整单文件，不分片） */
-async function makeOverallExcel(area: string, type: 'sz' | 'tb' | 'yx' | 'zd'): Promise<Buffer | null> {
+/** 加载导出数据并重命名列 */
+async function loadExportData(area: string, type: 'sz' | 'tb' | 'yx' | 'zd'): Promise<{
+  renamedRows: Record<string, any>[];
+  headerOrder: string[];
+  mergeHeaderKeys: string[];
+  cfg: typeof overallConfig.sz;
+} | null> {
   const rawRows = await domain.queryExportList(area, type);
   if (rawRows.length === 0) return null;
 
@@ -475,6 +480,15 @@ async function makeOverallExcel(area: string, type: 'sz' | 'tb' | 'yx' | 'zd'): 
 
   const mergeHeaderKeys = cfg.mergeCols.map(c => cfg.headers[c]);
 
+  return { renamedRows, headerOrder, mergeHeaderKeys, cfg };
+}
+
+/** 生成单个规则类型的总体 Excel 文件 buffer（完整单文件，不分片） */
+async function makeOverallExcel(area: string, type: 'sz' | 'tb' | 'yx' | 'zd'): Promise<Buffer | null> {
+  const data = await loadExportData(area, type);
+  if (!data) return null;
+
+  const { renamedRows, headerOrder, mergeHeaderKeys } = data;
   const ws = XLSX.utils.json_to_sheet(renamedRows, { header: headerOrder });
   const merges = computeHierarchicalMerges(renamedRows, mergeHeaderKeys);
   clearMergedValues(ws, merges);
@@ -568,38 +582,28 @@ async function splitExcelIntoSheets(
   type: 'sz' | 'tb' | 'yx' | 'zd',
   maxRows: number = 175000,
 ): Promise<{ buffer: Buffer; name: string }[]> {
-  const fullBuffer = await makeOverallExcel(area, type);
-  if (!fullBuffer) throw new Error(`未找到 ${typeNames[type]} 类型的导出数据`);
+  const data = await loadExportData(area, type);
+  if (!data) throw new Error(`未找到 ${typeNames[type]} 类型的导出数据`);
 
-  const wb = XLSX.read(fullBuffer, { type: 'buffer' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const allData: Record<string, any>[] = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
-  if (allData.length <= 1) throw new Error('数据为空');
+  const { renamedRows, headerOrder } = data;
+  const totalRows = renamedRows.length;
 
-  const header = allData[0] as string[];
-  const rows = allData.slice(1);
-  const totalRows = rows.length;
+  // 用原始数据计算合并信息，直接从数据判断不可拆分边界
+  // 按 mergeCols 第一列（A 列）的连续相同值分组，连续相同值的行不可拆分
+  const mergeColKey = data.mergeHeaderKeys[0];
 
-  // 提取 A 列合并范围
-  const merges = (ws['!merges'] || []) as XLSX.Range[];
-  const aMerges = merges
-    .filter(m => m.s.c === 0 && m.e.c === 0)
-    .map(m => ({ start: m.s.r + 1, end: m.e.r + 1 }))
-    .sort((a, b) => a.start - b.start);
-
-  // 构建不可拆分块
-  const blocks: { type: 'normal' | 'merged'; start: number; end: number; rowCount: number }[] = [];
-  let currentRow = 1;
-  for (const mr of aMerges) {
-    if (currentRow < mr.start) {
-      blocks.push({ type: 'normal', start: currentRow, end: mr.start - 1, rowCount: mr.start - currentRow });
+  // 构建不可拆分块（按 A 列合并边界）
+  const blocks: { start: number; end: number; rowCount: number }[] = [];
+  let blockStart = 1;
+  let currentVal = renamedRows[0]?.[mergeColKey];
+  for (let i = 1; i < totalRows; i++) {
+    if (renamedRows[i]?.[mergeColKey] !== currentVal) {
+      blocks.push({ start: blockStart, end: i, rowCount: i - blockStart + 1 });
+      currentVal = renamedRows[i]?.[mergeColKey];
+      blockStart = i + 1;
     }
-    blocks.push({ type: 'merged', start: mr.start, end: mr.end, rowCount: mr.end - mr.start + 1 });
-    currentRow = mr.end + 1;
   }
-  if (currentRow <= totalRows) {
-    blocks.push({ type: 'normal', start: currentRow, end: totalRows, rowCount: totalRows - currentRow + 1 });
-  }
+  blocks.push({ start: blockStart, end: totalRows, rowCount: totalRows - blockStart + 1 });
 
   // 计算拆分断点
   const splitPoints: { start: number; end: number }[] = [];
@@ -622,19 +626,41 @@ async function splitExcelIntoSheets(
 
   for (let i = 0; i < splitPoints.length; i++) {
     const { start, end } = splitPoints[i];
-    const chunkRows = [header, ...rows.slice(start - 1, end)];
+    const chunkRows = [headerOrder, ...renamedRows.slice(start - 1, end).map(r => headerOrder.map(h => r[h]))];
     const newWs = XLSX.utils.aoa_to_sheet(chunkRows as any[][]);
 
-    const newMerges: XLSX.Range[] = [];
-    const mergedInChunk = aMerges.filter(m => m.start >= start && m.end <= end);
-    for (const m of mergedInChunk) {
-      newMerges.push({ s: { r: m.start - start + 1, c: 0 }, e: { r: m.end - start + 1, c: 0 } });
-    }
-    for (const col of syncCols) {
-      for (const m of mergedInChunk) {
-        newMerges.push({ s: { r: m.start - start + 1, c: col - 1 }, e: { r: m.end - start + 1, c: col - 1 } });
+    // 计算当前分片内的 A 列合并范围
+    const aMergeRanges: { start: number; end: number }[] = [];
+    let mStart = 2; // 数据在分片 sheet 中从 r=1 开始，r=0 是表头
+    let mVal = chunkRows[1]?.[0];
+    for (let r = 2; r < chunkRows.length; r++) {
+      if (chunkRows[r]?.[0] !== mVal) {
+        if (r - mStart > 1) {
+          aMergeRanges.push({ start: mStart, end: r - 1 });
+        } else if (r - mStart === 1) {
+          // 两行相同才需要合并（单行不必合并）
+          aMergeRanges.push({ start: mStart, end: r - 1 });
+        }
+        mVal = chunkRows[r]?.[0];
+        mStart = r;
       }
     }
+    if (chunkRows.length - mStart > 1) {
+      aMergeRanges.push({ start: mStart, end: chunkRows.length - 1 });
+    }
+
+    const newMerges: XLSX.Range[] = aMergeRanges.map(m => ({
+      s: { r: m.start - 1, c: 0 },
+      e: { r: m.end - 1, c: 0 },
+    }));
+
+    // 同步合并 syncCols 列
+    for (const col of syncCols) {
+      for (const m of aMergeRanges) {
+        newMerges.push({ s: { r: m.start - 1, c: col - 1 }, e: { r: m.end - 1, c: col - 1 } });
+      }
+    }
+
     newWs['!merges'] = newMerges;
     clearMergedValues(newWs, newMerges);
 
