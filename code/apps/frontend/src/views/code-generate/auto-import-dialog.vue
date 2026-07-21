@@ -213,7 +213,15 @@ function handleFileChange(file: any) {
   reader.onload = (e) => {
     const data = new Uint8Array(e.target!.result as ArrayBuffer);
     const workbook = XLSX.read(data, { type: 'array' });
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      ElMessage.warning('文件中没有工作表');
+      return;
+    }
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet || !sheet['!ref']) {
+      ElMessage.warning('文件为空或格式不正确');
+      return;
+    }
     const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
     if (json.length < 2) {

@@ -411,6 +411,37 @@ export interface CodeCorrectionResult {
   correctionTime: string;
 }
 
+// ========== 编码修正 V2 ==========
+
+/** 编码修正V2 - 输入项 */
+export interface CodeCorrectionV2Item {
+  code: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+  thirdClassCode: string;
+  codeName?: string;
+}
+
+/** 编码修正V2 - 段位变更 */
+export interface SegmentChangeV2 {
+  segmentLabel: string;
+  oldValue: string;
+  newValue: string;
+  start: number;
+  length: number;
+}
+
+/** 编码修正V2 - 结果 */
+export interface CodeCorrectionV2Result {
+  oldCode: string;
+  newCode: string;
+  codeName?: string;
+  changes: SegmentChangeV2[];
+  duplicate: boolean;
+  correctionTime: string;
+}
+
 /**
  * 解析修改内容字符串
  * 格式: "数据类码修改为11，数据码修改为112"
@@ -549,6 +580,230 @@ export async function batchCorrectCodes(
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [parsed.original.code, parsed.newCode, parsed.original.description, parsed.original.modification, duplicate ? '1' : '0', now],
     );
+  }
+
+  return results;
+}
+
+/** 将数字格式化为4位扩展码 */
+function toExtCode(num: number): string {
+  return Math.min(num, 9999).toString().padStart(4, '0');
+}
+
+/** 通过名称查找三级类码 */
+async function lookupThirdClassCodeByName(schema: string, name: string, secondClassCode: string): Promise<string | null> {
+  const rows = await dbQuery<{ code: string }>(
+    `SELECT third_class_code AS code FROM ${schema}.cec_new_energy_third_class_dict
+     WHERE if_delete = '0' AND third_class_name = $1 AND second_class_code = $2 LIMIT 1`,
+    [name, secondClassCode],
+  );
+  return rows[0]?.code || null;
+}
+
+/** 组合查询：根据二级类码/数据类码/数据码的名称一次性查出对应代码 */
+async function lookupNameGroup(
+  schema: string,
+  names: { secondClassName?: string; dataCategoryName?: string; dataName?: string },
+): Promise<{ secondClassCode?: string; dataCategoryCode?: string; dataCode?: string } | null> {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = 0;
+
+  if (names.secondClassName) { idx++; conditions.push(`second_class_name = $${idx}`); params.push(names.secondClassName); }
+  if (names.dataCategoryName) { idx++; conditions.push(`data_category_name = $${idx}`); params.push(names.dataCategoryName); }
+  if (names.dataName) { idx++; conditions.push(`data_name = $${idx}`); params.push(names.dataName); }
+
+  if (conditions.length === 0) return null;
+
+  const sql = `SELECT second_class_code, data_category_code, data_code
+               FROM ${schema}.cec_new_energy_code_dict
+               WHERE if_delete = '0' AND ${conditions.join(' AND ')}
+               LIMIT 1`;
+  const rows = await dbQuery<{ second_class_code: string; data_category_code: string; data_code: string }>(sql, params);
+  if (rows.length === 0) return null;
+  return {
+    secondClassCode: rows[0].second_class_code,
+    dataCategoryCode: rows[0].data_category_code,
+    dataCode: rows[0].data_code,
+  };
+}
+
+/**
+ * 编码修正V2
+ * 导入字段: 测点编码 / 二级类码 / 数据类码 / 数据码 / 三级类码
+ * 根据 二级类码/数据类码/数据码/三级类码 修改 测点编码，
+ * 自动填充 二级类扩展码 和 三级类扩展码，保证新编码不重复
+ */
+export async function batchCorrectCodesV2(
+  items: CodeCorrectionV2Item[],
+  existingNewCodes?: string[],
+): Promise<CodeCorrectionV2Result[]> {
+  const schema = getSchema();
+  const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const results: CodeCorrectionV2Result[] = [];
+  const batchNewCodes = new Set<string>(existingNewCodes);
+
+  // 批量查询所有旧编码的名称
+  const allCodes = [...new Set(items.map(i => i.code?.trim()).filter(Boolean))];
+  const nameRows = await dbQuery<{ code: string; name: string }>(
+    `SELECT code, name FROM ${schema}.cec_new_energy_createcode
+     WHERE if_delete = '0' AND code = ANY($1)`,
+    [allCodes],
+  );
+  const nameMap = new Map(nameRows.map(r => [r.code, r.name]));
+
+  for (const item of items) {
+    const oldCode = item.code?.trim();
+    if (!/^[A-Za-z0-9]{31}$/.test(oldCode)) continue;
+
+    const oldSC = oldCode.substring(12, 15);
+
+    let sc = oldSC;
+    let tc = oldCode.substring(19, 22);
+    let dc = oldCode.substring(26, 28);
+    let dcode = oldCode.substring(28, 31);
+
+    const changes: SegmentChangeV2[] = [];
+
+    const rawSC = item.secondClassCode?.trim();
+    const rawTC = item.thirdClassCode?.trim();
+    const rawDC = item.dataCategoryCode?.trim();
+    const rawDCode = item.dataCode?.trim();
+
+    let resolvedSC = rawSC;
+    let resolvedTC = rawTC;
+    let resolvedDC = rawDC;
+    let resolvedDCode = rawDCode;
+
+    // 二级类码/数据类码/数据码：纯数字且长度正确→直接当代码，否则按名称查字典
+    const needSC = resolvedSC && !/^\d{3}$/.test(resolvedSC);
+    const needDC = resolvedDC && !/^\d{2}$/.test(resolvedDC);
+    const needDCode = resolvedDCode && !/^\d{3}$/.test(resolvedDCode);
+    if (needSC || needDC || needDCode) {
+      // 先尝试组合查询（三个名称同时在一条记录中匹配）
+      const result = await lookupNameGroup(schema, {
+        secondClassName: needSC ? resolvedSC : undefined,
+        dataCategoryName: needDC ? resolvedDC : undefined,
+        dataName: needDCode ? resolvedDCode : undefined,
+      });
+      if (result) {
+        if (needSC && result.secondClassCode) resolvedSC = result.secondClassCode;
+        if (needDC && result.dataCategoryCode) resolvedDC = result.dataCategoryCode;
+        if (needDCode && result.dataCode) resolvedDCode = result.dataCode;
+      } else {
+        // 组合查询无结果，逐个字段独立查询
+        if (needSC) {
+          const rows = await dbQuery<{ code: string }>(
+            `SELECT second_class_code AS code FROM ${schema}.cec_new_energy_second_class_type_dict
+             WHERE type_code = $1 AND second_class_name = $2 AND if_delete = '0' LIMIT 1`,
+            [oldCode.substring(4, 6), resolvedSC],
+          );
+          resolvedSC = rows[0]?.code || '';
+        }
+        if (needDC) {
+          const scForDC = resolvedSC || sc;
+          const rows = await dbQuery<{ code: string }>(
+            `SELECT data_category_code AS code FROM ${schema}.cec_new_energy_code_dict
+             WHERE if_delete = '0' AND second_class_code = $1 AND data_category_name = $2 LIMIT 1`,
+            [scForDC, resolvedDC],
+          );
+          resolvedDC = rows[0]?.code || '';
+        }
+        if (needDCode) {
+          const scForDC = resolvedSC || sc;
+          const dcForDC = resolvedDC || dc;
+          const rows = await dbQuery<{ code: string }>(
+            `SELECT data_code AS code FROM ${schema}.cec_new_energy_code_dict
+             WHERE if_delete = '0' AND second_class_code = $1 AND data_category_code = $2 AND data_name = $3 LIMIT 1`,
+            [scForDC, dcForDC, resolvedDCode],
+          );
+          resolvedDCode = rows[0]?.code || '';
+        }
+      }
+    }
+
+    // 三级类码：纯数字且3位→直接当代码，否则按名称查字典（在二级类码解析之后）
+    if (resolvedTC && !/^\d{3}$/.test(resolvedTC)) {
+      const scForLookup = resolvedSC || sc;
+      const found = await lookupThirdClassCodeByName(schema, resolvedTC, scForLookup);
+      if (!found) { resolvedTC = ''; } else { resolvedTC = found; }
+    }
+
+    if (resolvedSC && resolvedSC.length === 3 && resolvedSC !== sc) {
+      changes.push({ segmentLabel: '二级类码', oldValue: sc, newValue: resolvedSC, start: 12, length: 3 });
+      sc = resolvedSC;
+    }
+    if (resolvedTC && resolvedTC.length === 3 && resolvedTC !== tc) {
+      changes.push({ segmentLabel: '三级类码', oldValue: tc, newValue: resolvedTC, start: 19, length: 3 });
+      tc = resolvedTC;
+    }
+    if (resolvedDC && resolvedDC.length === 2 && resolvedDC !== dc) {
+      changes.push({ segmentLabel: '数据类码', oldValue: dc, newValue: resolvedDC, start: 26, length: 2 });
+      dc = resolvedDC;
+    }
+    if (resolvedDCode && resolvedDCode.length === 3 && resolvedDCode !== dcode) {
+      changes.push({ segmentLabel: '数据码', oldValue: dcode, newValue: resolvedDCode, start: 28, length: 3 });
+      dcode = resolvedDCode;
+    }
+
+    // 如果没有实际变更，直接返回原编码
+    if (changes.length === 0) {
+      results.push({ oldCode, newCode: oldCode, codeName: item.codeName || nameMap.get(oldCode), changes: [], duplicate: false, correctionTime: now });
+      continue;
+    }
+
+    // 查询存量编码中匹配前缀+新段位的所有编码（扩展码部分用通配符）
+    const codePrefix = oldCode.substring(0, 12);
+    const likePattern = codePrefix + sc + '____' + tc + '____' + dc + dcode;
+
+    const existingRows = await dbQuery<{ code: string }>(
+      `SELECT code FROM ${schema}.cec_new_energy_measurement_points
+       WHERE if_delete = '0' AND code LIKE $1`,
+      [likePattern],
+    );
+
+    const existingSet = new Set(existingRows.map((r: { code: string }) => r.code));
+
+    // 从旧的扩展码开始尝试，如果跟存量冲突则顺延
+    const oldSCExt = oldCode.substring(15, 19);
+    const oldTCExt = oldCode.substring(22, 26);
+    let secondExt = parseInt(oldSCExt, 10);
+    let thirdExt = parseInt(oldTCExt, 10);
+    let newCode = '';
+    let found = false;
+
+    for (let attempt = 0; attempt < 10000; attempt++) {
+      const candidate = codePrefix + sc + toExtCode(secondExt) + tc + toExtCode(thirdExt) + dc + dcode;
+      if (!existingSet.has(candidate) && !batchNewCodes.has(candidate)) {
+        newCode = candidate;
+        found = true;
+        break;
+      }
+      thirdExt++;
+      if (thirdExt > 9999) {
+        secondExt++;
+        thirdExt = 0;
+      }
+    }
+
+    if (!found) continue;
+
+    batchNewCodes.add(newCode);
+
+    // 记录扩展码变更（仅当实际变化时）
+    const newSCExt = newCode.substring(15, 19);
+    if (oldSCExt !== newSCExt) {
+      changes.push({ segmentLabel: '二级类扩展码', oldValue: oldSCExt, newValue: newSCExt, start: 15, length: 4 });
+    }
+
+    const newTCExt = newCode.substring(22, 26);
+    if (oldTCExt !== newTCExt) {
+      changes.push({ segmentLabel: '三级类扩展码', oldValue: oldTCExt, newValue: newTCExt, start: 22, length: 4 });
+    }
+
+    const duplicate = existingSet.has(newCode);
+
+    results.push({ oldCode, newCode, codeName: item.codeName || nameMap.get(oldCode), changes, duplicate, correctionTime: now });
   }
 
   return results;

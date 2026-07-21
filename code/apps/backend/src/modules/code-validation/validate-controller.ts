@@ -28,4 +28,27 @@ router.post('/api/validate/correct-codes', async (req: Request, res: Response) =
   }
 });
 
+/** 编码修正V2：根据二级类码/数据类码/数据码/三级类码修正编码 */
+router.post('/api/validate/correct-codes-v2', async (req: Request, res: Response) => {
+  try {
+    const { items, existingNewCodes } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return error(res, ErrorCode.MISSING_PARAMETER, '待修正的编码列表不能为空');
+    }
+    if (items.length > 1000) {
+      return error(res, ErrorCode.VALIDATE_LIMIT_EXCEEDED, '单次修正数量超出限制（上限1000条）');
+    }
+    for (const item of items) {
+      if (!item.code) {
+        return error(res, ErrorCode.MISSING_PARAMETER, '每条记录必须包含 code 字段');
+      }
+    }
+    const results = await validateService.batchCorrectCodesV2(items, existingNewCodes);
+    success(res, { items: results, totalCount: results.length });
+  } catch (err) {
+    console.error('Failed to correct codes v2:', err);
+    error(res, ErrorCode.SYSTEM_ERROR, '编码修正V2失败', 500);
+  }
+});
+
 export default router;

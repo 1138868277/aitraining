@@ -11,6 +11,20 @@
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      // 开发模式自动登录（跳过认证页面）
+      if (!localStorage.getItem('auth_token')) {
+        localStorage.setItem('auth_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IlRPS0VOIn0.eyJ1c2VybmFtZSI6Inl1bm5hbiIsInRlbmFudCI6Inl1bm5hbiIsImRpc3BsYXlOYW1lIjoi5LqR5Y2X5Yy65Z-fIiwicmVnaW9uIjoi5LqR5Y2X55yBIiwiZXhwIjoxNzg0MTE3NjQ0NTM4fQ.EWESw-EbBVUB3qUWk-JaCWdapV1XPLWA_YkEJHDKl8o');
+        localStorage.setItem('auth_user', JSON.stringify({
+          username: 'yunnan',
+          displayName: '云南区域',
+          region: '云南省',
+          tenant: 'yunnan',
+          password: 'yunnan'
+        }));
+        localStorage.setItem('auth_last_activity', String(Date.now()));
+      }
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

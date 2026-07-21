@@ -116,3 +116,11 @@ export async function batchCorrectCodes(
 ): Promise<validateDomain.CodeCorrectionResult[]> {
   return validateDomain.batchCorrectCodes(items);
 }
+
+/** 编码修正V2：根据二级类码/数据类码/数据码/三级类码修正编码 */
+export async function batchCorrectCodesV2(
+  items: validateDomain.CodeCorrectionV2Item[],
+  existingNewCodes?: string[],
+): Promise<validateDomain.CodeCorrectionV2Result[]> {
+  return validateDomain.batchCorrectCodesV2(items, existingNewCodes);
+}

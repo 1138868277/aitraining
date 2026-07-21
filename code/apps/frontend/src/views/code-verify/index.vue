@@ -445,6 +445,158 @@
           </div>
         </div>
 
+        <div v-show="activeTab === 'correctV2'" class="tab-panel">
+          <div class="tech-hero">
+            <div class="tech-hero-bg">
+              <div class="tech-grid"></div>
+              <div class="tech-glow tech-glow-1"></div>
+              <div class="tech-glow tech-glow-2"></div>
+            </div>
+            <div class="tech-hero-content">
+              <div class="tech-hero-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/><path d="M15 5l4 4"/></svg>
+              </div>
+              <div class="tech-hero-text">
+                <div class="tech-hero-title">编码修正V2</div>
+                <div class="tech-hero-desc">导入Excel根据二级类码/数据类码/数据码/三级类码修正测点编码，自动填充扩展码，支持重复校验与导出</div>
+              </div>
+            </div>
+          </div>
+          <div class="correct-container">
+            <el-card shadow="never" class="correct-upload-section">
+              <div class="correct-upload-title">导入修正数据</div>
+              <el-upload
+                drag
+                action="#"
+                accept=".xlsx,.xls"
+                :auto-upload="false"
+                :on-change="handleCorrectV2FileUpload"
+                :on-exceed="handleUploadExceed"
+                :limit="1"
+                :file-list="correctV2FileList"
+              >
+                <template #default>
+                  <template v-if="correctV2FileList.length === 0">
+                    <el-icon class="el-icon--upload">
+                      <svg viewBox="0 0 1024 1024" width="40" height="40" fill="#909399">
+                        <path d="M544 864V288h-64v576H352l160 160 160-160z"/>
+                        <path d="M128 128h768v128H128z"/>
+                      </svg>
+                    </el-icon>
+                    <div class="el-upload__text">拖拽文件到此处，或<em>点击上传</em></div>
+                  </template>
+                  <template v-else>
+                    <div class="excel-file-display">
+                      <svg viewBox="0 0 1024 1024" width="64" height="64" fill="#67c23a">
+                        <path d="M854.6 288.7L639.4 73.4c-6-6-14.2-9.4-22.7-9.4H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V311.3c0-8.5-3.4-16.6-9.4-22.6zM790.2 326H602V137.8L790.2 326zM840 896H184V96h368v232c0 17.7 14.3 32 32 32h232v536h24zM421.1 476.4l-42.4 86.1-42.4-86.1h-39.9l60.9 124.3-67.6 132.3h40.6l45.5-93.8 45.5 93.8h41.5l-67.2-131.6 59.1-124.9zM544 599.8h72.3v-39.9H544v-45.6h82.4v-40.4H503.6V733h41.4l0.3-133.2h-0.6z"/>
+                      </svg>
+                      <div class="excel-file-name">{{ correctV2FileList[0]?.name }}</div>
+                      <div class="excel-file-size">{{ formatFileSize(correctV2FileList[0]?.size) }}</div>
+                    </div>
+                  </template>
+                </template>
+                <template #tip>
+                  <div class="el-upload__tip">
+                    支持 .xlsx/.xls 文件，请确保包含"测点编码"、"二级类码"、"数据类码"、"数据码"、"三级类码"五列<br/>
+                    系统将根据新的二级类码/数据类码/数据码/三级类码修正编码，并自动填充扩展码
+                  </div>
+                </template>
+              </el-upload>
+              <div class="correct-hint" v-if="correctV2Items.length > 0">
+                已解析 {{ correctV2Items.length }} 条待修正编码
+              </div>
+              <div class="correct-actions">
+                <el-button
+                  :disabled="correctV2Items.length === 0 || correctingV2"
+                  @click="handleCorrectCodesV2"
+                  class="btn-correct"
+                >
+                  <span class="btn-correct-inner">
+                    <span class="btn-correct-icon">
+                      <svg v-if="!correctingV2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/><path d="M15 5l4 4"/></svg>
+                      <span v-else class="btn-spinner"></span>
+                    </span>
+                    <span class="btn-correct-text">{{ correctingV2 ? '修正中 ' + correctV2Progress + '%' : '开始修正' }}</span>
+                  </span>
+                </el-button>
+                <el-button :disabled="correctV2Items.length === 0" @click="clearCorrectV2" class="btn-clear">清空</el-button>
+              </div>
+              <div v-if="correctingV2" class="correct-progress-wrapper">
+                <el-progress
+                  :percentage="correctV2Progress"
+                  :stroke-width="16"
+                  :format="progressFormat"
+                  class="correct-progress"
+                />
+                <span class="correct-progress-text">正在修正第 {{ correctV2CorrectedCount }}/{{ correctV2Items.length }} 条</span>
+              </div>
+            </el-card>
+
+            <div v-if="correctV2Results.length > 0" class="correct-result-section">
+              <div class="correct-result-header">
+                <span>修正V2结果（共 {{ correctV2Results.length }} 条）</span>
+                <el-tag type="info" effect="plain" v-if="correctV2Results.length > DISPLAY_LIMIT">
+                  表格仅显示前 {{ DISPLAY_LIMIT }} 条，导出 Excel 包含全量数据
+                </el-tag>
+                <el-tag type="warning" effect="plain" v-if="correctV2DuplicateCount > 0">
+                  {{ correctV2DuplicateCount }} 条重复
+                </el-tag>
+                <el-button @click="exportCorrectV2Results" class="btn-export"><span class="btn-export-inner">导出 Excel</span></el-button>
+              </div>
+              <el-table :data="displayCorrectV2Results" border stripe style="width: 100%" max-height="600">
+                <el-table-column type="index" label="序号" width="60" fixed />
+                <el-table-column label="测点编码（旧）" min-width="300">
+                  <template #default="{ row }">
+                    <div class="code-segment-compare">
+                      <span
+                        v-for="(seg, idx) in row.oldSegments"
+                        :key="idx"
+                        class="seg-code"
+                        :class="getChangedClassV2(row, seg.label, 'old')"
+                      >{{ seg.code }}</span>
+                    </div>
+                    <div v-if="row.codeName" class="code-name-desc">{{ row.codeName }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="测点编码（新）" min-width="300">
+                  <template #default="{ row }">
+                    <div class="code-segment-compare">
+                      <span
+                        v-for="(seg, idx) in row.newSegments"
+                        :key="idx"
+                        class="seg-code"
+                        :class="getChangedClassV2(row, seg.label, 'new')"
+                      >{{ seg.code }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="修改的段位" min-width="260">
+                  <template #default="{ row }">
+                    <div class="v2-changes-display">
+                      <el-tag
+                        v-for="ch in row.changes"
+                        :key="ch.segmentLabel"
+                        size="small"
+                        :type="ch.segmentLabel.includes('扩展码') ? 'info' : 'warning'"
+                        style="margin: 2px 4px 2px 0"
+                      >
+                        {{ ch.segmentLabel }}: {{ ch.oldValue }}→{{ ch.newValue }}
+                      </el-tag>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="重复校验" width="120">
+                  <template #default="{ row }">
+                    <span v-if="!row.duplicate" class="audit-pass">✓ 不重复</span>
+                    <span v-else class="audit-fail">✗ 重复</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="correctionTime" label="修正时间" width="180" />
+              </el-table>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
     </div>
@@ -473,6 +625,8 @@ const tabDefs = [
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>' },
   { name: 'correct', label: '编码修正', adminOnly: false,
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>' },
+  { name: 'correctV2', label: '编码修正V2', adminOnly: false,
+    icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/><path d="M15 5l4 4"/></svg>' },
 ];
 
 watch(activeTab, (tab) => {
@@ -682,7 +836,15 @@ function handleCorrectFileUpload(file: any) {
     try {
       const data = new Uint8Array(e.target?.result as ArrayBuffer);
       const workbook = XLSX.read(data, { type: 'array' });
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        ElMessage.warning('文件中没有工作表');
+        return;
+      }
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!firstSheet || !firstSheet['!ref']) {
+        ElMessage.warning('文件为空或格式不正确');
+        return;
+      }
       const jsonData = XLSX.utils.sheet_to_json<any>(firstSheet);
 
       const items: Array<{ code: string; description: string; modification: string }> = [];
@@ -763,6 +925,160 @@ function clearCorrect() {
   correctResults.value = [];
   correctProgress.value = 0;
   correctedCount.value = 0;
+}
+
+// ========== 编码修正V2 ==========
+const correctV2FileList = ref<Array<{ name: string; size: number }>>([]);
+const correctV2Items = ref<Array<{
+  code: string;
+  secondClassCode: string;
+  dataCategoryCode: string;
+  dataCode: string;
+  thirdClassCode: string;
+}>>([]);
+const correctingV2 = ref(false);
+const correctV2Progress = ref(0);
+const correctV2CorrectedCount = ref(0);
+const correctV2Results = ref<Array<any>>([]);
+const CHUNK_SIZE_V2 = 50;
+
+const displayCorrectV2Results = computed(() => {
+  return correctV2Results.value.slice(0, DISPLAY_LIMIT);
+});
+
+const correctV2DuplicateCount = computed(() => {
+  return correctV2Results.value.filter(r => r.duplicate).length;
+});
+
+function handleCorrectV2FileUpload(file: any) {
+  correctV2FileList.value = [{ name: file.name, size: file.size }];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        ElMessage.warning('文件中没有工作表');
+        return;
+      }
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!firstSheet || !firstSheet['!ref']) {
+        ElMessage.warning('文件为空或格式不正确');
+        return;
+      }
+      const jsonData = XLSX.utils.sheet_to_json<any>(firstSheet);
+
+      const items: Array<{ code: string; secondClassCode: string; dataCategoryCode: string; dataCode: string; thirdClassCode: string; codeName?: string }> = [];
+      for (const row of jsonData) {
+        const code = row['测点编码'] || '';
+        const secondClassCode = row['二级类码'] || '';
+        const dataCategoryCode = row['数据类码'] || '';
+        const dataCode = row['数据码'] || '';
+        const thirdClassCode = row['三级类码'] || '';
+        const codeName = row['测点描述'] || '';
+        // 测点编码为必填，其余字段为空表示不修改该段位
+        if (code) {
+          items.push({
+            code: String(code).trim(),
+            secondClassCode: secondClassCode ? String(secondClassCode).trim() : '',
+            dataCategoryCode: dataCategoryCode ? String(dataCategoryCode).trim() : '',
+            dataCode: dataCode ? String(dataCode).trim() : '',
+            thirdClassCode: thirdClassCode ? String(thirdClassCode).trim() : '',
+            ...(codeName ? { codeName: String(codeName).trim() } : {}),
+          });
+        }
+      }
+
+      if (items.length === 0) {
+        ElMessage.warning('文件中未识别到有效数据，请确保包含"测点编码"列');
+        return;
+      }
+      correctV2Items.value = items;
+      ElMessage.success(`已解析 ${items.length} 条待修正编码`);
+    } catch {
+      ElMessage.error('文件解析失败，请检查文件格式');
+    }
+  };
+  reader.readAsArrayBuffer(file.raw);
+  return false;
+}
+
+async function handleCorrectCodesV2() {
+  if (correctV2Items.value.length === 0) return;
+  if (correctV2Items.value.length > 100000) {
+    ElMessage.warning('单次修正数量超出限制（上限100000条）');
+    return;
+  }
+
+  correctingV2.value = true;
+  correctV2Progress.value = 0;
+  correctV2CorrectedCount.value = 0;
+  correctV2Results.value = [];
+  const allResults: any[] = [];
+  const allNewCodes: string[] = [];
+  const total = correctV2Items.value.length;
+
+  try {
+    for (let i = 0; i < total; i += CHUNK_SIZE_V2) {
+      const chunk = correctV2Items.value.slice(i, i + CHUNK_SIZE_V2);
+      const result = await validateService.batchCorrectCodesV2(chunk, allNewCodes);
+      for (const item of result.items) {
+        allResults.push(item);
+        if (item.newCode) allNewCodes.push(item.newCode);
+      }
+
+      correctV2CorrectedCount.value = allResults.length;
+      correctV2Progress.value = Math.round((allResults.length / total) * 100);
+    }
+
+    const enhanced = allResults.map((item: any) => ({
+      ...item,
+      oldSegments: splitCodeIntoSegments(item.oldCode),
+      newSegments: splitCodeIntoSegments(item.newCode),
+    }));
+    correctV2Results.value = enhanced;
+    ElMessage.success(`修正完成，共 ${allResults.length} 条`);
+  } catch (err: any) {
+    ElMessage.error(err.message || '编码修正V2失败');
+  } finally {
+    correctingV2.value = false;
+  }
+}
+
+function clearCorrectV2() {
+  correctV2FileList.value = [];
+  correctV2Items.value = [];
+  correctV2Results.value = [];
+  correctV2Progress.value = 0;
+  correctV2CorrectedCount.value = 0;
+}
+
+function getChangedClassV2(row: any, segmentLabel: string, type: 'old' | 'new') {
+  const changed = row.changes?.find((c: any) => c.segmentLabel === segmentLabel);
+  if (!changed) return 'seg-unchanged';
+  return type === 'old' ? 'seg-changed-old' : 'seg-changed-new';
+}
+
+function exportCorrectV2Results() {
+  if (correctV2Results.value.length === 0) {
+    ElMessage.warning('没有可导出的数据');
+    return;
+  }
+
+  const exportData = correctV2Results.value.map((row: any) => {
+    return {
+      '测点编码（旧）': row.oldCode,
+      '新测点编码': row.newCode,
+      '测点描述': row.codeName || '',
+      '是否重复': row.duplicate ? '重复' : '不重复',
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '编码修正V2');
+  XLSX.writeFile(wb, `编码修正V2结果_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  ElMessage.success('导出成功');
 }
 
 function getChangedClass(row: any, segmentLabel: string, type: 'old' | 'new') {
@@ -1341,6 +1657,7 @@ function exportCorrectResults() {
 .seg-unchanged { background: transparent; color: #303133; }
 .seg-changed-old { background: #fef0f0; color: #f56c6c; text-decoration: line-through; }
 .seg-changed-new { background: #f0f9eb; color: #67c23a; font-weight: 700; }
+.code-name-desc { font-size: 12px; color: #909399; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ebeef5; line-height: 1.4; }
 .correct-progress-wrapper {
   margin-top: 16px;
   display: flex;
@@ -1534,6 +1851,12 @@ function exportCorrectResults() {
 @keyframes rowIn {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+.v2-changes-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
 }
 
 </style>

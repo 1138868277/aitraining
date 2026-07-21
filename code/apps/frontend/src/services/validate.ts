@@ -96,3 +96,33 @@ export async function batchCorrectCodes(
   const res = await api.post('/validate/correct-codes', { items });
   return res.data;
 }
+
+/** 编码修正V2：根据二级类码/数据类码/数据码/三级类码修正编码 */
+export async function batchCorrectCodesV2(
+  items: Array<{
+    code: string;
+    secondClassCode: string;
+    dataCategoryCode: string;
+    dataCode: string;
+    thirdClassCode: string;
+  }>,
+  existingNewCodes?: string[],
+): Promise<{
+  items: Array<{
+    oldCode: string;
+    newCode: string;
+    changes: Array<{
+      segmentLabel: string;
+      oldValue: string;
+      newValue: string;
+      start: number;
+      length: number;
+    }>;
+    duplicate: boolean;
+    correctionTime: string;
+  }>;
+  totalCount: number;
+}> {
+  const res = await api.post('/validate/correct-codes-v2', { items, existingNewCodes });
+  return res.data;
+}
