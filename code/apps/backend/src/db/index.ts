@@ -15,6 +15,7 @@ function buildPoolConfig(dbConfig?: DatasourceConfig) {
     user: cfg.user,
     password: cfg.password,
     max: config.db.maxPoolSize,
+    connectionTimeoutMillis: 5000,
     ssl: cfg.ssl ? { rejectUnauthorized: false } : false,
   };
 }
