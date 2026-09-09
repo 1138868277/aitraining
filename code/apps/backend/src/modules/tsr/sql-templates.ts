@@ -192,9 +192,20 @@ export function getMergeConfig(ruleType: string): { headers: Record<string, stri
       };
     case 'tb':
       return {
-        headers: { ...common, tb_windows: '窗口大小(秒)', sliding_step: '滑动步长(秒)', k_coefficient: 'K值' },
+        headers: {
+          module_source: '模块来源',
+          energy_type: '能源类型',
+          standard_name: '标准化名称',
+          tb_windows: '窗口大小(秒)',
+          sliding_step: '滑动步长(秒)',
+          begin_time: '生效开始时间',
+          end_time: '生效结束时间',
+          measure_name: '描述',
+          k_coefficient: 'K值',
+          cd_code: '组合31位码',
+        },
         mergeColumns: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'k_coefficient'],
-        customFields: ['module_source', 'energy_type', 'standard_name', 'tb_windows', 'sliding_step', 'k_coefficient', 'begin_time', 'end_time', 'measure_name', 'cd_code'],
+        customFields: ['module_source', 'energy_type', 'standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'k_coefficient', 'cd_code'],
       };
     case 'yx':
       return {

@@ -247,7 +247,7 @@ export async function exportToExcel(
 
   function makeExcel(rowsChunk: Record<string, any>[]): Buffer {
     const ws = XLSX.utils.json_to_sheet(rowsChunk, { header: allHeaders });
-    const merges = computeHierarchicalMerges(rowsChunk, headerKeys);
+    const merges = computeHierarchicalMerges(rowsChunk, headerKeys, allHeaders);
     clearMergedValues(ws, merges);
     ws['!merges'] = merges;
     ws['!cols'] = allHeaders.map(h => ({
@@ -278,7 +278,11 @@ export async function exportToExcel(
  * 层级合并计算（从第2行开始，第1行是表头）
  * 按 mergeColumns 的顺序逐层合并
  */
-function computeHierarchicalMerges(rows: Record<string, any>[], mergeColumns: string[]): XLSX.Range[] {
+function computeHierarchicalMerges(
+  rows: Record<string, any>[],
+  mergeColumns: string[],
+  orderedHeaders?: string[],
+): XLSX.Range[] {
   if (rows.length === 0) return [];
 
   const merges: XLSX.Range[] = [];
@@ -286,7 +290,8 @@ function computeHierarchicalMerges(rows: Record<string, any>[], mergeColumns: st
   let ranges: [number, number][] = [[2, rows.length + 1]]; // Excel 行号从1开始，数据从第2行
 
   for (const colKey of mergeColumns) {
-    const colIdx = Object.keys(rows[0]).indexOf(colKey) + 1; // Excel 列号从1开始
+    // 以实际导出表头顺序定位列（json_to_sheet 的列序 = orderedHeaders），避免按行对象键序错位
+    const colIdx = orderedHeaders ? orderedHeaders.indexOf(colKey) + 1 : Object.keys(rows[0]).indexOf(colKey) + 1; // Excel 列号从1开始
     if (colIdx <= 0) continue;
 
     const newRanges: [number, number][] = [];
@@ -478,8 +483,8 @@ const overallConfig: Record<string, { fields: string[]; headers: Record<string, 
     mergeCols: ['standard_name', 'sz_threshold', 'sz_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name'],
   },
   tb: {
-    fields: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'cd_code', 'k_coefficient'],
-    headers: { standard_name: '标准化名称', tb_windows: '窗口大小(秒)', sliding_step: '滑动步长(秒)', begin_time: '生效开始时间', end_time: '生效结束时间', measure_name: '描述', cd_code: '组合31位码', k_coefficient: 'K值' },
+    fields: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'k_coefficient', 'cd_code'],
+    headers: { standard_name: '标准化名称', tb_windows: '窗口大小(秒)', sliding_step: '滑动步长(秒)', begin_time: '生效开始时间', end_time: '生效结束时间', measure_name: '描述', k_coefficient: 'K值', cd_code: '组合31位码' },
     mergeCols: ['standard_name', 'tb_windows', 'sliding_step', 'begin_time', 'end_time', 'measure_name', 'k_coefficient'],
   },
   yx: {
@@ -529,7 +534,7 @@ async function makeOverallExcel(area: string, type: 'sz' | 'tb' | 'yx' | 'zd'): 
 
   const { renamedRows, headerOrder, mergeHeaderKeys } = data;
   const ws = XLSX.utils.json_to_sheet(renamedRows, { header: headerOrder });
-  const merges = computeHierarchicalMerges(renamedRows, mergeHeaderKeys);
+  const merges = computeHierarchicalMerges(renamedRows, mergeHeaderKeys, headerOrder);
   clearMergedValues(ws, merges);
   ws['!merges'] = merges;
 
@@ -608,7 +613,7 @@ export async function exportAllToZip(area: string, maxRows: number = 150000): Pr
 /** 各类型同步列配置（1-based，与 Z7 完全一致） */
 const splitSyncColumns: Record<string, number[]> = {
   sz: [2, 3, 4, 5, 6, 7],  // B~G
-  tb: [2, 3, 4, 5, 6, 8],     // B~F,H（跳过 G=cd_code）
+  tb: [2, 3, 4, 5, 6, 7],  // B~G（合并 A-G；H=组合31位码 不合并）
   yx: [2, 3, 4, 5, 6],     // B~F
   zd: [2, 3, 4, 5],        // B~E
 };
