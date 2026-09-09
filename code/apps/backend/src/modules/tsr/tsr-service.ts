@@ -3,6 +3,7 @@ import { createRequire } from 'module';
 const { ZipArchive } = createRequire(import.meta.url)('archiver');
 import * as domain from './tsr-domain.js';
 import { getAllRuleSqls, getMergeConfig } from './sql-templates.js';
+import { extractSheetRowsByColumns } from './xlsx-missing.js';
 
 // ==================== 导入 ====================
 
@@ -54,24 +55,60 @@ export async function importMeasureFromBuffer(area: string, buffer: Buffer): Pro
 
   const allMeasures: { cd_code: string; cd_name: string }[] = [];
 
+  // 兜底：SheetJS 读不出的超大 Sheet（如 100 万行）只出现在 SheetNames、
+  // 不在 wb.Sheets 里 → 用 Node 直接按行抽取"测点编码/测点描述"
+  const missingSheets = wb.SheetNames.filter(n => !wb.Sheets[n]);
+  for (const mn of missingSheets) {
+    try {
+      const { rows } = extractSheetRowsByColumns(buffer, mn);
+      allMeasures.push(...rows);
+      console.log(`  [importMeasure] Sheet "${mn}"（超大Sheet，SheetJS读不出）已直读 ${rows.length} 行`);
+    } catch (err: any) {
+      console.log(`  [importMeasure] Sheet "${mn}" 直读失败：${err.message}，跳过`);
+    }
+  }
+
   for (const sheetName of wb.SheetNames) {
+    // 某些文件会含图表/宏等非工作表，SheetNames 有名字但 Sheets 无对应对象；
+    // 已在上面直读过的超大 Sheet 无需再处理
     const ws = wb.Sheets[sheetName];
+    if (!ws) { continue; }
     const ref = ws['!ref'];
-    if (!ref) continue;
+    if (!ref) { continue; }
 
     const range = XLSX.utils.decode_range(ref);
-    const totalDataRows = range.e.r; // row 0 is header
-    console.log(`  [importMeasure] Sheet "${sheetName}": ${totalDataRows} 行数据`);
 
-    // 读取表头行确定列索引
-    const headerRow = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', range: 0 })[0] as string[];
-    const idxCode = headerRow.indexOf('测点编码');
-    const idxName = headerRow.indexOf('测点描述');
-    if (idxCode === -1) continue; // 没有测点编码列，跳过该 Sheet
+    // 兼容第0行是标题、表头在后续行的情况：在前几行内自动定位"测点编码/测点描述"表头行
+    const scanEnd = Math.min(range.e.r, range.s.r + 4); // 只扫前几行找表头
+    const headRows: any[][] = XLSX.utils.sheet_to_json(ws, {
+      header: 1, defval: '',
+      range: XLSX.utils.encode_range({ s: { r: range.s.r, c: range.s.c }, e: { r: scanEnd, c: range.e.c } }),
+    });
+    let headerRowIdx = -1;
+    let headerCells: string[] = [];
+    for (let i = 0; i < headRows.length; i++) {
+      const cells = (headRows[i] || []).map((c: any) => String(c).trim());
+      if (cells.indexOf('测点编码') !== -1 && cells.indexOf('测点描述') !== -1) {
+        headerRowIdx = range.s.r + i;
+        headerCells = cells;
+        break;
+      }
+    }
+    if (headerRowIdx === -1) {
+      const preview = headRows.slice(0, Math.min(headRows.length, 3)).map(r => JSON.stringify((r || []).map((c: any) => String(c).trim())));
+      console.log(`  [importMeasure] Sheet "${sheetName}" 跳过：前 ${scanEnd - range.s.r + 1} 行未找到"测点编码+测点描述"表头。前几行cells: ${preview.join(' | ')}`);
+      continue;
+    }
 
-    // 分块处理数据行
+    const idxCode = headerCells.indexOf('测点编码');
+    const idxName = headerCells.indexOf('测点描述');
+    const totalDataRows = range.e.r;
+    console.log(`  [importMeasure] Sheet "${sheetName}"：表头第${headerRowIdx}行 idxCode=${idxCode} idxName=${idxName}，range=${JSON.stringify(ref)}，数据行=${totalDataRows - headerRowIdx}`);
+    let sheetCount = 0;
+
+    // 分块处理数据行（表头的下一行开始）
     const CHUNK = 50000;
-    for (let start = 1; start <= totalDataRows; start += CHUNK) {
+    for (let start = headerRowIdx + 1; start <= totalDataRows; start += CHUNK) {
       const end = Math.min(start + CHUNK - 1, totalDataRows);
       const chunkRange = XLSX.utils.encode_range({
         s: { r: start, c: range.s.c },
@@ -88,9 +125,11 @@ export async function importMeasureFromBuffer(area: string, buffer: Buffer): Pro
             cd_code: code,
             cd_name: String(row[idxName] || '').trim(),
           });
+          sheetCount++;
         }
       }
     }
+    console.log(`  [importMeasure] Sheet "${sheetName}" 有效读取 ${sheetCount} 条`);
   }
 
   console.log(`  [importMeasure] 有效测点总数: ${allMeasures.length}`);
