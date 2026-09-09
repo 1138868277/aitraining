@@ -178,6 +178,10 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               <span>重新导入</span>
             </button>
+            <button class="result-btn export-btn" :disabled="resultRows.length === 0" @click="exportResult">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>导出匹配结果</span>
+            </button>
             <button class="result-btn send-btn" :disabled="successCount === 0" @click="sendToPreview">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
               <span>发送到编码结果</span>
@@ -392,6 +396,25 @@ function sendToPreview() {
   const codes = resultRows.value.filter(r => r.generatedCode).map(r => r.generatedCode!);
   emit('success', codes);
   resetAll();
+}
+
+/** 导出匹配结果（含成功/失败行及失败原因），用于人工核查 */
+function exportResult() {
+  const data = resultRows.value.map((r, i) => ({
+    '序号': i + 1,
+    '测点编码': r.generatedCode?.code || '',
+    '测点描述': r.name,
+    '状态': r.generatedCode ? '成功' : '失败',
+    '失败原因': r.error || (r.allMatched ? '' : failedFields(r)),
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 34 }, { wch: 36 }, { wch: 8 }, { wch: 40 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '匹配结果');
+  const date = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `自动编码匹配结果_${date}.xlsx`);
 }
 </script>
 
@@ -815,6 +838,24 @@ function sendToPreview() {
   background: #f8fafc;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+/* 导出匹配结果按钮 */
+.export-btn {
+  color: #047857;
+  background: transparent;
+  border: 1.5px solid #6ee7b7;
+}
+.export-btn:hover:not(:disabled) {
+  color: #065f46;
+  border-color: #34d399;
+  background: #ecfdf5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16,185,129,0.15);
+}
+.export-btn:disabled {
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
 }
 /* 发送按钮 */
 .send-btn {

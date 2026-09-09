@@ -1,0 +1,17 @@
+import pg from 'pg';
+const { Client } = pg;
+const c = new Client({ host:'10.1.1.113', port:7300, database:'training_exercises', user:'liuhaojun', password:'liuhaojun' });
+await c.connect();
+const schema = 'liuhaojun';
+const cols = await c.query(`SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2 ORDER BY ordinal_position`, [schema, 'cec_new_energy_measurement_points']);
+console.log('=== measurement_points columns ===\n' + cols.rows.map(r=>r.column_name).join(', '));
+const sample = await c.query(`SELECT * FROM ${schema}.cec_new_energy_measurement_points WHERE if_delete='0' LIMIT 2`);
+console.log('=== sample ===');
+for (const row of sample.rows) console.log(JSON.stringify(row).slice(0,600));
+const cnt = await c.query(`SELECT COUNT(*) n FROM ${schema}.cec_new_energy_measurement_points WHERE if_delete='0'`);
+console.log('measurement_points count=', cnt.rows[0].n);
+const cc = await c.query(`SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2 ORDER BY ordinal_position`, [schema,'cec_new_energy_createcode']);
+console.log('=== createcode columns ===\n' + cc.rows.map(r=>r.column_name).join(', '));
+const ccnt = await c.query(`SELECT COUNT(*) n FROM ${schema}.cec_new_energy_createcode WHERE if_delete='0'`);
+console.log('createcode count=', ccnt.rows[0].n);
+await c.end();

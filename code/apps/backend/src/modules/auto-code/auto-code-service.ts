@@ -6,6 +6,7 @@ import {
   findNextAvailableExtCodes,
 } from './auto-code-domain.js';
 import { generateCodeFromConditions } from '../code-generation/code-domain.js';
+import { checkDuplicateCodeNames } from '../code-generation/code-service.js';
 import { query, getSchema } from '../../db/index.js';
 
 export interface AutoCodeConfig {
@@ -318,6 +319,24 @@ export async function generateCodeFromMatch(
 
   const codePrefix = stationCode + config.typeCode + config.projectLineCode + config.prefixNo + config.firstClassCode + secondClassCode;
 
+  // 用"真实生成的 31 位码"做撞码判重（保证与最终落库编码完全一致，不因可空分段漏判）
+  const buildFull = (secondExtCode: string, thirdExtCode: string): string => {
+    const s = generateCodeFromConditions({
+      stationCode,
+      typeCode: config.typeCode,
+      projectLineCode: config.projectLineCode,
+      prefixNo: config.prefixNo,
+      firstClassCode: config.firstClassCode,
+      secondClassCode,
+      secondExtCode,
+      thirdClassCode,
+      thirdExtCode,
+      dataTypeCode,
+      dataCode,
+    });
+    return typeof s === 'string' ? s : s[0];
+  };
+
   const { secondExtCode, thirdExtCode } = await findNextAvailableExtCodes(
     baseCodes.map(r => r.code),
     codePrefix,
@@ -325,23 +344,11 @@ export async function generateCodeFromMatch(
     dataTypeCode,
     dataCode,
     secondExt, thirdExt,
+    buildFull,
   );
 
-  const codes = generateCodeFromConditions({
-    stationCode,
-    typeCode: config.typeCode,
-    projectLineCode: config.projectLineCode,
-    prefixNo: config.prefixNo,
-    firstClassCode: config.firstClassCode,
-    secondClassCode,
-    secondExtCode,
-    thirdClassCode,
-    thirdExtCode,
-    dataTypeCode,
-    dataCode,
-  });
-
-  const codeStr = typeof codes === 'string' ? codes : codes[0];
+  // 分配到的扩展码经 findNextAvailableExtCodes 校验必不与存量重复，据此生成最终编码
+  const codeStr = buildFull(secondExtCode, thirdExtCode);
 
   return { code: codeStr, name };
 }
@@ -422,12 +429,13 @@ async function batchFindExistingCodes(
     const rows = await query<{ rn: number; code: string | null }>(sql, params);
 
     // 按组合分组：同一组合的 rows 会在结果中连续出现（因 ORDER BY v.rn）
+    // 注意：ROW_NUMBER() 经 pg 返回为字符串，需转数字比较
     let rowPos = 0;
     for (let ci = 0; ci < comboToParamIdx.length; ci++) {
       const { indices } = comboToParamIdx[ci];
       const codes: Array<{ code: string }> = [];
       // 收集当前组合的所有匹配行（code 可能为 NULL）
-      while (rowPos < rows.length && rows[rowPos].rn === ci + 1) {
+      while (rowPos < rows.length && Number(rows[rowPos].rn) === ci + 1) {
         if (rows[rowPos].code) {
           codes.push({ code: rows[rowPos].code! });
         }
@@ -442,6 +450,24 @@ async function batchFindExistingCodes(
   return result;
 }
 
+/** 计算一条匹配结果的编码前缀组合 key（与 batchFindExistingCodes 的分组 key 一致） */
+function comboKeyOf(
+  matched: AutoMatchField[],
+  config: AutoCodeConfig,
+): string {
+  return [
+    getMatchedCode(matched, 'stationCode'),
+    config.typeCode,
+    config.projectLineCode,
+    config.prefixNo,
+    config.firstClassCode,
+    getMatchedCode(matched, 'secondClassCode'),
+    getMatchedCode(matched, 'thirdClassCode'),
+    getMatchedCode(matched, 'dataTypeCode'),
+    getMatchedCode(matched, 'dataCode'),
+  ].join('|');
+}
+
 /** 批量自动编码 */
 export async function autoGenerateBatch(
   rows: ImportRow[],
@@ -450,70 +476,120 @@ export async function autoGenerateBatch(
   // 预加载字典数据
   await preloadDictData();
 
-  const results: AutoCodeRowResult[] = [];
+  // 按原始行号存放结果，保证最终顺序与导入文件一致
+  const resultByIndex: (AutoCodeRowResult | null)[] = new Array(rows.length).fill(null);
+
+  interface MatchedItem {
+    origIdx: number;
+    name: string;
+    matched: AutoMatchField[];
+    rowConfig: AutoCodeConfig;
+  }
 
   // 第一轮：全部做内存匹配
-  const matchedRows: { name: string; matched: AutoMatchField[]; allMatched: boolean; rowConfig: AutoCodeConfig }[] = [];
+  const matchedRows: MatchedItem[] = [];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     try {
       const rowConfig = { ...config };
       const matchResult = await autoMatchRowInMemory(row, rowConfig);
       if (!matchResult.allMatched) {
-        results.push({
+        resultByIndex[i] = {
           rowIndex: i,
           name: row.name || '',
           matched: matchResult.fields,
           allMatched: false,
           error: '部分字段匹配失败',
-        });
+        };
         continue;
       }
       matchedRows.push({
+        origIdx: i,
         name: row.name || '',
         matched: matchResult.fields,
-        allMatched: true,
         rowConfig,
       });
     } catch (err: any) {
-      results.push({
+      resultByIndex[i] = {
         rowIndex: i,
         name: row.name || '',
         matched: [],
         allMatched: false,
         error: err.message || '生成失败',
-      });
+      };
     }
   }
 
-  // 第二轮：批量查询已存在的编码
-  const existingCodesMap = await batchFindExistingCodes(
-    matchedRows.map(r => ({ name: r.name, matched: r.matched, config: r.rowConfig }))
-  );
-
-  // 第三轮：生成编码
-  for (let i = 0; i < matchedRows.length; i++) {
-    const mr = matchedRows[i];
-    try {
-      const existingCodes = existingCodesMap.get(i) || [];
-      const { code, name } = await generateCodeFromMatch(mr.name, mr.matched, mr.rowConfig, existingCodes);
-      results.push({
-        rowIndex: i,
-        name: mr.name,
-        matched: mr.matched,
-        allMatched: true,
-        generatedCode: { code, name, generateTime: new Date().toISOString() },
-      });
-    } catch (err: any) {
-      results.push({
-        rowIndex: i,
-        name: mr.name || '',
+  // 第二轮：测点描述查重。
+  // 描述与存量(已保存编码列表 createcode.name / 编码字典 data_name)重复，
+  // 或与本次导入文件中前面行相同 → 判为失败，不生成编码。
+  const allNames = [...new Set(matchedRows.map(r => r.name).filter(Boolean))];
+  const existingNames =
+    allNames.length > 0 ? new Set(await checkDuplicateCodeNames(allNames)) : new Set<string>();
+  const usedNames = new Set<string>();
+  const genRows: MatchedItem[] = [];
+  for (const mr of matchedRows) {
+    const nm = mr.name;
+    if (nm && (existingNames.has(nm) || usedNames.has(nm))) {
+      resultByIndex[mr.origIdx] = {
+        rowIndex: mr.origIdx,
+        name: nm,
         matched: mr.matched,
         allMatched: false,
+        error: '编码描述已存在',
+      };
+      continue;
+    }
+    if (nm) usedNames.add(nm);
+    genRows.push(mr);
+  }
+
+  // 第三轮：批量查询已存在的编码（仅针对需要生成的行）
+  const existingCodesMap = await batchFindExistingCodes(
+    genRows.map(r => ({ name: r.name, matched: r.matched, config: r.rowConfig }))
+  );
+
+  // 编码列表(createcode)中已保存的完整编码也要一并避免撞号：
+  // 生成的编码绝不与"已保存的存量编码"重复
+  const schema = getSchema();
+  const savedCodeRows = await query<{ code: string }>(
+    `SELECT code FROM ${schema}.cec_new_energy_createcode WHERE if_delete = '0'`
+  );
+
+  // 第四轮：生成编码；同一组合在本批次内已生成的编码也参与冲突检测，避免撞码
+  const comboRunCodes = new Map<string, string[]>();
+
+  for (let j = 0; j < genRows.length; j++) {
+    const gr = genRows[j];
+    try {
+      const existingCodes = existingCodesMap.get(j) || [];
+      const comboKey = comboKeyOf(gr.matched, gr.rowConfig);
+      const runCodes = comboRunCodes.get(comboKey) || [];
+      const { code, name } = await generateCodeFromMatch(
+        gr.name,
+        gr.matched,
+        gr.rowConfig,
+        existingCodes.concat(savedCodeRows).concat(runCodes.map(c => ({ code: c }))),
+      );
+      runCodes.push(code);
+      comboRunCodes.set(comboKey, runCodes);
+      resultByIndex[gr.origIdx] = {
+        rowIndex: gr.origIdx,
+        name,
+        matched: gr.matched,
+        allMatched: true,
+        generatedCode: { code, name, generateTime: new Date().toISOString() },
+      };
+    } catch (err: any) {
+      resultByIndex[gr.origIdx] = {
+        rowIndex: gr.origIdx,
+        name: gr.name || '',
+        matched: gr.matched,
+        allMatched: false,
         error: err.message || '生成失败',
-      });
+      };
     }
   }
 
-  return results;
+  return resultByIndex.filter((r): r is AutoCodeRowResult => r !== null);
 }

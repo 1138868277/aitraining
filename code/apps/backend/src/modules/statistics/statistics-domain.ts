@@ -672,14 +672,17 @@ export function cancelImport(tenantId: string): void {
 
 /** 批量插入测点数据（解析版：直接在 JS 中计算段字段，避免后续全表 UPDATE） */
 async function batchInsertPoints(
-  batchId: string, codes: string[], schema: string, tenantId: string,
+  batchId: string, items: Array<{ code: string; name: string | null }>,
+  schema: string, tenantId: string,
   client?: any,
 ): Promise<void> {
-  if (codes.length === 0) return;
+  if (items.length === 0) return;
   const values: string[] = [];
-  const params: string[] = [];
+  const params: (string | null)[] = [];
   let idx = 1;
-  for (const code of codes) {
+  for (const item of items) {
+    const code = item.code;
+    const name = item.name?.trim() || null;
     // SUBSTRING(code, 1, 4)  → station_code
     // SUBSTRING(code, 5, 2)  → type_code
     // SUBSTRING(code, 7, 3)  → project_line_code
@@ -702,13 +705,13 @@ async function batchInsertPoints(
     const third_ext_code    = code.substring(22, 26) || null;
     const data_category_code = code.substring(26, 28) || null;
     const data_code         = code.substring(28, 31) || null;
-    values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, 'system', NOW(), NOW(), '0')`);
-    params.push(code, batchId, station_code, type_code, project_line_code, prefix_no,
+    values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, 'system', NOW(), NOW(), '0')`);
+    params.push(code, batchId, name, station_code, type_code, project_line_code, prefix_no,
                  first_class_code, second_class_code, second_ext_code,
                  third_class_code, third_ext_code, data_category_code, data_code);
   }
   const sql = `INSERT INTO ${schema}.cec_new_energy_measurement_points
-    (code, import_batch_id, station_code, type_code, project_line_code, prefix_no,
+    (code, import_batch_id, name, station_code, type_code, project_line_code, prefix_no,
      first_class_code, second_class_code, second_ext_code,
      third_class_code, third_ext_code, data_category_code, data_code,
      creator, create_tm, modify_tm, if_delete)
@@ -741,12 +744,14 @@ export async function importMeasurementFile(
   store.message = '正在初始化...';
 
   const batchId = store.batchId;
-  const BATCH_SIZE = 5000;
+  // 每行约 14 个绑定参数，PG 参数总数上限 65535：5000×14=70000 会溢出
+  const BATCH_SIZE = 4000;
 
   // 1. 确保表存在，并建好索引（插入时 PG 会增量维护，省去导入后重建的开销）
   await queryAsTenant(tenantId, `CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
     id BIGSERIAL PRIMARY KEY,
     code VARCHAR(31) NOT NULL,
+    name VARCHAR(500),
     station_code VARCHAR(4),
     type_code VARCHAR(2),
     project_line_code VARCHAR(3),
@@ -764,6 +769,8 @@ export async function importMeasurementFile(
     modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     if_delete CHAR(1) DEFAULT '0'
   )`);
+  // 老表可能已存在但缺 name(测点描述) 列，补齐
+  await queryAsTenant(tenantId, `ALTER TABLE ${schema}.cec_new_energy_measurement_points ADD COLUMN IF NOT EXISTS name VARCHAR(500)`);
   await Promise.all([
     queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_type ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code)`),
     queryAsTenant(tenantId, `CREATE INDEX IF NOT EXISTS idx_mp_second_class ON ${schema}.cec_new_energy_measurement_points (if_delete, type_code, second_class_code)`),
@@ -790,6 +797,7 @@ export async function importMeasurementFile(
 
     // 识别测点编码列的索引（使用 header:1 数组模式，与 TSR 保持一致）
     let codeColIdx = -1;
+    let descColIdx = -1;
     for (const name of sheetNames) {
       const ws = wb.Sheets[name];
       if (!ws['!ref']) continue;
@@ -799,7 +807,15 @@ export async function importMeasurementFile(
         const idx = headers.findIndex(h =>
           h.includes('测点编码') || h.includes('编码') || h.includes('code') || h.includes('Code')
         );
-        if (idx !== -1) { codeColIdx = idx; break; }
+        // 测点描述（可选）：模板第二列为"测点描述"
+        const dIdx = headers.findIndex(h =>
+          h.includes('测点描述') || h.includes('测点名称') || h.includes('描述') || h.includes('名称')
+        );
+        if (idx !== -1) {
+          codeColIdx = idx;
+          descColIdx = dIdx === idx ? -1 : dIdx;
+          break;
+        }
       }
     }
     if (codeColIdx === -1) throw new Error('IMPORT_DATA_EMPTY');
@@ -811,8 +827,8 @@ export async function importMeasurementFile(
     // 5. 清空旧数据（TRUNCATE 比 DELETE 快得多，直接释放数据页）
     await client.query(`TRUNCATE ${schema}.cec_new_energy_measurement_points`);
 
-    // 6. 分块解析 & 批量插入（只写 code + batch_id，不解析段）
-    const batch: string[] = [];
+    // 6. 分块解析 & 批量插入（code + 可选的测点描述 name，不解析段）
+    const batch: Array<{ code: string; name: string | null }> = [];
     let totalValid = 0;
 
     for (const name of sheetNames) {
@@ -839,7 +855,8 @@ export async function importMeasurementFile(
           if (store.cancelRequested) break;
           const raw = String(row[codeColIdx] || '').trim();
           if (raw) {
-            batch.push(raw);
+            const rawName = descColIdx >= 0 ? String(row[descColIdx] ?? '') : '';
+            batch.push({ code: raw, name: rawName });
             totalValid++;
           }
 
@@ -911,6 +928,7 @@ export async function getMeasureOverview(): Promise<{
   if (!tableVerifiedSchemas.has(schema)) {
     await query(`CREATE TABLE IF NOT EXISTS ${schema}.cec_new_energy_measurement_points (
       id BIGSERIAL PRIMARY KEY, code VARCHAR(31) NOT NULL,
+      name VARCHAR(500),
       station_code VARCHAR(4), type_code VARCHAR(2), project_line_code VARCHAR(3),
       prefix_no VARCHAR(1), first_class_code VARCHAR(2), second_class_code VARCHAR(3),
       second_ext_code VARCHAR(4), third_class_code VARCHAR(3), third_ext_code VARCHAR(4),
@@ -919,6 +937,7 @@ export async function getMeasureOverview(): Promise<{
       create_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP, modify_tm TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       if_delete CHAR(1) DEFAULT '0'
     )`);
+    await query(`ALTER TABLE ${schema}.cec_new_energy_measurement_points ADD COLUMN IF NOT EXISTS name VARCHAR(500)`);
     tableVerifiedSchemas.add(schema);
   }
   const sql = `SELECT

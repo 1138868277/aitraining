@@ -41,7 +41,11 @@ export function toExtCode(num: number): string {
   return Math.min(num, 9999).toString().padStart(4, '0');
 }
 
-/** 查找下一个可用的扩展码组合（避免重复，使用完整31位编码做冲突检测） */
+/** 查找下一个可用的扩展码组合（避免重复，使用完整31位编码做冲突检测）
+ *
+ * buildFull 可选：把 (二级扩展码, 三级扩展码) 拼成最终完整编码的回调。
+ * 传入时可保证按"真实生成的 31 位码"判重，避免可空分段拼串不一致导致漏判。
+ */
 export async function findNextAvailableExtCodes(
   existingFullCodes: string[],
   codePrefix: string,
@@ -50,6 +54,7 @@ export async function findNextAvailableExtCodes(
   dataCode: string,
   secondExtBase: number,
   thirdExtBase: number,
+  buildFull?: (secondExtCode: string, thirdExtCode: string) => string,
 ): Promise<{ secondExtCode: string; thirdExtCode: string }> {
   // 如果没有已有编码，直接返回基础值
   if (!existingFullCodes || existingFullCodes.length === 0) {
@@ -60,23 +65,35 @@ export async function findNextAvailableExtCodes(
   let secondExt = secondExtBase;
   let thirdExt = thirdExtBase;
 
-  // 最多尝试10000次避免死循环
-  for (let attempt = 0; attempt < 10000; attempt++) {
-    const fullCandidate = codePrefix + toExtCode(secondExt) + thirdClassCode + toExtCode(thirdExt) + dataTypeCode + dataCode;
-    if (!existingSet.has(fullCandidate)) {
+  // 构造某组扩展码对应的完整编码（默认手工拼段；传入 buildFull 时使用真实拼码结果）
+  const fullOf = (se: number, te: number): string => {
+    if (buildFull) return buildFull(toExtCode(se), toExtCode(te));
+    return codePrefix + toExtCode(se) + thirdClassCode + toExtCode(te) + dataTypeCode + dataCode;
+  };
+
+  // 从基础值起，三级类扩展码优先自增，二级类扩展码满 9999 后进位并清零三级。
+  // 兜底保障：保证一定找到与"存量编码集合"不重复的码，因此不设随意的小上限，
+  // 而是扫描完整扩展空间（0~9999 × 0~9999）。正常几次到几十次即可命中；
+  // 仅当存量把同一组合的扩展码占满（实际不可能）才在扫完后抛错。
+  const MAX_TRIES = 10000 * 10000;
+  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    if (!existingSet.has(fullOf(secondExt, thirdExt))) {
       return { secondExtCode: toExtCode(secondExt), thirdExtCode: toExtCode(thirdExt) };
     }
-    // 三级类扩展码先自增
+    // 三级类扩展码先自增；满 9999 后二级进位并清零三级
     thirdExt++;
     if (thirdExt > 9999) {
       secondExt++;
       thirdExt = 0;
     }
+    // 二级也扫满一圈后回到 0000 重新覆盖整个空间，保证必能找到可用编码
+    if (secondExt > 9999) {
+      secondExt = 0;
+      thirdExt = 0;
+    }
   }
 
-  // 兜底：加上随机偏移
-  const offset = Math.floor(Math.random() * 9000) + 1000;
-  return { secondExtCode: toExtCode(secondExtBase + offset), thirdExtCode: '0000' };
+  throw new Error('扩展码已无可用值，请联系管理员核查存量编码是否占满');
 }
 
 /** 查询数据库中已有的编码列表（用于冲突检测） */

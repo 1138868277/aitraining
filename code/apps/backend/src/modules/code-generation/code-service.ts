@@ -289,12 +289,33 @@ export async function batchDeleteCodeRecords(ids: number[]): Promise<number> {
 export async function checkDuplicateCodeNames(names: string[]): Promise<string[]> {
   if (names.length === 0) return [];
   const schema = getSchema();
-  const sql = `
-    SELECT DISTINCT data_name FROM ${schema}.cec_new_energy_code_dict
-    WHERE if_delete = '0' AND data_name = ANY($1)
-    UNION
-    SELECT DISTINCT name FROM ${schema}.cec_new_energy_createcode
-    WHERE if_delete = '0' AND name = ANY($1)`;
+  const parts = [
+    // 编码字典中的数据码名称
+    `SELECT DISTINCT data_name FROM ${schema}.cec_new_energy_code_dict
+      WHERE if_delete = '0' AND data_name = ANY($1)`,
+    // 编码列表(已保存的生成记录)
+    `SELECT DISTINCT name FROM ${schema}.cec_new_energy_createcode
+      WHERE if_delete = '0' AND name = ANY($1)`,
+  ];
+
+  // 已导入测点(系统配置-测点导入)的"测点描述"也视为存量描述；
+  // measurement_points 存在且含 name 列时才纳入比对（老库未重导前无该列则跳过）
+  const hasMeasureName = await query<{ ok: number }>(
+    `SELECT 1 AS ok FROM information_schema.columns
+       WHERE table_schema = $1
+         AND table_name = 'cec_new_energy_measurement_points'
+         AND column_name = 'name'
+       LIMIT 1`,
+    [schema],
+  );
+  if (hasMeasureName.length > 0) {
+    parts.push(
+      `SELECT DISTINCT name FROM ${schema}.cec_new_energy_measurement_points
+        WHERE if_delete = '0' AND name IS NOT NULL AND name <> '' AND name = ANY($1)`,
+    );
+  }
+
+  const sql = parts.join('\n UNION \n');
   const result = await query<{ data_name: string }>(sql, [names]);
   return result.map(r => r.data_name);
 }
