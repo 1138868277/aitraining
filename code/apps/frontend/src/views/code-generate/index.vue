@@ -116,27 +116,51 @@
               :header-cell-style="{ background: '#f0f5ff', color: '#1d40af', fontWeight: 600 }"
               ref="quickSearchTableRef"
             >
-              <el-table-column label="类型域" align="center" width="200">
+              <el-table-column label="类型域" align="center" width="100">
                 <template #default="{ row }">
                   <el-tag size="small" :style="{ background: typeTagColor(row.typeCode), color: '#fff', border: 'none', fontWeight: 600 }">{{ typeLabel(row.typeCode) }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="二级类码" width="300">
+              <el-table-column label="二级类码" min-width="200">
                 <template #default="{ row }">
                   <el-tag size="small" color="#e8f4fd" style="color: #1677ff; border: none; font-family: monospace; margin-right: 4px;">{{ row.secondClassCode }}</el-tag>
                   <span class="cell-name">{{ row.secondClassName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="数据类码" width="270">
+              <el-table-column label="数据类码" min-width="200">
                 <template #default="{ row }">
                   <el-tag size="small" color="#f0f9eb" style="color: #67c23a; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCategoryCode }}</el-tag>
                   <span class="cell-name">{{ row.dataCategoryName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="数据码">
+              <el-table-column label="数据码" min-width="200">
                 <template #default="{ row }">
                   <el-tag size="small" color="#fdf6ec" style="color: #e6a23c; border: none; font-family: monospace; margin-right: 4px;">{{ row.dataCode }}</el-tag>
                   <span class="cell-name">{{ row.dataName }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="三级类码" min-width="200">
+                <template #default="{ row }">
+                  <el-select
+                    v-model="row.thirdClassCode"
+                    placeholder="请选择"
+                    size="small"
+                    clearable
+                    filterable
+                    class="third-class-select"
+                    popper-class="tech-select-popper"
+                    style="width: 100%"
+                    :loading="row.thirdClassLoading"
+                    @change="onThirdClassSelectChange(row)"
+                    @visible-change="(visible: boolean) => onThirdClassDropdownVisible(row, visible)"
+                  >
+                    <el-option
+                      v-for="opt in row.thirdClassOptions || []"
+                      :key="opt.code"
+                      :label="`${opt.code} ${opt.name}`"
+                      :value="opt.code"
+                    />
+                  </el-select>
                 </template>
               </el-table-column>
               <el-table-column label="操作" align="center" fixed="right" width="140">
@@ -1057,6 +1081,11 @@ const quickSearchResults = ref<Array<{
   dataCategoryCode: string; dataCategoryName: string;
   dataCode: string; dataName: string;
   isManual?: string;
+  /** 行内可选的三级类码（按类型域 + 二级类码过滤） */
+  thirdClassCode?: string;
+  thirdClassName?: string;
+  thirdClassOptions?: Array<{ code: string; name: string }>;
+  thirdClassLoading?: boolean;
 }>>([]);
 const quickSearchLoading = ref(false);
 const quickSearchSearched = ref(false);
@@ -1286,9 +1315,66 @@ function onQuickSearchClear() {
   clearQuickSearchState();
 }
 
-/** 复制单行名称（二级类 + 数据类 + 数据码名称，tab 分隔便于贴到Excel） */
-function copyQuickCodes(row: { secondClassName: string; dataCategoryName: string; dataName: string }) {
-  const text = `${row.secondClassName}\t${row.dataCategoryName}\t${row.dataName}`;
+/** 类型域 -> 具体类型码。同域内三级类码集合一致（F1..F4 为重复存储），取域内首个即可 */
+const THIRD_CLASS_TYPE_BY_DOMAIN: Record<string, string> = { F: 'F1', G: 'G1', S: 'S1' };
+
+/** 三级类码选项缓存：key = 类型域|二级类码 */
+const thirdClassOptionsCache = new Map<string, Array<{ code: string; name: string }>>();
+
+type QuickSearchThirdClassRow = {
+  typeCode: string;
+  secondClassCode: string;
+  thirdClassOptions?: Array<{ code: string; name: string }>;
+  thirdClassLoading?: boolean;
+};
+
+/** 展开下拉时才按需加载，避免一次性为整页 100 行发请求 */
+async function onThirdClassDropdownVisible(row: QuickSearchThirdClassRow, visible: boolean) {
+  if (!visible) return;
+  if (row.thirdClassOptions?.length) return;
+  if (row.thirdClassLoading) return;
+
+  const key = `${row.typeCode}|${row.secondClassCode}`;
+  const cached = thirdClassOptionsCache.get(key);
+  if (cached) {
+    row.thirdClassOptions = cached;
+    return;
+  }
+
+  row.thirdClassLoading = true;
+  try {
+    const typeCode = THIRD_CLASS_TYPE_BY_DOMAIN[row.typeCode] || row.typeCode;
+    const items = await dictService.getCascadedDictItems(row.secondClassCode, typeCode);
+    thirdClassOptionsCache.set(key, items);
+    row.thirdClassOptions = items;
+  } catch {
+    row.thirdClassOptions = [];
+  } finally {
+    row.thirdClassLoading = false;
+  }
+}
+
+/** 选中后记录名称，供复制使用 */
+function onThirdClassSelectChange(row: {
+  thirdClassCode?: string;
+  thirdClassName?: string;
+  thirdClassOptions?: Array<{ code: string; name: string }>;
+}) {
+  const opt = (row.thirdClassOptions || []).find(o => o.code === row.thirdClassCode);
+  row.thirdClassName = opt?.name || '';
+}
+
+/** 复制单行名称（二级类 + 数据类 + 数据码 + 三级类码名称，tab 分隔便于贴到Excel） */
+function copyQuickCodes(row: {
+  secondClassName: string; dataCategoryName: string; dataName: string;
+  thirdClassCode?: string;
+  thirdClassName?: string;
+  thirdClassOptions?: Array<{ code: string; name: string }>;
+}) {
+  const thirdName = row.thirdClassName
+    || (row.thirdClassOptions || []).find(o => o.code === row.thirdClassCode)?.name
+    || '';
+  const text = `${row.secondClassName}\t${row.dataCategoryName}\t${row.dataName}\t${thirdName}`;
   navigator.clipboard.writeText(text).then(
     () => ElMessage.success('已复制'),
     () => ElMessage.warning('复制失败'),
@@ -3485,6 +3571,49 @@ function cancelEditName() {
   line-height: 24px !important;
   padding: 0 8px !important;
 }
+
+/* ===== 快速检索结果：三级类码下拉（现代科技风） ===== */
+/* 弹层复用全局的 .tech-select-popper（暗色科技面板），此处只美化框体本体 */
+.third-class-select :deep(.el-select__wrapper) {
+  height: 30px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(30, 58, 95, 0.06), rgba(59, 130, 246, 0.09));
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  box-shadow: inset 0 1px 2px rgba(59, 130, 246, 0.06);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+.third-class-select :deep(.el-select__wrapper.is-hovering:not(.is-focused)) {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.18), inset 0 1px 2px rgba(59, 130, 246, 0.08);
+}
+.third-class-select :deep(.el-select__wrapper.is-focused) {
+  border-color: #409eff;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.12), 0 0 14px rgba(64, 158, 255, 0.3);
+}
+.third-class-select :deep(.el-select__placeholder) {
+  font-size: 12px;
+  color: #1d40af;
+}
+.third-class-select :deep(.el-select__placeholder.is-transparent) {
+  color: #8ea6c8;
+}
+.third-class-select :deep(.el-select__caret) {
+  color: #409eff;
+  transition: color 0.25s ease, filter 0.25s ease;
+}
+.third-class-select :deep(.el-select__wrapper.is-focused .el-select__caret) {
+  color: #1d6bc0;
+  filter: drop-shadow(0 0 4px rgba(64, 158, 255, 0.5));
+}
+.third-class-select :deep(.el-select__clear) {
+  color: #8ea6c8;
+}
+.third-class-select :deep(.el-select__clear:hover) {
+  color: #409eff;
+}
 .code-count-tag {
   margin-right: 6px;
 }
@@ -3665,11 +3794,13 @@ function cancelEditName() {
   margin: 2px 0 !important;
   transition: all 0.2s ease !important;
 }
-.tech-select-popper .el-select-dropdown__item:hover {
+.tech-select-popper .el-select-dropdown__item:hover,
+.tech-select-popper .el-select-dropdown__item.is-hovering {
   background: linear-gradient(135deg, rgba(64, 158, 255, 0.15), rgba(64, 158, 255, 0.05)) !important;
   color: #fff !important;
 }
-.tech-select-popper .el-select-dropdown__item.selected {
+/* Element Plus 2.13 的选中态是 is-selected（旧的 .selected 已失效） */
+.tech-select-popper .el-select-dropdown__item.is-selected {
   background: linear-gradient(135deg, rgba(64, 158, 255, 0.25), rgba(64, 158, 255, 0.1)) !important;
   color: #66b1ff !important;
   box-shadow: inset 0 0 0 1px rgba(64, 158, 255, 0.3);

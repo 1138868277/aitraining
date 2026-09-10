@@ -284,7 +284,7 @@ function onDrop(e: DragEvent) {
 }
 
 function downloadTemplate() {
-  const headers = ['测点描述', '场站名称', '二级类码', '数据类码', '数据码', '项目期号', '三级类码'];
+  const headers = ['测点描述', '场站名称', '二级类码', '数据类码', '数据码', '三级类码', '项目期号'];
   const ws = XLSX.utils.aoa_to_sheet([headers]);
   ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 18) }));
   const wb = XLSX.utils.book_new();
