@@ -3,7 +3,7 @@ import {
   type AutoMatchResult,
   type AutoMatchField,
   extractNumbers,
-  findNextAvailableExtCodes,
+  toExtCode,
 } from './auto-code-domain.js';
 import { generateCodeFromConditions } from '../code-generation/code-domain.js';
 import { checkDuplicateCodeNames } from '../code-generation/code-service.js';
@@ -295,13 +295,19 @@ export function extractExtCodes(name: string): { secondExt: number; thirdExt: nu
   };
 }
 
-/** 根据匹配结果生成完整编码 */
+/** 根据匹配结果生成完整编码
+ *
+ * 扩展码**不做顺延**：完全由测点名称里的数字决定（第 1 个→二级类扩展码，
+ * 第 2 个→三级类扩展码，无数字则 0），因此同一输入必然得到同一编码。
+ * 若该编码与存量撞号，照常返回编码，同时通过 stockConflict 告知调用方，
+ * 由调用方决定呈现方式（当前为：状态失败 + 写明原因）。
+ */
 export async function generateCodeFromMatch(
   name: string,
   matched: AutoMatchField[],
   config: AutoCodeConfig,
-  existingCodes?: Array<{ code: string }>,
-): Promise<{ code: string; name: string }> {
+  existingCodes?: Array<{ code: string; name: string }>,
+): Promise<{ code: string; name: string; stockConflict?: { code: string; name: string } }> {
   const getCode = (key: string): string => {
     const f = matched.find(m => m.fieldKey === key);
     return f?.matchedCode || '';
@@ -315,42 +321,31 @@ export async function generateCodeFromMatch(
 
   const { secondExt, thirdExt } = extractExtCodes(name);
 
-  const baseCodes = existingCodes || [];
-
-  const codePrefix = stationCode + config.typeCode + config.projectLineCode + config.prefixNo + config.firstClassCode + secondClassCode;
-
   // 用"真实生成的 31 位码"做撞码判重（保证与最终落库编码完全一致，不因可空分段漏判）
-  const buildFull = (secondExtCode: string, thirdExtCode: string): string => {
-    const s = generateCodeFromConditions({
-      stationCode,
-      typeCode: config.typeCode,
-      projectLineCode: config.projectLineCode,
-      prefixNo: config.prefixNo,
-      firstClassCode: config.firstClassCode,
-      secondClassCode,
-      secondExtCode,
-      thirdClassCode,
-      thirdExtCode,
-      dataTypeCode,
-      dataCode,
-    });
-    return typeof s === 'string' ? s : s[0];
-  };
-
-  const { secondExtCode, thirdExtCode } = await findNextAvailableExtCodes(
-    baseCodes.map(r => r.code),
-    codePrefix,
+  const built = generateCodeFromConditions({
+    stationCode,
+    typeCode: config.typeCode,
+    projectLineCode: config.projectLineCode,
+    prefixNo: config.prefixNo,
+    firstClassCode: config.firstClassCode,
+    secondClassCode,
+    secondExtCode: toExtCode(secondExt),
     thirdClassCode,
+    thirdExtCode: toExtCode(thirdExt),
     dataTypeCode,
     dataCode,
-    secondExt, thirdExt,
-    buildFull,
-  );
+  });
+  const code = typeof built === 'string' ? built : built[0];
 
-  // 分配到的扩展码经 findNextAvailableExtCodes 校验必不与存量重复，据此生成最终编码
-  const codeStr = buildFull(secondExtCode, thirdExtCode);
+  // 同一编码在存量里可能有多行（重复导入/重复保存），优先取带描述的那条
+  const hits = (existingCodes || []).filter(r => r.code === code);
+  const hit = hits.find(r => r.name) || hits[0];
 
-  return { code: codeStr, name };
+  return {
+    code,
+    name,
+    stockConflict: hit ? { code: hit.code, name: hit.name || '' } : undefined,
+  };
 }
 
 /** 获取匹配结果的编码值 */
@@ -358,11 +353,34 @@ function getMatchedCode(matched: AutoMatchField[], key: string): string {
   return matched.find(m => m.fieldKey === key)?.matchedCode || '';
 }
 
-/** 聚合所有唯一的前缀组合，批量查询已存在的编码（支持20000行） */
+/** measurement_points 的 name(测点描述) 列是否存在。
+ *
+ * 该列是后来才加的，实测四个租户 schema 中只有部分有；缺列时降级为 NULL，
+ * 否则整批会因 "column m.name does not exist" 直接报错。
+ * 按 schema 缓存（getSchema() 是租户感知的，不能做成全局布尔）。
+ */
+const mpNameColumnCache = new Map<string, boolean>();
+
+async function measurementPointsHasNameColumn(schema: string): Promise<boolean> {
+  const cached = mpNameColumnCache.get(schema);
+  if (cached !== undefined) return cached;
+  const rows = await query<{ ok: number }>(
+    `SELECT 1 AS ok FROM information_schema.columns
+      WHERE table_schema = $1 AND table_name = 'cec_new_energy_measurement_points'
+        AND column_name = 'name' LIMIT 1`,
+    [schema],
+  );
+  const has = rows.length > 0;
+  mpNameColumnCache.set(schema, has);
+  return has;
+}
+
+/** 聚合所有唯一的前缀组合，批量查询已存在的编码及其描述（支持20000行） */
 async function batchFindExistingCodes(
   matchedRows: { name: string; matched: AutoMatchField[]; config: AutoCodeConfig }[],
-): Promise<Map<number, Array<{ code: string }>>> {
+): Promise<Map<number, Array<{ code: string; name: string }>>> {
   const schema = getSchema();
+  const hasName = await measurementPointsHasNameColumn(schema);
   const seen = new Map<string, number[]>();
 
   matchedRows.forEach((row, idx) => {
@@ -382,7 +400,7 @@ async function batchFindExistingCodes(
     seen.get(key)!.push(idx);
   });
 
-  const result = new Map<number, Array<{ code: string }>>();
+  const result = new Map<number, Array<{ code: string; name: string }>>();
   const uniqueCombos = Array.from(seen.entries());
 
   // PG 参数上限 ~65535，每组9字段 → 最多 ~7280 组合/批
@@ -406,7 +424,7 @@ async function batchFindExistingCodes(
 
     const valueExpr = `VALUES ${valueRows.join(',')}`;
     const sql = `
-      SELECT v.rn, m.code FROM (
+      SELECT v.rn, m.code, ${hasName ? 'm.name' : 'NULL::varchar'} AS name FROM (
         SELECT ROW_NUMBER() OVER () AS rn,
                t.s_code, t.t_code, t.pl_code, t.p_no, t.fc_code,
                t.sc_code, t.tc_code, t.dt_code, t.d_code
@@ -426,18 +444,18 @@ async function batchFindExistingCodes(
       ORDER BY v.rn
     `;
 
-    const rows = await query<{ rn: number; code: string | null }>(sql, params);
+    const rows = await query<{ rn: number; code: string | null; name: string | null }>(sql, params);
 
     // 按组合分组：同一组合的 rows 会在结果中连续出现（因 ORDER BY v.rn）
     // 注意：ROW_NUMBER() 经 pg 返回为字符串，需转数字比较
     let rowPos = 0;
     for (let ci = 0; ci < comboToParamIdx.length; ci++) {
       const { indices } = comboToParamIdx[ci];
-      const codes: Array<{ code: string }> = [];
+      const codes: Array<{ code: string; name: string }> = [];
       // 收集当前组合的所有匹配行（code 可能为 NULL）
       while (rowPos < rows.length && Number(rows[rowPos].rn) === ci + 1) {
         if (rows[rowPos].code) {
-          codes.push({ code: rows[rowPos].code! });
+          codes.push({ code: rows[rowPos].code!, name: rows[rowPos].name || '' });
         }
         rowPos++;
       }
@@ -448,24 +466,6 @@ async function batchFindExistingCodes(
   }
 
   return result;
-}
-
-/** 计算一条匹配结果的编码前缀组合 key（与 batchFindExistingCodes 的分组 key 一致） */
-function comboKeyOf(
-  matched: AutoMatchField[],
-  config: AutoCodeConfig,
-): string {
-  return [
-    getMatchedCode(matched, 'stationCode'),
-    config.typeCode,
-    config.projectLineCode,
-    config.prefixNo,
-    config.firstClassCode,
-    getMatchedCode(matched, 'secondClassCode'),
-    getMatchedCode(matched, 'thirdClassCode'),
-    getMatchedCode(matched, 'dataTypeCode'),
-    getMatchedCode(matched, 'dataCode'),
-  ].join('|');
 }
 
 /** 批量自动编码 */
@@ -492,7 +492,29 @@ export async function autoGenerateBatch(
     const row = rows[i];
     try {
       const rowConfig = { ...config };
+      // 项目期号以导入文件为准（编码配置里已不再提供该选项）。
+      // 先原样灌入，格式校验放到真正生成编码时做，避免抢在"编码描述已存在"前面报错。
+      rowConfig.projectLineCode = String(row.projectLineCode ?? '').trim();
       const matchResult = await autoMatchRowInMemory(row, rowConfig);
+
+      // 6 个字段（场站 / 二级类码 / 三级类码 / 数据类码 / 数据码 / 项目期号）
+      // 必须齐全且都能对上字典，否则不进入编码环节。
+      // 注意：空值原先被视为"通过"，会让缺失分段被补零、产出看似正常的垃圾编码，这里收紧。
+      const missing = matchResult.fields
+        .filter(f => f.status === 'empty')
+        .map(f => f.fieldLabel);
+      if (!rowConfig.projectLineCode) missing.push('项目期号');
+      if (missing.length > 0) {
+        resultByIndex[i] = {
+          rowIndex: i,
+          name: row.name || '',
+          matched: matchResult.fields,
+          allMatched: false,
+          error: `字段不全：${missing.join('、')}`,
+        };
+        continue;
+      }
+
       if (!matchResult.allMatched) {
         resultByIndex[i] = {
           rowIndex: i,
@@ -544,41 +566,66 @@ export async function autoGenerateBatch(
     genRows.push(mr);
   }
 
-  // 第三轮：批量查询已存在的编码（仅针对需要生成的行）
+  // 第三轮：批量查询已存在的编码及其描述（仅针对需要生成的行）
   const existingCodesMap = await batchFindExistingCodes(
     genRows.map(r => ({ name: r.name, matched: r.matched, config: r.rowConfig }))
   );
 
-  // 编码列表(createcode)中已保存的完整编码也要一并避免撞号：
-  // 生成的编码绝不与"已保存的存量编码"重复
+  // 编码列表(createcode)中已保存的完整编码同样视为存量，一并参与撞号判定
   const schema = getSchema();
-  const savedCodeRows = await query<{ code: string }>(
-    `SELECT code FROM ${schema}.cec_new_energy_createcode WHERE if_delete = '0'`
+  const savedCodeRows = await query<{ code: string; name: string | null }>(
+    `SELECT code, name FROM ${schema}.cec_new_energy_createcode WHERE if_delete = '0'`
   );
+  const savedCodes = savedCodeRows.map(r => ({ code: r.code, name: r.name || '' }));
 
-  // 第四轮：生成编码；同一组合在本批次内已生成的编码也参与冲突检测，避免撞码
-  const comboRunCodes = new Map<string, string[]>();
+  // 本批次内已出现过的编码 → 归属行号（界面「序号」列 = origIdx + 1）。
+  // 去掉顺延后编码完全由输入决定，同组合的重复行必然算出同一个码，必须拦住。
+  const batchCodeOwner = new Map<string, number>();
 
+  // 第四轮：生成编码。扩展码不再顺延；撞号时照常产出编码，但整体判为失败
   for (let j = 0; j < genRows.length; j++) {
     const gr = genRows[j];
+    const rowNo = gr.origIdx + 1;
     try {
+      // 项目期号以文件为准：缺失或非 3 位数字则该行不编码
+      if (!/^\d{3}$/.test(gr.rowConfig.projectLineCode)) {
+        resultByIndex[gr.origIdx] = {
+          rowIndex: gr.origIdx,
+          name: gr.name,
+          matched: gr.matched,
+          allMatched: false,
+          error: `项目期号缺失或格式不对：${gr.rowConfig.projectLineCode || '（空）'}`,
+        };
+        continue;
+      }
       const existingCodes = existingCodesMap.get(j) || [];
-      const comboKey = comboKeyOf(gr.matched, gr.rowConfig);
-      const runCodes = comboRunCodes.get(comboKey) || [];
-      const { code, name } = await generateCodeFromMatch(
+      const { code, name, stockConflict } = await generateCodeFromMatch(
         gr.name,
         gr.matched,
         gr.rowConfig,
-        existingCodes.concat(savedCodeRows).concat(runCodes.map(c => ({ code: c }))),
+        existingCodes.concat(savedCodes),
       );
-      runCodes.push(code);
-      comboRunCodes.set(comboKey, runCodes);
+
+      // 冲突判定优先级：存量（测点 / 已保存）> 本批次内前面的行
+      let error: string | undefined;
+      if (stockConflict) {
+        error = `编码与存量重复：${stockConflict.code}（描述：${stockConflict.name || '无'}）`;
+      } else {
+        const owner = batchCodeOwner.get(code);
+        if (owner !== undefined) {
+          error = `编码与本次导入第 ${owner} 行重复：${code}`;
+        }
+      }
+      // 所有生成的码都登记占位（含失败行），后续行撞上时才能指回第一处
+      if (!batchCodeOwner.has(code)) batchCodeOwner.set(code, rowNo);
+
       resultByIndex[gr.origIdx] = {
         rowIndex: gr.origIdx,
         name,
         matched: gr.matched,
-        allMatched: true,
+        allMatched: !error,
         generatedCode: { code, name, generateTime: new Date().toISOString() },
+        ...(error ? { error } : {}),
       };
     } catch (err: any) {
       resultByIndex[gr.origIdx] = {

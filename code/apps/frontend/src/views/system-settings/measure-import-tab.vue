@@ -63,6 +63,21 @@
         <div class="card-desc">按模板格式填写测点数据后导入</div>
         <div class="card-tip">.xlsx 格式，含标准列头</div>
       </div>
+      <div class="step-card clear-card" @click="clearData">
+        <div class="card-bg-glow"></div>
+        <div class="card-icon-wrap clear-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <line x1="10" y1="11" x2="10" y2="17"/>
+            <line x1="14" y1="11" x2="14" y2="17"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </div>
+        <div class="card-title clear-title">清空数据</div>
+        <div class="card-desc">删除当前租户下的全部测点数据</div>
+        <div class="card-tip">此操作不可恢复</div>
+      </div>
     </div>
 
     <!-- 导入统计 -->
@@ -344,9 +359,47 @@ async function pollStatus() {
   }
 }
 
+/** 清空全部测点：先取真实条数写进弹窗，再要求手输确认文字（百万级不可逆删除） */
 async function clearData() {
+  if (importing.value) {
+    ElMessage.warning('正在导入中，请先终止导入再清空');
+    return;
+  }
+
+  // 取当前租户下的真实测点数，让用户确认前就知道要删多少
+  let count: number | null = null;
   try {
-    await ElMessageBox.confirm('确定清空所有导入的测点数据？此操作不可恢复。', '确认', { type: 'warning' });
+    count = (await statsService.getMeasureOverview()).totalPoints;
+  } catch {
+    /* 取不到条数时降级为不显示具体数字，不阻断清空 */
+  }
+
+  if (count === 0) {
+    ElMessage.info('当前没有测点数据');
+    return;
+  }
+
+  const countText = count === null ? '全部' : count.toLocaleString();
+  try {
+    await ElMessageBox.prompt(
+      `即将永久删除当前租户下的 ${countText} 条测点数据，此操作不可恢复。`,
+      '清空全部测点数据',
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        inputPlaceholder: '请输入「清空」',
+        inputValidator: (val: string) => val === '清空' || '请输入「清空」两个字以确认',
+        confirmButtonClass: 'el-button--danger',
+        // 弹窗渲染到 body，scoped 样式够不着，靠这个类名在文件末尾的全局样式块里定制
+        customClass: 'tech-confirm-box',
+      },
+    );
+  } catch {
+    return; // 用户取消
+  }
+
+  try {
     await statsService.clearMeasurementData();
     imported.value = false;
     selectedFileName.value = '';
@@ -354,7 +407,9 @@ async function clearData() {
     importStatus.value = { importing: false, batchId: null, totalRows: 0, importedRows: 0, validRows: 0, status: 'IDLE', message: '' };
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     ElMessage.success('已清空');
-  } catch {}
+  } catch {
+    ElMessage.error('清空失败，请重试');
+  }
 }
 
 function downloadTemplate() {
@@ -412,6 +467,9 @@ onMounted(async () => {
   background: #fafcff;
   min-height: 200px;
   display: flex;
+  /* 卡片内容是「图标 / 标题 / 描述 / 提示」的纵向堆叠。
+     缺失 column 时多子元素卡片（如下载模板、清空数据）会被横排挤压 */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -426,6 +484,20 @@ onMounted(async () => {
   background: #f5f3ff;
   box-shadow: 0 4px 20px rgba(139,92,246,0.10);
 }
+.step-card.clear-card:hover {
+  border-color: #ef4444;
+  background: #fef2f2;
+  box-shadow: 0 4px 20px rgba(239,68,68,0.12);
+}
+/* 这两张卡片的内容是卡片的直接子元素（没有 card-click-area 那层包裹），
+   所以内边距与间距直接给到卡片本身 */
+.step-card.template-card,
+.step-card.clear-card {
+  gap: 8px;
+  padding: 32px 24px;
+}
+.clear-icon { background: rgba(239,68,68,0.10); }
+.card-title.clear-title { color: #dc2626; }
 .card-bg-glow {
   position: absolute;
   inset: 0;
@@ -628,5 +700,143 @@ onMounted(async () => {
   margin-top: 16px;
   font-size: 14px;
   color: #909399;
+}
+</style>
+
+<style>
+/* ==================== 清空数据确认弹窗：科技现代风 ====================
+   弹窗由 ElMessageBox 渲染到 body 下，scoped 样式无法命中，
+   因此这里用非 scoped 块 + customClass('tech-confirm-box') 定向。
+   面板沿用项目既有的暗色科技语言（深蓝底 + 20px 毛玻璃 + 霓虹描边），
+   因为是不可逆的删除操作，强调色用红色而非惯用的蓝色。 */
+
+.tech-confirm-box {
+  background: rgba(20, 28, 52, 0.96) !important;
+  border: 1px solid rgba(239, 68, 68, 0.35) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 0 24px rgba(239, 68, 68, 0.18),
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(20px) !important;
+  overflow: hidden;
+  padding-bottom: 0 !important;
+}
+
+/* 顶部危险色扫光线 */
+.tech-confirm-box::before {
+  content: '';
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ef4444 50%, transparent);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+}
+
+/* ---------- 头部 ---------- */
+.tech-confirm-box .el-message-box__header {
+  padding: 18px 22px 6px;
+}
+.tech-confirm-box .el-message-box__title {
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+.tech-confirm-box .el-message-box-icon--warning {
+  color: #f87171 !important;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
+}
+.tech-confirm-box .el-message-box__headerbtn .el-message-box__close {
+  color: rgba(255, 255, 255, 0.5) !important;
+  transition: all 0.25s ease;
+}
+.tech-confirm-box .el-message-box__headerbtn:hover .el-message-box__close {
+  color: #ffffff !important;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9));
+}
+
+/* ---------- 正文 ---------- */
+.tech-confirm-box .el-message-box__content {
+  padding: 4px 22px 0;
+}
+.tech-confirm-box .el-message-box__message,
+.tech-confirm-box .el-message-box__message p,
+.tech-confirm-box .el-message-box__message span {
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+/* ---------- 输入框 ---------- */
+.tech-confirm-box .el-message-box__input {
+  padding-top: 14px;
+}
+.tech-confirm-box .el-input__wrapper {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(64, 158, 255, 0.28);
+  border-radius: 8px !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+  transition: all 0.25s ease;
+}
+.tech-confirm-box .el-input__wrapper:hover {
+  border-color: rgba(64, 158, 255, 0.5);
+  box-shadow:
+    0 0 10px rgba(64, 158, 255, 0.18),
+    inset 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+}
+.tech-confirm-box .el-input__wrapper.is-focus {
+  border-color: #409eff;
+  box-shadow:
+    0 0 0 2px rgba(64, 158, 255, 0.15),
+    0 0 14px rgba(64, 158, 255, 0.35),
+    inset 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+}
+.tech-confirm-box .el-input__inner {
+  color: #ffffff !important;
+  letter-spacing: 2px;
+}
+.tech-confirm-box .el-input__inner::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.5px;
+}
+.tech-confirm-box .el-message-box__errormsg {
+  color: #f87171 !important;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}
+
+/* ---------- 底部按钮 ---------- */
+.tech-confirm-box .el-message-box__btns {
+  padding: 18px 22px 20px;
+  gap: 10px;
+}
+.tech-confirm-box .el-message-box__btns .el-button {
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all 0.25s ease;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.8);
+}
+.tech-confirm-box .el-message-box__btns .el-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+/* 确认删除：红色危险（confirmButtonClass 给的是 danger，默认 primary 一并覆盖） */
+.tech-confirm-box .el-message-box__btns .el-button--danger,
+.tech-confirm-box .el-message-box__btns .el-button--primary {
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+  border: 1px solid rgba(239, 68, 68, 0.6) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+}
+.tech-confirm-box .el-message-box__btns .el-button--danger:hover,
+.tech-confirm-box .el-message-box__btns .el-button--primary:hover {
+  background: linear-gradient(135deg, #f87171, #dc2626) !important;
+  border-color: rgba(248, 113, 113, 0.8) !important;
+  box-shadow: 0 0 22px rgba(239, 68, 68, 0.55);
 }
 </style>

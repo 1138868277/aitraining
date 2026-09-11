@@ -138,13 +138,6 @@
             <div class="config-card-body">
               <div class="config-row">
                 <div class="config-item">
-                  <label>项目期号 &amp; 并网线路</label>
-                  <div class="cfg-input-box">
-                    <input v-model="codeConfig.projectLineCode" placeholder="111" maxlength="3" class="cfg-input" />
-                    <span class="cfg-hint">第 7-9 位</span>
-                  </div>
-                </div>
-                <div class="config-item">
                   <label>前缀号</label>
                   <div class="cfg-input-box">
                     <input v-model="codeConfig.prefixNo" placeholder="0" maxlength="1" class="cfg-input" />
@@ -194,12 +187,12 @@
           <table class="cyber-table result-table">
             <thead><tr><th>序号</th><th>测点编码</th><th>测点描述</th><th>状态</th><th>失败原因</th></tr></thead>
             <tbody>
-              <tr v-for="(row, ri) in resultRows" :key="ri" :class="{ 'row-fail': !row.allMatched }">
+              <tr v-for="(row, ri) in resultRows" :key="ri" :class="{ 'row-fail': !isRowSuccess(row), 'row-dup': !row.allMatched && !!row.generatedCode }">
                 <td class="row-num">{{ ri + 1 }}</td>
                 <td><span v-if="row.generatedCode" class="code-cell">{{ row.generatedCode.code }}</span><span v-else class="text-dim">—</span></td>
                 <td class="text-desc">{{ row.name }}</td>
-                <td><span class="status-tag" :class="row.allMatched ? 'ok' : 'no'">{{ row.allMatched ? '成功' : '失败' }}</span></td>
-                <td class="text-fail">{{ row.error || (row.allMatched ? '' : failedFields(row)) }}</td>
+                <td><span class="status-tag" :class="isRowSuccess(row) ? 'ok' : 'no'">{{ isRowSuccess(row) ? '成功' : '失败' }}</span></td>
+                <td class="text-fail">{{ row.error || (isRowSuccess(row) ? '' : failedFields(row)) }}</td>
               </tr>
             </tbody>
           </table>
@@ -382,7 +375,14 @@ async function startMatch() {
   }
 }
 
-const successCount = computed(() => resultRows.value.filter(r => r.allMatched && r.generatedCode).length);
+/** 行的最终判定口径：字段全部匹配 **且** 编码未撞号才算成功。
+ *  注意"编码重复"的行会带有 generatedCode 但 allMatched=false，
+ *  所以界面上任何地方都不能用 "有没有 generatedCode" 来判成功。 */
+function isRowSuccess(row: AutoCodeRowResult): boolean {
+  return row.allMatched && !!row.generatedCode;
+}
+
+const successCount = computed(() => resultRows.value.filter(isRowSuccess).length);
 const failCount = computed(() => resultRows.value.length - successCount.value);
 
 function failedFields(row: AutoCodeRowResult): string {
@@ -393,8 +393,14 @@ function failedFields(row: AutoCodeRowResult): string {
 }
 
 function sendToPreview() {
-  const codes = resultRows.value.filter(r => r.generatedCode).map(r => r.generatedCode!);
+  // 只送成功行：编码重复的行虽然也生成了码，但入库会造成重复编码
+  const codes = resultRows.value.filter(isRowSuccess).map(r => r.generatedCode!);
+  const dropped = resultRows.value.filter(r => !isRowSuccess(r) && r.generatedCode).length;
   emit('success', codes);
+  if (dropped > 0) {
+    // resetAll() 会清空结果表，提醒用户失败行需先导出留档
+    ElMessage.warning(`有 ${dropped} 条编码重复未发送到预览，如需留档请先「导出匹配结果」`);
+  }
   resetAll();
 }
 
@@ -404,12 +410,12 @@ function exportResult() {
     '序号': i + 1,
     '测点编码': r.generatedCode?.code || '',
     '测点描述': r.name,
-    '状态': r.generatedCode ? '成功' : '失败',
-    '失败原因': r.error || (r.allMatched ? '' : failedFields(r)),
+    '状态': isRowSuccess(r) ? '成功' : '失败',
+    '失败原因': r.error || (isRowSuccess(r) ? '' : failedFields(r)),
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   ws['!cols'] = [
-    { wch: 6 }, { wch: 34 }, { wch: 36 }, { wch: 8 }, { wch: 40 },
+    { wch: 6 }, { wch: 34 }, { wch: 36 }, { wch: 8 }, { wch: 72 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '匹配结果');
@@ -958,6 +964,14 @@ function exportResult() {
   border: 1px solid #dbeafe;
 }
 .row-fail td { background: #fef2f2 !important; }
+/* 编码重复：生成了码但判失败。用琥珀色区别于「无码失败」的红行，
+   避免用户误以为红行都没有编码可看 */
+.row-dup td { background: #fffbeb !important; }
+.row-dup .status-tag.no {
+  color: #b45309;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
 .step-footer {
   display: flex;
   justify-content: space-between;
